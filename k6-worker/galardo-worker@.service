@@ -1,0 +1,30 @@
+# systemd template — worker daemon sebagai service (Server B)
+# Install:
+#   cp galardo-worker@.service /etc/systemd/system/
+#   systemctl daemon-reload
+#   systemctl enable --now galardo-worker@w11-jkt-1.service   (1 unit = 1 worker)
+#   systemctl enable --now galardo-worker@w12-jkt-1.service   (dst: 2-4 unit paralel)
+#
+# Unit templated: %i = worker id. Setiap instance punya pid/restart/log sendiri.
+
+[Unit]
+Description=GALARDO worker daemon (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=galardo
+WorkingDirectory=/opt/galardo/backend
+Environment=GALARDO_K6_BIN=/usr/local/bin/k6
+# Ganti ORCH_HOST dengan address Server A:
+ExecStart=/usr/bin/python3 /opt/galardo/backend/worker_daemon.py \
+  --api http://ORCH_HOST:8090 --name %i
+Restart=always
+RestartSec=5
+# Fail-closed tuning (lihat SERVER-SPEC.md §4):
+LimitNOFILE=655350
+LimitNPROC=65535
+
+[Install]
+WantedBy=multi-user.target

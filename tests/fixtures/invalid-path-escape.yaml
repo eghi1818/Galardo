@@ -1,0 +1,14 @@
+#_fixture: INVALID - path outside allowlist (expect 422 path_not_allowed)
+schema_version: "1.0"
+name: "path-escape"
+target_ref: "galardo-lab-target"
+profile:
+  duration_seconds: 10
+  virtual_users: 1
+  max_rps: 2
+requests:
+  - name: "admin"
+    method: "GET"
+    path: "/admin/secret"
+    weight: 100
+    timeout_ms: 1000

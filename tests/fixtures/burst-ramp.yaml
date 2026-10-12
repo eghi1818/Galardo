@@ -1,0 +1,29 @@
+schema_version: "1.0"
+name: "burst-ramp"
+target_ref: "galardo-lab-target"
+description: "Ramped stress: 2 -> 10 -> 20 VUs against lab endpoints"
+profile:
+  duration_seconds: 45
+  virtual_users: 20
+  max_rps: 50
+  ramp:
+    - after_seconds: 0
+      virtual_users: 2
+    - after_seconds: 10
+      virtual_users: 10
+    - after_seconds: 25
+      virtual_users: 20
+requests:
+  - name: "health"
+    method: "GET"
+    path: "/healthz"
+    weight: 60
+    timeout_ms: 2000
+  - name: "root"
+    method: "GET"
+    path: "/"
+    weight: 40
+    timeout_ms: 2000
+think_time_ms:
+  min: 50
+  max: 150

@@ -1,0 +1,22 @@
+schema_version: "1.0"
+name: "health-smoke"
+target_ref: "galardo-lab-target"
+description: "Low volume smoke test (Blueprint §4.3)"
+profile:
+  duration_seconds: 20
+  virtual_users: 2
+  max_rps: 4
+  ramp:
+    - after_seconds: 0
+      virtual_users: 1
+    - after_seconds: 5
+      virtual_users: 2
+requests:
+  - name: "health"
+    method: "GET"
+    path: "/healthz"
+    weight: 100
+    timeout_ms: 1500
+think_time_ms:
+  min: 100
+  max: 250

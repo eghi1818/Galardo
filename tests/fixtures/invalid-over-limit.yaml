@@ -1,0 +1,14 @@
+#_fixture: INVALID - exceeds every global cap (expect 422 over_limit)
+schema_version: "1.0"
+name: "over-limit"
+target_ref: "galardo-lab-target"
+profile:
+  duration_seconds: 99999
+  virtual_users: 5000
+  max_rps: 99999
+requests:
+  - name: "health"
+    method: "GET"
+    path: "/healthz"
+    weight: 100
+    timeout_ms: 1000

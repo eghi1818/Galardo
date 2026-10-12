@@ -1,0 +1,14 @@
+#_fixture: INVALID - absolute URL to another host (expect 422 absolute_url; no network call)
+schema_version: "1.0"
+name: "external-host"
+target_ref: "galardo-lab-target"
+profile:
+  duration_seconds: 10
+  virtual_users: 1
+  max_rps: 2
+requests:
+  - name: "redirect"
+    method: "GET"
+    path: "http://evil.example.com/steal"
+    weight: 100
+    timeout_ms: 1000

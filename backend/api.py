@@ -8,6 +8,7 @@ import json
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse, parse_qs
 
 import db
@@ -217,7 +218,8 @@ class Handler(BaseHTTPRequestHandler):
         # health/readiness (internal)
         if api_path == "/health" and method == "GET":
             return self._json(200, {"status": "ok", "service": "galardo-api", "version": "1.0",
-                                    "time": now_iso()})
+                                    "time": now_iso(),
+                                    "local_dev_override": os.environ.get("GALARDO_LOCAL_DEV") == "1"})
 
         user = self._auth()
         if user is None:
@@ -295,6 +297,12 @@ class Handler(BaseHTTPRequestHandler):
             # ---- targets ----
             if api_path == "/targets" and method == "GET":
                 return self._json(200, db.list("targets"))
+            # LOCAL DEV OVERRIDE: saat env GALARDO_LOCAL_DEV=1, target baru langsung
+            # VERIFIED (operator attestation ter-audit) tanpa verifikasi DNS/file.
+            # Safety pipeline (policy, preflight, probe, abort) TETAP aktif penuh.
+            # Default: OFF. Hanya relevan di local development (deployment produksi
+            # wajib env ini tidak diset / server fisik).
+            LOCAL_DEV = os.environ.get("GALARDO_LOCAL_DEV") == "1"
             if api_path == "/targets" and method == "POST":
                 b = self._body()
                 eng = db.get("engagements", b.get("engagement_id", ""))
@@ -304,6 +312,13 @@ class Handler(BaseHTTPRequestHandler):
                 if not origin.startswith(("http://", "https://")):
                     return self._json(422, {"error": {"field": "canonical_origin",
                                                       "message": "must be http(s) origin"}})
+                if LOCAL_DEV:
+                    status = "VERIFIED"
+                    valid_until = b.get("valid_until") or (datetime.now(timezone.utc)
+                                    + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+                else:
+                    status = "UNVERIFIED"
+                    valid_until = b.get("valid_until")
                 tgt = {"id": gen_id("tgt"), "org_id": "org-lab", "engagement_id": eng["id"],
                        "name": b.get("name", origin), "environment": b.get("environment", "LAB"),
                        "canonical_origin": origin,
@@ -313,9 +328,16 @@ class Handler(BaseHTTPRequestHandler):
                            "url": origin + "/healthz", "expected_status": 200,
                            "interval_sec": 2, "timeout_sec": 1, "failure_threshold": 3},
                        "valid_from": b.get("valid_from") or now_iso(),
-                       "valid_until": b.get("valid_until"),
-                       "status": "UNVERIFIED", "created_at": now_iso()}
-                db.insert("targets", tgt, actor=user, action="target.created", resource_type="target")
+                       "valid_until": valid_until,
+                       "ownership": ("operator_attestation_local_dev" if LOCAL_DEV else "pending_verification"),
+                       "status": status, "created_at": now_iso()}
+                db.insert("targets", tgt, actor=user, action="target.created", resource_type="target",
+                          reason=("LOCAL DEV OVERRIDE: operator attestation - auto-VERIFIED, "
+                                  "window 1 day, no DNS/file verification" if LOCAL_DEV else ""))
+                if LOCAL_DEV:
+                    db.audit_event(user, "target.local_dev_auto_verified", "target", tgt["id"],
+                                   reason=f"GALARDO_LOCAL_DEV=1; origin={origin}; "
+                                          f"attestation by {user}; window 24h")
                 return self._json(201, tgt)
             m = _match(api_path, "/targets/*/probe-contract")
             if m and method == "POST":

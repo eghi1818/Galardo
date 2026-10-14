@@ -128,3 +128,19 @@ make test    # 38 checks: validasi scenario, idempotency, preflight,
 4. **AI advisory** — HAR import + redaction, scenario draft, analisis pasca-run; semua output
    draft + review manusia (GOV §1–3), tanpa kredensial dispatch.
 5. **External authorized testing** — egress allowlist, runbook, on-call, safety review (TD §17).
+
+## Download & Instalasi
+
+```bash
+# Clone (butuh akses SSH akun eghi1818):
+git clone git@github.com:eghi1818/Galardo.git
+cd Galardo
+
+# Jalankan lab (API + dashboard :8090, lab target :8095):
+make dev-up
+# Dashboard: http://127.0.0.1:8090
+```
+
+Alternatif: tombol `<> Code` → `Download ZIP` di halaman repo.
+Folder `data/` (state & evidence runtime) tidak ikut ter-download by design —
+lihat `.gitignore`. Konfigurasi contoh: `.env.example`.

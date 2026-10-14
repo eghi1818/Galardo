@@ -353,6 +353,48 @@ class Handler(BaseHTTPRequestHandler):
                           actor=user, action="target.probe_contract_updated", resource_type="target",
                           reason=json.dumps(patch))
                 return self._json(200, db.get("targets", m[0]))
+            m = _match(api_path, "/targets/*/verify/dns")
+            if m and method == "POST":
+                tgt = db.get("targets", m[0])
+                if not tgt:
+                    return self._json(404, {"error": "not found"})
+                host = _host_of(tgt.get("canonical_origin") or "")
+                if not host:
+                    return self._json(422, {"error": {"field": "canonical_origin",
+                                                      "message": "cannot parse host"}})
+                # Challenge: deterministic per-target token, rotateable by operator.
+                expected = tgt.get("dns_challenge") or sha256_text("galardo-dns:" + tgt["id"])[:40]
+                if not tgt.get("dns_challenge"):
+                    db.update("targets", m[0], lambda t: t.update({"dns_challenge": expected}),
+                              actor=user, action="target.dns_challenge_issued", resource_type="target",
+                              reason="auto-issued deterministic challenge")
+                record_name = f"_galardo.{host}"
+                found, values, err = _dns_txt_lookup(record_name)
+                matched = any(v.strip() == expected for v in values)
+                now = now_iso()
+                if matched:
+                    window = (datetime.now(timezone.utc) + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
+                    db.update("targets", m[0], lambda t: t.update({
+                        "status": "VERIFIED",
+                        "ownership": "dns_txt_challenge",
+                        "valid_from": now, "valid_until": window,
+                        "dns_verification": {"record": record_name, "verified_at": now,
+                                             "values_seen": values[:5]}}),
+                        actor=user, action="target.verified_dns", resource_type="target",
+                        reason=f"TXT {record_name} matched challenge")
+                else:
+                    db.update("targets", m[0], lambda t: t.update({
+                        "dns_verification": {"record": record_name, "checked_at": now,
+                                             "values_seen": values[:5], "error": err,
+                                             "matched": False}}),
+                        actor=user, action="target.dns_check_failed", resource_type="target",
+                        reason=f"TXT {record_name} no match")
+                return self._json(matched and 200 or 422, {
+                    "target_id": m[0], "record": record_name,
+                    "expected_value": expected,
+                    "matched": matched, "values_seen": values[:5],
+                    "error": err,
+                    "status": (db.get("targets", m[0]) or {}).get("status")})
             m = _match(api_path, "/targets/*/verify")
             if m and method == "POST":
                 tgt = db.get("targets", m[0])
@@ -773,6 +815,86 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             db.audit_event("api", "api.error", "route", path, reason=str(e)[:200])
             return self._json(500, {"error": "internal error", "detail": str(e)[:200]})
+
+
+def _dns_txt_lookup(record_name):
+    """Query TXT records for record_name using stdlib DNS over UDP (zero-dependency).
+    Returns (found_bool, values_list, error_or_None). Minimal DNS packet builder/parser
+    limited to TXT (type 16) queries — no subprocess, no external deps.
+    """
+    import socket, struct, random
+    try:
+        parts = record_name.rstrip(".").split(".")
+        qname = b"".join(bytes([len(p)]) + p.encode("idna") if not p.isascii() else bytes([len(p)]) + p.encode() for p in parts) + b"\x00"
+        txid = random.randint(0, 65535)
+        header = struct.pack(">HHHHHH", txid, 0x0100, 1, 0, 0, 0)
+        question = qname + struct.pack(">HH", 16, 1)  # TXT, IN
+        packet = header + question
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(4.0)
+        try:
+            resolver = socket.gethostbyname("resolver1.opendns.com") if False else None
+            servers = []
+            try:
+                import subprocess as _sp
+                sc = _sp.run(["scutil", "--dns"], capture_output=True, text=True, timeout=3)
+                for line in sc.stdout.splitlines():
+                    line = line.strip()
+                    if line.startswith("nameserver[") and "]" in line:
+                        ip = line.split("]", 1)[1].strip().split("#")[0]
+                        if ip and ":" not in ip:
+                            servers.append(ip)
+            except Exception:
+                pass
+            servers = servers or ["1.1.1.1", "8.8.8.8"]
+            last_err = None
+            for srv in servers[:3]:
+                try:
+                    s.sendto(packet, (srv, 53))
+                    data, _ = s.recvfrom(4096)
+                    break
+                except Exception as e:
+                    last_err = str(e)
+                    data = None
+            if data is None:
+                return False, [], last_err or "no resolver responded"
+        finally:
+            s.close()
+        # parse response
+        rid, flags, qd, an, ns, ar = struct.unpack(">HHHHHH", data[:12])
+        if rid != txid:
+            return False, [], "transaction id mismatch"
+        if (flags & 0x000F) != 0:
+            return False, [], f"DNS rcode={(flags & 0x000F)}"
+        idx = 12
+        # skip questions
+        for _ in range(qd):
+            while data[idx] != 0:
+                idx += data[idx] + 1
+            idx += 5
+        values = []
+        for _ in range(an):
+            # name (possibly compressed)
+            if data[idx] & 0xC0 == 0xC0:
+                idx += 2
+            else:
+                while data[idx] != 0:
+                    idx += data[idx] + 1
+                idx += 1
+            rtype, rclass, ttl, rdlen = struct.unpack(">HHIH", data[idx:idx + 10])
+            idx += 10
+            rd = data[idx:idx + rdlen]
+            idx += rdlen
+            if rtype == 16:
+                pos, chunks = 0, []
+                while pos < len(rd):
+                    ln = rd[pos]
+                    chunks.append(rd[pos + 1:pos + 1 + ln].decode("utf-8", "replace"))
+                    pos += 1 + ln
+                values.append("".join(chunks))
+        return (len(values) > 0), values, None
+    except Exception as e:
+        return False, [], str(e)
 
 
 def _match(path, pattern):

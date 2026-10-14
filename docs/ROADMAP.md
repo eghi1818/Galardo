@@ -52,3 +52,26 @@ diidentifikasi** dengan fondasi kodenya siap — bukan bug.
 1. **Run 2b produksi wecash.ai** (ramp setara Run 1) — validasi efek tuning origin secara adil. Menunggu konfirmasi jendela uji.
 2. **Collapse test lab >2.000 rps** (policy v6) — mencari titik patah sesungguhnya (ulimit FD/thread-pool).
 3. **Keep-alive comparison run waspadaweb** — memisahkan kegagalan koneksi-baru vs kapasitas respons.
+
+---
+
+## SECURITY POLICY REFERENCE — Daftar Penolakan Permanen (14 poin)
+
+Ref: List Kendalan & Penolakan Galardo (2026-10-14). Poin 1–7 terdokumentasi di
+SESSION-HISTORY-COMPLETE.md. Poin 8–14 adalah **batasan permanen tambahan** yang
+berlaku sama kuatnya dengan §4 PRD Addendum — tidak bisa diubah via scenario/AI:
+
+| # | Kategori ditolak | Koridor yang benar |
+|---|---|---|
+| 8 | SQL injection / DB corruption otomatis saat load test | Audit DB via koneksi internal & staging; load test tetap bersih |
+| 9 | Botnet IoT / perangkat terkompromi | Fleet worker resmi milik sendiri |
+| 10 | DNS hijacking / cache poisoning | DNS staging internal, bukan DNS publik |
+| 11 | Memory leak / XXE / Zip-bomb forced crash | Collapse test via beban kapasitas natural, bukan exploit |
+| 12 | Credential stuffing / session hijacking | Security testing terpisah di staging, dengan izin eksplisit — bukan bagian Galardo |
+| 13 | DDoS reflection/amplification (NTP/DNS/SSDP) | Tidak ada padanan — dilarang mutlak |
+| 14 | Self-replicating test worm | Sharding terkontrol orchestrator (Tier 2 roadmap) |
+
+Prinsip pembeda yang berlaku untuk SEMUA permintaan masa depan:
+**load/stress testing mengukur performa di bawah beban sah; intrusi, exploit, dan
+sabotase infrastruktur bukan bagian dari mandat Galardo** — jalurnya alat security
+testing terpisah di staging dengan otorisasi eksplisit.

@@ -89,6 +89,20 @@ class ObserverReport(object):
             else:
                 self.nodes[node] = {"ok": False, "error": str(entry)}
 
+        # Never report "0 of 0". If the observer accepted N nodes but none have
+        # answered yet, say so explicitly: 0 answered out of N requested.
+        if not self.nodes:
+            for node in (check.nodes or []):
+                self.nodes[node] = {"ok": None, "pending": True}
+
+    @property
+    def requested_nodes(self):
+        return len(self.check.nodes or [])
+
+    @property
+    def pending_nodes(self):
+        return len([n for n in self.nodes.values() if n.get("ok") is None])
+
     @property
     def nodes_total(self):
         return len(self.nodes)
@@ -123,6 +137,9 @@ class ObserverReport(object):
         return {"verdict": self.verdict, "ok_ratio": round(self.ok_ratio, 3),
                 "nodes_total": self.nodes_total, "nodes_answered": self.nodes_answered,
                 "nodes_failed": self.nodes_failed,
+                "nodes_requested": self.requested_nodes,
+                "nodes_pending": self.pending_nodes,
+                "raw_keys": self.raw.get("raw_keys"),
                 "permanent_link": self.check.permanent_link,
                 "kind": self.check.kind, "target": self.check.target,
                 "nodes": self.nodes, "observed_at": now_iso(),
@@ -235,7 +252,24 @@ class ObserverClient(object):
             target, " | ".join(problems)))
 
     def result(self, request_id):
-        return self._get("/check-result/" + request_id)
+        """Fetch one result document, tolerating nesting differences.
+
+        Deployments have shipped the payload under different keys. If "nodes"
+        is absent, adopt the first dict-of-anything that looks like a node map
+        so a shape change does not silently produce an empty report.
+        """
+        doc = self._get("/check-result/" + request_id)
+        if not isinstance(doc, dict):
+            return {"nodes": {}}
+        if "nodes" not in doc:
+            for key in ("result", "data", "results", "checks"):
+                value = doc.get(key)
+                if isinstance(value, dict) and value:
+                    doc["nodes"] = value
+                    break
+        doc.setdefault("nodes", {})
+        doc["raw_keys"] = sorted(doc.keys())
+        return doc
 
     def poll(self, check, timeout=30.0, interval=2.0):
         deadline = time.time() + timeout

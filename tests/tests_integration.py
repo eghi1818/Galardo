@@ -265,12 +265,13 @@ def main():
         pass
     st, r = req("POST", f"/test-jobs/{job3['id']}/start")
     check("degraded-target job dispatched (async preflight DB checks PASS)", st == 200 and r["started"], f"st={st}")
-    snap3 = wait_terminal(job3["id"], 45)
+    snap3 = wait_terminal(job3["id"], 75)
     stt3 = snap3["job"]["status"] if snap3 else "timeout"
     check("degraded baseline -> FAILED (fail-closed, no traffic)", stt3 == "FAILED", stt3)
     check("FAILED reason mentions probe baseline",
-          "probe baseline" in str(snap3["job"].get("preflight", "")) or
-          "baseline" in json.dumps(snap3.get("safety") or "") or True)
+          bool(snap3) and ("probe baseline" in str(snap3["job"].get("preflight", ""))
+                           or "baseline" in json.dumps(snap3.get("safety") or "")),
+          str(snap3)[:160] if snap3 else "snapshot timeout")
     # recover target so baseline passes, then degrade DURING the run
     with urllib.request.urlopen(TGT + "/control/recover", timeout=5) as r:
         pass

@@ -135,6 +135,7 @@ class WorkerDaemon:
             [self.k6_bin, "run", "--quiet", script],
             env=envd, cwd=workdir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             start_new_session=True, text=True)
+        self.last_control_ok = time.time()   # D6: lease starts fresh at job start
         output_tail = []
         deadline_poll = time.time()
         abort_reason = None

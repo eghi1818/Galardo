@@ -2,8 +2,8 @@
 # Python stdlib implementation; no external services required.
 
 PY      ?= python3
-API_PORT ?= 8080
-TARGET_ORIGIN ?= http://127.0.0.1:8088
+API_PORT ?= 8090
+TARGET_ORIGIN ?= http://127.0.0.1:8095
 BACKEND := backend
 TESTPORT ?= 18088
 
@@ -56,3 +56,7 @@ clean:
 	@echo "local state removed"
 
 run-local: dev-up
+
+# --- GALARDO demo (Goal 2 + Goal 3 end-to-end) ---
+demo:
+	python3 tools/galardo_demo.py

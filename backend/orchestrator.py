@@ -97,10 +97,14 @@ def _set_state(job_id, new_state, actor="orchestrator", action=None, reason="", 
                    f"state: {old_state} -> {new_state}" + (f" ({reason})" if reason else ""),
                    correlation_id=correlation_id)
     # external webhook hooks (fire-and-forget, never blocks the state machine)
-    if webhooks and new_state in ("COMPLETED", "ABORTED", "FAILED", "RECOVERY_FAILED"):
+    if webhooks and new_state in ("COMPLETED", "ABORTED", "FAILED", "RECOVERY_FAILED",
+                                  "RECOVERY_WAIT"):
         j = db.get("test_jobs", job_id) or {}
+        _evt = {"COMPLETED": "job.completed", "ABORTED": "job.aborted",
+                "FAILED": "job.failed", "RECOVERY_FAILED": "job.failed",
+                "RECOVERY_WAIT": "job.recovery"}.get(new_state, "job.failed")   # D8
         webhooks.fire(
-            "job.completed" if new_state == "COMPLETED" else "job.aborted" if new_state == "ABORTED" else "job.failed",
+            _evt,
             {"job_id": job_id, "status": new_state, "plan": j.get("test_plan_id"),
              "abort_code": j.get("abort_code"), "abort_reason": j.get("abort_reason"),
              "started_at": j.get("started_at"), "ended_at": j.get("ended_at"),
@@ -517,6 +521,9 @@ def _execute(job_id):
                     ctx.engine.stop.set()
             db.observation(job_id, "safety", "CRIT", f"safety abort dispatched [{reason_code}] {detail}",
                            correlation_id=correlation_id)
+            if webhooks:
+                webhooks.fire("safety.abort", {"job_id": job_id, "reason_code": reason_code,
+                                               "detail": detail, "correlation_id": correlation_id})
             _set_state(job_id, "ABORT_REQUESTED", actor="safety-controller",
                        reason=f"[{reason_code}] {detail}", correlation_id=correlation_id)
             # persist abort reason onto the job immediately so finalization

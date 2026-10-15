@@ -167,9 +167,17 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
     def _auth(self):
-        tok = self.headers.get("Authorization", "")
-        if tok == f"Bearer {DEV_TOKEN}" or tok == "":
-            return "usr-operator"  # MVP lab: seeded dev user; production uses SSO/MFA (BLOCKER per Prolog §6)
+        # D14: header ABSENT (lab anonymous) vs header PRESENT but EMPTY (reject).
+        raw = self.headers.get("Authorization")
+        if raw is None:
+            if os.environ.get("GALARDO_REQUIRE_AUTH"):
+                return None
+            return "usr-operator"  # MVP lab: seeded dev user; production uses SSO/MFA
+        tok = raw.strip()
+        if not tok:
+            return None            # D14: empty header must NOT authenticate
+        if tok == f"Bearer {DEV_TOKEN}" or tok == DEV_TOKEN:
+            return "usr-operator"
         return None
 
     def _body(self):
@@ -185,9 +193,13 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---- static --------------------------------------------------------
     def _static(self, path):
-        if path == "/":
-            path = "/index.html"
-        fp = os.path.normpath(os.path.join(DASH_DIR, path.lstrip("/")))
+        # D11: normalise separators, drop query/fragment, block traversal.
+        path = path.split("?")[0].split("#")[0].replace("\\", "/")
+        parts = [seg for seg in path.split("/") if seg not in ("", ".")]
+        root = os.path.normpath(DASH_DIR)
+        fp = os.path.normpath(os.path.join(root, *parts)) if parts else os.path.join(root, "index.html")
+        if fp != root and not fp.startswith(root + os.sep):
+            fp = os.path.join(root, "index.html")
         if not fp.startswith(DASH_DIR) or not os.path.isfile(fp):
             self._json(404, {"error": "not found"})
             return
@@ -1061,7 +1073,8 @@ def _count_by_status(jobs):
     return out
 
 
-def serve(host="127.0.0.1", port=8080):
+def serve(host="127.0.0.1", port=None):
+    port = int(port or os.environ.get("GALARDO_API_PORT", "8090"))  # D12
     seed_lab()
     import fleet
     fleet.register_all()
@@ -1075,6 +1088,6 @@ if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, default=8080)
+    ap.add_argument("--port", type=int, default=int(os.environ.get("GALARDO_API_PORT", "8090")))
     args = ap.parse_args()
     serve(args.host, args.port)

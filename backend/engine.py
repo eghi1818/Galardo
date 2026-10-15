@@ -115,7 +115,7 @@ class TelemetryRing:
     def window(self, last_seconds):
         """Aggregate over the trailing window -> dict."""
         now = time.time()
-        lo = int(now - last_seconds)
+        lo = now - float(last_seconds)   # D15: no 1s truncation drift
         agg = {"requests": 0, "ok": 0, "err_4xx": 0, "err_5xx": 0, "timeouts": 0,
                "conn_errors": 0, "bytes_sent": 0, "bytes_recv": 0,
                "assert_hard": 0, "assert_soft": 0,

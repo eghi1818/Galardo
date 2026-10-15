@@ -24,7 +24,7 @@ from urllib.parse import urljoin, urlsplit
 __all__ = [
     "TransportError", "Response", "ConnectionPool", "Transport",
     "ConnectToIPHTTPConnection", "ConnectToIPHTTPSConnection",
-    "encode_body", "decode_body", "DEFAULT_USER_AGENT",
+    "encode_body", "decode_body", "estimate_request_bytes", "DEFAULT_USER_AGENT",
 ]
 
 DEFAULT_USER_AGENT = "Galardo/1.0"
@@ -171,6 +171,24 @@ def decode_body(payload, encoding="identity"):
         return gzip.decompress(base64.b64decode(raw))
     raise TransportError("unsupported body_encoding: %r" % (encoding,))
 
+def estimate_request_bytes(method, path, headers, payload_len):
+    """Approximate on-the-wire request size (defect D16).
+
+    Counts the request line, every header we control, and the two headers
+    http.client injects when absent (Host, Accept-Encoding). Labelled an
+    estimate because http.client may reformat header casing.
+    """
+    lowered = set(str(k).lower() for k in headers)
+    head = "%s %s HTTP/1.1\r\n" % (method, path)
+    if "host" not in lowered:
+        head += "Host: <injected>\r\n"
+    if "accept-encoding" not in lowered:
+        head += "Accept-Encoding: identity\r\n"
+    for key, value in headers.items():
+        head += "%s: %s\r\n" % (key, value)
+    head += "\r\n"
+    return len(head.encode("utf-8", "replace")) + payload_len
+
 class ConnectionPool(object):
     """Keyed idle-connection cache. Thread safe."""
 
@@ -188,6 +206,8 @@ class ConnectionPool(object):
                 (proxy[0], int(proxy[1])) if proxy else None)
 
     def acquire(self, scheme, host, port, connect_ip, proxy, timeout):
+        """Returns ``(connection, reused)`` so the caller can retry once when a
+        pooled socket turns out to have been closed by the peer."""
         cache_key = self.key(scheme, host, port, connect_ip, proxy)
         now = time.monotonic()
         with self._lock:
@@ -195,12 +215,12 @@ class ConnectionPool(object):
             while bucket:
                 connection, stamp = bucket.pop()
                 if now - stamp <= self.idle_timeout and connection.sock is not None:
-                    return connection
+                    return connection, True
                 try:
                     connection.close()
                 except Exception:
                     pass
-        return self._new(scheme, host, port, connect_ip, proxy, timeout)
+        return self._new(scheme, host, port, connect_ip, proxy, timeout), False
 
     def release(self, cache_key, connection):
         with self._lock:
@@ -340,53 +360,61 @@ class Transport(object):
 
         effective_proxy = proxy if proxy is not None else self.proxy
         cache_key = ConnectionPool.key(scheme, host, port, connect_ip, effective_proxy)
-        response = Response(method=method, url=url, connect_ip=connect_ip)
+        sent_bytes = estimate_request_bytes(method, path, headers, len(payload or b""))
 
-        connection = None
-        reusable = False
-        started = time.monotonic()
-        try:
-            connection = self._pool.acquire(
-                scheme, host, port, connect_ip, effective_proxy,
-                timeout or self.timeout)
-            response.bytes_sent = len(payload or b"")
-            connection.request(method, path, body=payload, headers=headers)
-            raw = connection.getresponse()
-            data = raw.read(self.max_body_bytes + 1)
-            if len(data) > self.max_body_bytes:
-                data = data[:self.max_body_bytes]
-                reusable = False
-            else:
-                reusable = not raw.will_close
-            response.status = raw.status
-            response.reason = raw.reason
-            response.headers = dict(raw.getheaders())
-            response.http_version = raw.version
-            response.body = data
-            response.bytes_received = len(data)
-        except Exception as exc:
-            response.error = "%s: %s" % (type(exc).__name__, exc)
-            if connection is not None:
-                try:
-                    connection.close()
-                except Exception:
-                    pass
-                connection = None
-        finally:
-            response.elapsed_ms = (time.monotonic() - started) * 1000.0
-            if connection is not None:
-                if reusable:
-                    self._pool.release(cache_key, connection)
+        for attempt in (0, 1):
+            response = Response(method=method, url=url, connect_ip=connect_ip)
+            response.bytes_sent = sent_bytes
+            connection = None
+            reusable = False
+            reused = False
+            started = time.monotonic()
+            try:
+                connection, reused = self._pool.acquire(
+                    scheme, host, port, connect_ip, effective_proxy,
+                    timeout or self.timeout)
+                connection.request(method, path, body=payload, headers=headers)
+                raw = connection.getresponse()
+                data = raw.read(self.max_body_bytes + 1)
+                if len(data) > self.max_body_bytes:
+                    data = data[:self.max_body_bytes]
+                    reusable = False
                 else:
+                    reusable = not raw.will_close
+                response.status = raw.status
+                response.reason = raw.reason
+                response.headers = dict(raw.getheaders())
+                response.http_version = raw.version
+                response.body = data
+                response.bytes_received = len(data)
+            except Exception as exc:
+                response.error = "%s: %s" % (type(exc).__name__, exc)
+                if connection is not None:
                     try:
                         connection.close()
                     except Exception:
                         pass
+                    connection = None
+            finally:
+                response.elapsed_ms = (time.monotonic() - started) * 1000.0
+                if connection is not None:
+                    if reusable:
+                        self._pool.release(cache_key, connection)
+                    else:
+                        try:
+                            connection.close()
+                        except Exception:
+                            pass
 
-        with self._lock:
-            self._counters["requests"] += 1
-            self._counters["bytes_sent"] += response.bytes_sent or 0
-            self._counters["bytes_received"] += response.bytes_received or 0
-            if response.error:
-                self._counters["errors"] += 1
-        return response
+            # A pooled socket may have been closed by the peer after release.
+            # Exactly one transparent retry, on a fresh connection.
+            if response.error and reused and attempt == 0:
+                continue
+
+            with self._lock:
+                self._counters["requests"] += 1
+                self._counters["bytes_sent"] += response.bytes_sent or 0
+                self._counters["bytes_received"] += response.bytes_received or 0
+                if response.error:
+                    self._counters["errors"] += 1
+            return response

@@ -16,6 +16,7 @@ LOCK = threading.Lock()
 
 class TargetHandler(BaseHTTPRequestHandler):
     server_version = "GalardoLabTarget/1.0"
+    protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):
         pass
@@ -73,6 +74,36 @@ class TargetHandler(BaseHTTPRequestHandler):
             return self._json(200, {"path": path, "mode": mode, "ts": time.time()})
 
         return self._json(404, {"error": "not found", "hint": "see allowed_paths in target scope"})
+
+    def do_POST(self):
+        """Echo endpoint: proves a scenario body actually arrived, and in which
+        encoding. Lab-only convenience for active-mode verification."""
+        length = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(length) if length else b""
+        encoding = (self.headers.get("Content-Encoding") or "identity").lower()
+        decoded = raw
+        note = "as-is"
+        try:
+            if encoding == "gzip":
+                import gzip
+                decoded = gzip.decompress(raw)
+                note = "gunzipped"
+            elif encoding == "base64":
+                import base64
+                decoded = base64.b64decode(raw)
+                note = "base64-decoded"
+            elif encoding == "base64+gzip":
+                import base64
+                import gzip
+                decoded = gzip.decompress(base64.b64decode(raw))
+                note = "base64+gunzipped"
+        except Exception as exc:
+            return self._json(400, {"error": "decode failed", "detail": str(exc)[:120]})
+        return self._json(200, {
+            "path": self.path.split("?")[0], "method": "POST",
+            "content_encoding": encoding, "decoded_len": len(decoded),
+            "body": decoded.decode("utf-8", "replace")[:200], "note": note,
+        })
 
     def _control_recover(self):
         with LOCK:

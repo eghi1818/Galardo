@@ -100,11 +100,23 @@ def test_modes():
               trust.TrustPolicy(mode="ngawur", keyring=kr, peers=peers).mode == "warn")
 
         pol.mode = "enforce"
-        pol2 = trust.TrustPolicy(mode="enforce", keyring=kr, peers=peers)
-        unsigned_env = pol2.wrap({"no": "key"})
+
+        # STEP-01: node TANPA kunci sendiri (keyring kosong) -> wrap() tanpa tanda tangan.
+        # Sebelumnya dipakai `kr` yang PUNYA secret, jadi jalur "tanpa secret" tak pernah diuji.
+        bare_dir = os.path.join(d, "bare")
+        if not os.path.isdir(bare_dir):
+            os.makedirs(bare_dir, 0o700)
+        bare_kr = envelope.Keyring(os.path.join(bare_dir, "keys.json"))
+        bare = trust.TrustPolicy(mode="enforce", keyring=bare_kr, peers=peers)
+
+        unsigned_env = bare.wrap({"no": "key"})
         check("A wrap tanpa secret menghasilkan sig kosong", unsigned_env["sig"] == "", unsigned_env["sig"])
-        ok, reason, _ = pol2.unwrap(unsigned_env)
+        check("A envelope tanpa secret tetap punya nonce dan ts",
+              bool(unsigned_env["body"].get("nonce")) and bool(unsigned_env["body"].get("ts")),
+              unsigned_env["body"])
+        ok, reason, _ = pol.unwrap(unsigned_env)
         check("A enforce tolak envelope tanpa sig", (not ok) and reason == "unsigned", reason)
+        check("A unsigned terhitung di stats", pol.stats["unsigned"] >= 1, pol.stats)
     finally:
         shutil.rmtree(d, ignore_errors=True)
 

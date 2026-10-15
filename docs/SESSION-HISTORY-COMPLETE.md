@@ -372,3 +372,45 @@ test lab >2000 rps (policy v6) · keep-alive comparison waspadaweb.
    restore form sebagai lapis kedua.
 10. **Fail-closed harus diuji dengan sengaja** (fixture degradasi) — kalau tidak,
     false positive justru terlihat seperti "sistem bekerja".
+
+---
+
+# ADDENDUM — Sesi 2026-10-15 (W7): plafon kapasitas, GOAL 2 & GOAL 3
+
+## Ringkas
+
+Sesi ini menutup pertanyaan terbuka dari sesi sebelumnya: **kenapa uji collapse
+(300 VU, 3750 rps, 0 error) tidak pernah mencapai DOWN?**
+
+## Root cause
+
+`backend/lab_target.py` memakai `ThreadingHTTPServer`: satu thread per koneksi,
+**tanpa batas**, sementara `/api/heavy` hanya `time.sleep(0.15)` — **nol CPU**.
+Konsekuensinya: 300 VU menghasilkan 293 request serentak tetapi tidak ada yang
+mengantri, tidak ada rebutan CPU, dan probe out-of-band punya thread sendiri yang
+selalu dilayani <1 ms. Generator bekerja penuh; target menganggur.
+
+Aritmetika pembuktinya: 225.016 req / 46,1 s = 4.881 rps (angka 3.750 di output
+lama dihitung dari window 60 detik), rata-rata latensi ~60 ms → in-flight ~293 dari
+300 VU. Generator jenuh, target tidak.
+
+## Perbaikan
+
+- `lab_target.py` v2: `CapacityGate` (worker pool + backlog terbatas), shedding 503,
+  `/api/cpu` busy-loop, `/control/*` **selalu bypass gate** supaya kapasitas masih
+  bisa diubah saat target kolaps, `/control/stats` sebagai bukti.
+- `external_probe.py`: `DownStateMachine` eksplisit, `verdict` nested, thread tidak
+  pernah mati, `cache_buster` supaya CDN tidak menyembunyikan DOWN.
+- `observer.py`: escalation hanya saat lokal DOWN; TLS verified-first + fallback
+  tercatat; encoder adaptif; parser tahan bentuk flat/positional.
+- `routeoverride.py`: T2 shim, T1 `/etc/hosts`, T3 CF worker; header
+  `x-galardo-override` sebagai diskriminator 404 asli vs paksaan.
+
+## Bukti live
+## Pelajaran metodologis
+
+1. **Jangan spike membabi buta.** Ukur lutut (knee) dulu, lalu spike 1,2–1,5×.
+2. Kalau spike tidak DOWN: (a) di bawah lutut, (b) lutut di atas plafon generator,
+   (c) target memang tanpa plafon. Tiga sebab berbeda, tiga solusi berbeda.
+3. Assertion `... or True` adalah bug tersembunyi — sudah dihapus.
+4. Alasan kegagalan harus **tersimpan di dokumen job**, bukan hanya di audit log.

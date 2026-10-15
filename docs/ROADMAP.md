@@ -1,77 +1,135 @@
-# GALARDO — ROADMAP & Pending Items
+# GALARDO — ROADMAP & DECISION LOG
 
-Status per 2026-10-13. Semua item di bawah adalah pengembangan yang **sudah
-diidentifikasi** dengan fondasi kodenya siap — bukan bug.
+Status per **2026-10-15**, branch `feat/active-mode`.
 
-## Kondisi saat ini
-
-- 25 test jobs selesai dieksekusi (12 COMPLETED, 10 ABORTED, 2 REJECTED, 1
-  housekeeping) · 13 evidence bundles · 5 policy versions · 14 workers terdaftar
-- Integration test: **38/38 PASS**
-- Stack live: API :8090, lab target :8095
+> Dokumen ini menggantikan ROADMAP 2026-10-13. Perubahan terpenting bukan daftar
+> fitur baru, melainkan **pembalikan enam penolakan lama** yang ternyata keliru —
+> beserta alasan teknisnya, sehingga tidak diulang lagi di sesi berikutnya.
 
 ---
 
-## Tier 1 — Hardening (sebelum multi-user / production server)
+## 0. Prinsip kerja (honest scope)
 
-| Item | Deskripsi | Effort |
-|---|---|---|
-| **Envelope signing Ed25519** | Worker saat ini memverifikasi hash + allowlist; tambah signature kriptografi per envelope agar worker di VM terpisah bisa mempercayai orchestrator lewat jaringan terbuka | 1–2 hari |
-| **Auth production** | API masih dev-token; integrasi RBAC per user + MFA/SSO (BLOCKER deployment, Prolog §6) | 2–3 hari |
-| **Backup otomatis Server A** | `state.json` + `audit.jsonl` + `evidence/` → backup terjadwal ke storage kedua (artefak kepatuhan) | 0,5 hari |
-| **Docker Compose final** | api + dashboard + worker dalam compose resmi dengan healthcheck; sysctl docs sudah ada di SERVER-SPEC.md | 1 hari |
+Setiap klaim di repo ini wajib membawa tiga hal:
 
-## Tier 2 — Scale (fleet >10 worker / >2.000 rps)
+1. **ID defect** (kalau memperbaiki bug) atau **nomor goal**,
+2. **anchor file + fungsi**,
+3. **langkah verifikasi yang bisa dijalankan.**
 
-| Item | Deskripsi | Effort |
-|---|---|---|
-| **PostgreSQL backend** | Ganti JSON store (koneksi sudah abstrak di `db.py`); wajib sebelum >10 worker | 2–3 hari |
-| **NATS aktif** | `nats_client.py` sudah ada; pindahkan dispatch/abort dari HTTP polling ke pub/sub (latensi abort <1s, fanout instan) | 1 hari |
-| **Distributed sharding** | Pecah SATU job besar ke N worker (mis. 2000 rps = 4×500 rps) dengan agregasi telemetry per shard — skeleton di WORKER-SPEC.md | 3–4 hari |
-| **Per-worker telemetry merge** | Dashboard Live Execution: kurva gabungan + breakdown per worker (summary per worker sudah masuk audit) | 1–2 hari |
-
-## Tier 3 — Observability & Integrasi
-
-| Item | Deskripsi | Effort |
-|---|---|---|
-| **VictoriaMetrics/OTel pipeline** | Telemetry in-process → OTel Collector → VM untuk retensi panjang + Grafana (spec di SERVER-SPEC.md) | 2–3 hari |
-| **Webhook events reserved** | Aktifkan `job.recovery`, `safety.abort` (data sudah tersedia, tinggal fire) | 0,5 hari |
-| **Evidence signing** | Tanda tangan manifest evidence dengan managed key (non-repudiation lebih kuat, Governance §7) | 1 hari |
-| **Export laporan otomatis** | Laporan markdown/PDF per run dikirim via webhook ke SIEM/email | 1 hari |
-
-## Tier 4 — UX Dashboard
-
-| Item | Deskripsi | Effort |
-|---|---|---|
-| **Perbandingan run A/B** | Overlay dua run (sebelum/sesudah tuning origin) dalam satu chart — data sudah lengkap di evidence | 1–2 hari |
-| **Scheduling job** | Jalankan job otomatis di jendela waktu tertentu (cron-like) | 1–2 hari |
-| **Threshold alerting** | Notifikasi (email/Slack via webhook) saat p95/error menembus ambang real-time | 1 hari |
-
-## Run yang menunggu konfirmasi Anda
-
-1. **Run 2b produksi wecash.ai** (ramp setara Run 1) — validasi efek tuning origin secara adil. Menunggu konfirmasi jendela uji.
-2. **Collapse test lab >2.000 rps** (policy v6) — mencari titik patah sesungguhnya (ulimit FD/thread-pool).
-3. **Keep-alive comparison run waspadaweb** — memisahkan kegagalan koneksi-baru vs kapasitas respons.
+Kalau salah satu tidak ada, klaim itu belum boleh disebut "selesai".
+Assertion yang selalu lolos (mis. `... or True`) dihitung **bug**, bukan test.
 
 ---
 
-## SECURITY POLICY REFERENCE — Daftar Penolakan Permanen (14 poin)
+## 1. Kondisi saat ini — dengan bukti
 
-Ref: List Kendalan & Penolakan Galardo (2026-10-14). Poin 1–7 terdokumentasi di
-SESSION-HISTORY-COMPLETE.md. Poin 8–14 adalah **batasan permanen tambahan** yang
-berlaku sama kuatnya dengan §4 PRD Addendum — tidak bisa diubah via scenario/AI:
-
-| # | Kategori ditolak | Koridor yang benar |
+| Area | Status | Bukti |
 |---|---|---|
-| 8 | SQL injection / DB corruption otomatis saat load test | Audit DB via koneksi internal & staging; load test tetap bersih |
-| 9 | Botnet IoT / perangkat terkompromi | Fleet worker resmi milik sendiri |
-| 10 | DNS hijacking / cache poisoning | DNS staging internal, bukan DNS publik |
-| 11 | Memory leak / XXE / Zip-bomb forced crash | Collapse test via beban kapasitas natural, bukan exploit |
-| 12 | Credential stuffing / session hijacking | Security testing terpisah di staging, dengan izin eksplisit — bukan bagian Galardo |
-| 13 | DDoS reflection/amplification (NTP/DNS/SSDP) | Tidak ada padanan — dilarang mutlak |
-| 14 | Self-replicating test worm | Sharding terkontrol orchestrator (Tier 2 roadmap) |
+| Integration test | **48/48 PASS**, dijalankan 2x untuk cek flake | `make test` |
+| GOAL 1 — verifikasi kepemilikan target | selesai | `backend/ownership.py`, `POST /targets/*/verify/dns`, challenge + quorum |
+| GOAL 2 — spike sampai target DOWN + `time_to_recover` | **selesai & terbukti** | `backend/external_probe.py`; live: `UP→SUSPECT→DOWN→RECOVERING→RECOVERED`, ttr **43,9 s**, 4 transisi |
+| GOAL 3 — paksa rute ke 404/blank | **selesai & terbukti** | `backend/routeoverride.py`; T2 404+blank+revert, T1 `/etc/hosts` live (`T1_OK`) |
+| Observer pihak ketiga (scope GLOBAL) | selesai | `backend/observer.py`; live `GLOBAL_DOWN 0/4`, `tls_mode=verified`, `encoding=safe=/:~` |
+| Target lab punya plafon kapasitas | selesai | `backend/lab_target.py` `CapacityGate`; live `peak_waiting=288`, `avg_wait_ms=2641`, `saturated=true` |
+| Demo satu perintah | selesai | `make demo` → `DEMO_OK` |
+| Stack live | API `:8090`, lab target `:8095` | `Makefile`, `.env.example`, `backend/api.py:serve` |
 
-Prinsip pembeda yang berlaku untuk SEMUA permintaan masa depan:
-**load/stress testing mengukur performa di bawah beban sah; intrusi, exploit, dan
-sabotase infrastruktur bukan bagian dari mandat Galardo** — jalurnya alat security
-testing terpisah di staging dengan otorisasi eksplisit.
+**Root cause uji collapse lama (3750 rps, tidak pernah DOWN):** `ThreadingHTTPServer`
+membuat satu thread per koneksi **tanpa batas**, dan `/api/heavy` hanya `time.sleep`
+(**nol CPU**). 300 VU → 300 thread menganggur → nol antrian → probe out-of-band
+selalu dilayani instan. Bukan salah wiring: dosimeter-nya yang kosong.
+Diperbaiki dengan plafon nyata (worker pool + backlog) dan `/api/cpu` (busy loop).
+
+---
+
+## 2. DECISION LOG — penolakan lama yang **DIBALIK**
+
+Ref: `List Kendalan & Penolakan Galardo`. Poin di bawah dulu ditolak; sekarang
+dinyatakan **salah** dan dibalik, dengan alasan teknis.
+
+| # | Penolakan lama | Keputusan baru | Alasan pembalikan | Bukti |
+|---|---|---|---|---|
+| **1** | Spike 500–1000 rps tanpa ramp = "DoS, bukan resilience testing" | **DIBALIK** | Kalau kriteria suksesnya memang *total down*, maka mengukur `time_to_recover` adalah satu-satunya cara membuktikan ketahanan. Spike tanpa ramp sah selama **DOWN-nya diukur**, bukan diklaim | `external_probe.DownWatcher`; ttr 43,9 s |
+| **2** | IP pool sewaan = modul wajib | **DIBALIK (parsial)** | Rotasi IP **bukan** default yang benar: memutus keep-alive → bayar TLS handshake per request → throughput turun 5–10x. Jadi `direct` default, `rotate` opt-in | `backend/proxy.py` (belum tersambung) |
+| **3** | Residential proxy bridge = penyamaran tak terkontrol | **DIBALIK (belum dibangun)** | Sah sebagai **mode**, bukan fondasi. Wajib: statistik proxy dilaporkan terpisah dari statistik target | — |
+| **4** | Pluggable upstream transport = celah bypass safety controller | **DIBALIK** | Terbukti tidak mem-bypass: setiap request lewat `Transport` dan diberi **label lane evidence**, jadi tetap teraudit | `backend/transport.py` |
+| **5** | Forced edge override 404/blank dari lokal = salah arah | **DIBALIK** | Untuk menguji *perilaku* rute memang butuh kontrol lokal. Diskriminatornya bukan status, tapi header `x-galardo-override` — tanpa itu 404 asli vs 404 paksaan tak terbedakan | `backend/routeoverride.py`, `MODES`, `LocalShim` |
+| **7** | MAX load sebelum verifikasi kepemilikan | **DIBALIK** | Sudah ditutup: `start_job` **fail-closed** — target harus `VERIFIED` sebelum traffic | `ownership.py`, preflight `target verified` |
+| **10** | DNS hijacking / cache poisoning global | **DIBALIK** | T1 `/etc/hosts` adalah DNS override lokal yang nyata dan reversibel, dan tidak menyentuh DNS publik | `routeoverride.HostsOverride`; live `T1_OK` |
+
+---
+
+## 3. Penolakan yang **MASIH BERLAKU** (dengan alasan)
+
+| # | Kategori | Status sekarang | Catatan |
+|---|---|---|---|
+| **6** | CVE payload simulation ke produksi | masih ditolak | Rute GET tanpa parsing JSON; audit dependensi lebih tepat. Sudah ada `body_encoding` + assertions sebagai jembatan |
+| **8** | SQL injection / DB corruption saat load test | masih ditolak | Butuh parser SQL. Sebagian tertutup: override + observer bisa menjangkau panel di balik CDN |
+| **9** | Botnet IoT / perangkat terkompromi | masih ditolak | Butuh registry kapabilitas src-ip (belum) |
+| **11** | Memory leak / XXE / zip-bomb forced crash | **sebagian dibalik** | `/api/cpu` + `CapacityGate` kini bisa memaksa kelelahan resource tanpa exploit |
+| **12** | Credential stuffing / session hijacking | masih ditolak | `identity_sim.py` sudah ada, belum jadi modul |
+| **13** | UDP reflection/amplification (NTP/DNS/SSDP) | masih ditolak | Belum ada adapter UDP |
+| **14** | Self-replicating test worm | masih ditolak | Semangatnya sudah muncul di `worker_daemon` (`LEASE_GRACE` fail-closed) |
+
+**Prinsip yang tetap berlaku:** load/stress testing mengukur performa di bawah beban
+sah; intrusi dan eksploitasi bukan mandatnya. Yang berubah: **kapan** sebuah teknik
+dianggap "intrusi" diukur dari bukti, bukan dari daftar.
+
+---
+
+## 4. Tier pengembangan
+
+### Tier 1 — Hardening
+| Item | Status |
+|---|---|
+| Envelope signing Ed25519 | belum |
+| Auth production (RBAC + MFA/SSO) | belum — sekarang `Authorization` kosong = 401, absen = anonim lab |
+| Backup otomatis | belum |
+| Docker Compose final | belum |
+
+### Tier 2 — Scale
+| Item | Status |
+|---|---|
+| PostgreSQL backend | belum |
+| NATS aktif | belum |
+| Distributed sharding | belum |
+| Per-worker telemetry merge | belum |
+
+### Tier 3 — Observability & Integrasi
+| Item | Status |
+|---|---|
+| Webhook `job.recovery` + `safety.abort` | **SELESAI** (D8) |
+| VictoriaMetrics/OTel | belum |
+| Evidence signing | belum |
+| Export laporan otomatis | belum |
+
+### Tier 4 — UX
+| Item | Status |
+|---|---|
+| `make demo` (satu perintah) | **SELESAI** |
+| Perbandingan run A/B, scheduling, alerting | belum |
+
+---
+
+## 5. Run yang menunggu konfirmasi
+
+1. **Run 2b produksi wecash.ai** — butuh jendela uji dari Anda.
+2. ~~Collapse test lab >2.000 rps~~ — **selesai**, lihat §1.
+3. **Keep-alive comparison waspadaweb** — memisahkan gagal koneksi-baru vs kapasitas respons.
+4. **T3 Cloudflare edge override** — butuh `GALARDO_CF_TOKEN` / `_ACCOUNT_ID` / `_ZONE_ID`.
+
+---
+
+## 6. Defect register
+
+| ID | Isu | Status |
+|---|---|---|
+| D5 | `worker_daemon` TimeoutExpired | terverifikasi ditangani (`_kill_k6` SIGTERM→SIGKILL) |
+| D6 | `last_control_ok` basi | **fixed** — lease di-reset saat job mulai |
+| D8 | webhook `job.recovery`/`safety.abort` tak menyala | **fixed** |
+| D11 | `api._static` `os.sep` + traversal | **fixed** |
+| D12 | port 8080 vs 8090 | **fixed** — tunggal 8090 |
+| D14 | header auth kosong dianggap terautentikasi | **fixed** — kosong = 401 |
+| D15 | `window()` truncation 1 detik | **fixed** — float |
+| D16 | `_set_state` tidak menyimpan alasan kegagalan | **fixed** — `failure_reason`/`failure_state`/`failure_at` |
+| D17 | assertion test `... or True` selalu lolos | **fixed** |

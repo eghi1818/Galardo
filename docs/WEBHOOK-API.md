@@ -70,3 +70,15 @@ curl -X POST http://127.0.0.1:8090/api/v1/webhooks \
 
 Receiver lokal dengan verifikasi HMAC: `hook.ping`, `job.completed`,
 `evidence.created` — **semua signature VALID**, delivery attempt 1, status 200.
+
+---
+
+## Status implementasi (2026-10-15)
+
+Event `job.recovery` dan `safety.abort` kini **benar-benar ditembakkan** (sebelumnya
+hanya terdaftar di `EVENT_TYPES`):
+
+- `job.recovery` — saat job masuk `RECOVERY_WAIT` (orchestrator `_set_state`).
+- `safety.abort` — saat safety controller memicu abort (`abort_fn`), membawa
+  `reason_code`, `detail`, `correlation_id`.
+- `job.failed` juga dikirim saat `RECOVERY_FAILED`.

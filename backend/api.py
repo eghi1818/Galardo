@@ -35,6 +35,7 @@ MAX_BODY = 262144
 OVERRIDES = {}
 OVERRIDES_LOCK = threading.Lock()
 
+SOURCES_LOCK = threading.Lock()   # item 9: registry kapabilitas sumber
 MIME = {".html": "text/html", ".js": "application/javascript", ".css": "text/css",
         ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png"}
 
@@ -879,6 +880,68 @@ class Handler(BaseHTTPRequestHandler):
                 dl = sorted(_db.list("webhook_deliveries"),
                             key=lambda d: d.get("at") or "", reverse=True)[:100]
                 return self._json(200, dl)
+
+            # ---- source capability registry (item 9) ----
+            if api_path == "/sources/matrix" and method == "GET":
+                import srccap as _sc
+                return self._json(200, _sc.REGISTRY.matrix())
+            if api_path == "/sources/pick" and method == "POST":
+                import srccap as _sc
+                b = self._body()
+                src, why = _sc.REGISTRY.pick(b.get("required") or [], kind=b.get("kind"))
+                if not src:
+                    return self._json(409, {"error": "no source satisfies requirement",
+                                            "required": b.get("required"), "reasons": why})
+                return self._json(200, {"picked": src.to_dict(), "required": b.get("required")})
+            if api_path == "/sources" and method == "GET":
+                import srccap as _sc
+                with SOURCES_LOCK:
+                    items = [x.to_dict() for x in _sc.REGISTRY.list()]
+                return self._json(200, {"sources": items,
+                                        "capabilities": list(_sc.CAPABILITIES),
+                                        "ssl_lib": _sc.ssl.OPENSSL_VERSION})
+            if api_path == "/sources" and method == "POST":
+                import srccap as _sc
+                b = self._body()
+                label = (b.get("label") or "").strip()
+                if not label:
+                    return self._json(422, {"error": {"field": "label", "message": "required"}})
+                try:
+                    src = _sc.REGISTRY.register(label, kind=b.get("kind") or "local",
+                                                ip=b.get("ip"), region=b.get("region"),
+                                                declared=b.get("declared"),
+                                                note=b.get("note") or "")
+                except _sc.SourceError as e:
+                    return self._json(409, {"error": str(e)})
+                try:
+                    db.insert("sources", src.to_dict(), actor=user, action="source.registered",
+                              resource_type="source", reason="label=%s kind=%s" % (label, src.kind))
+                except Exception:
+                    pass
+                return self._json(201, src.to_dict())
+            m = _match(api_path, "/sources/*/probe")
+            if m and method == "POST":
+                import srccap as _sc
+                b = self._body()
+                if not _sc.REGISTRY.get(m[0]):
+                    return self._json(404, {"error": "source not found"})
+                r = _sc.REGISTRY.probe(m[0], url=b.get("url") or _sc.DEFAULT_PROBE_URL)
+                return self._json(200, {"source": m[0], "probe": r,
+                                        "capabilities": _sc.REGISTRY.get(m[0]).capabilities()})
+            m = _match(api_path, "/sources/*/remove")
+            if m and method == "POST":
+                import srccap as _sc
+                gone = _sc.REGISTRY.remove(m[0])
+                if not gone:
+                    return self._json(404, {"error": "source not found"})
+                return self._json(200, {"removed": m[0]})
+            m = _match(api_path, "/sources/*")
+            if m and method == "GET":
+                import srccap as _sc
+                src = _sc.REGISTRY.get(m[0])
+                if not src:
+                    return self._json(404, {"error": "source not found"})
+                return self._json(200, src.to_dict(with_evidence=True))
 
             # ---- route override (Goal 3) ----
             if api_path == "/overrides" and method == "GET":

@@ -361,6 +361,31 @@ def main():
     st, rv = req("POST", f"/overrides/{oid}/revert", {})
     check("override reverted", st == 200 and "T2" in (rv.get("reverted") or []), str(rv)[:200])
 
+    # ---- 15. source capability registry (item 9) ----
+    st, src = req("POST", "/sources", {"label": "it-src", "kind": "local",
+                                       "declared": ["udp", "spoof_src"]})
+    check("source registered with declared caps",
+          st == 201 and src.get("id") == "src-it-src" and "udp" in (src.get("declared") or []),
+          str(src)[:200])
+    sid = src.get("id") or ""
+    st, pr = req("POST", f"/sources/{sid}/probe", {"url": TGT + "/healthz"})
+    pv = (pr or {}).get("probe") or {}
+    check("source probe separates proven / unproven / na",
+          st == 200 and all(k in pv for k in ("proven", "unproven", "na"))
+          and "http1" in (pv.get("proven") or []), str(pr)[:200])
+    st, mx = req("GET", "/sources/matrix")
+    check("capability matrix exposes gaps",
+          st == 200 and "gaps" in mx and "capabilities" in mx and "ssl_lib" in mx,
+          str(mx)[:160])
+    st, pk = req("POST", "/sources/pick", {"required": ["http1"]})
+    check("pick returns a source for proven capability",
+          st == 200 and (pk.get("picked") or {}).get("id") == sid, str(pk)[:200])
+    st, pk2 = req("POST", "/sources/pick", {"required": ["http1", "residential"]})
+    check("pick refuses and names the missing capability",
+          st == 409 and "residential" in json.dumps(pk2), str(pk2)[:200])
+    st, rm = req("POST", f"/sources/{sid}/remove", {})
+    check("source removed", st == 200 and rm.get("removed") == sid, str(rm)[:160])
+
     # ---- summary ----
     print(f"\n{'='*60}\nRESULTS: {len(PASS)} passed, {len(FAIL)} failed")
     if FAIL:

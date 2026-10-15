@@ -158,10 +158,11 @@ def probe_egress(url=DEFAULT_PROBE_URL, timeout=8.0):
             proven.append(name)
         elif res.get("ok") is False:
             (na if res.get("reason") == "lib_tidak_mendukung" else unproven).append(name)
+        else:
+            na.append(name)          # library tidak punya versi ini sama sekali
     (proven if v6.get("ok") else unproven).append("ipv6")
     na.append("http2")            # stdlib urllib tidak negosiasi h2
     if not tls13.get("ok") and tls13.get("reason") == "lib_tidak_mendukung":
-        na.append("tls13_lib")
 
     return {"url": url, "at": time.time(), "ssl_lib": ssl.OPENSSL_VERSION,
             "proven": sorted(set(proven)), "unproven": sorted(set(unproven)),

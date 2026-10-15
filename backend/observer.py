@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import http.client
 import json
+import ssl
 import time
 from urllib.parse import quote, urlsplit
 
@@ -46,7 +47,8 @@ class ObserverError(Exception):
 
 
 class ObserverCheck(object):
-    __slots__ = ("request_id", "permanent_link", "nodes", "kind", "target", "started_at")
+    __slots__ = ("request_id", "permanent_link", "nodes", "kind", "target",
+                 "started_at", "tls_mode")
 
     def __init__(self, request_id, permanent_link, nodes, kind, target):
         self.request_id = request_id
@@ -55,6 +57,7 @@ class ObserverCheck(object):
         self.kind = kind
         self.target = target
         self.started_at = now_iso()
+        self.tls_mode = None
 
     def to_dict(self):
         return {"request_id": self.request_id, "permanent_link": self.permanent_link,
@@ -121,7 +124,8 @@ class ObserverReport(object):
                 "nodes_failed": self.nodes_failed,
                 "permanent_link": self.check.permanent_link,
                 "kind": self.check.kind, "target": self.check.target,
-                "nodes": self.nodes, "observed_at": now_iso()}
+                "nodes": self.nodes, "observed_at": now_iso(),
+                "observer_tls_mode": getattr(self.check, "tls_mode", None)}
 
     def __repr__(self):
         return "<ObserverReport %s ratio=%.2f answered=%d/%d>" % (
@@ -131,33 +135,50 @@ class ObserverReport(object):
 class ObserverClient(object):
     """Minimal check-host.net client. No dependencies beyond http.client."""
 
-    def __init__(self, host=OBSERVER_HOST, timeout=20.0):
+    def __init__(self, host=OBSERVER_HOST, timeout=20.0, verify_tls=True):
         self.host = host
         self.timeout = timeout
+        self.verify_tls = verify_tls
+        self.tls_mode = None
 
     def _get(self, path):
-        conn = None
-        try:
-            conn = http.client.HTTPSConnection(self.host, timeout=self.timeout)
-            conn.request("GET", path, headers={
-                "Accept": "application/json",
-                "User-Agent": USER_AGENT,
-            })
-            resp = conn.getresponse()
-            raw = resp.read()
-            if resp.status != 200:
-                raise ObserverError("%s -> HTTP %d %s" % (path, resp.status, raw[:140]))
-            return json.loads(raw.decode("utf-8", "replace"))
-        except ObserverError:
-            raise
-        except Exception as exc:
-            raise ObserverError("%s -> %s: %s" % (path, type(exc).__name__, exc))
-        finally:
-            if conn is not None:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
+        """GET with a verified-first TLS policy.
+
+        Some Python builds (notably macOS CommandLineTools 3.9) carry an empty
+        or stale trust store, so the observer's chain fails verification. We
+        try verified first, then fall back, and RECORD which mode was used.
+        """
+        attempts = []
+        if self.verify_tls:
+            attempts.append(("verified", ssl.create_default_context()))
+        attempts.append(("unverified", ssl._create_unverified_context()))
+        errors = []
+        for label, context in attempts:
+            conn = None
+            try:
+                conn = http.client.HTTPSConnection(self.host, timeout=self.timeout,
+                                                   context=context)
+                conn.request("GET", path, headers={
+                    "Accept": "application/json",
+                    "User-Agent": USER_AGENT,
+                })
+                resp = conn.getresponse()
+                raw = resp.read()
+                if resp.status != 200:
+                    raise ObserverError("%s -> HTTP %d %s" % (path, resp.status, raw[:140]))
+                self.tls_mode = label
+                return json.loads(raw.decode("utf-8", "replace"))
+            except ObserverError:
+                raise
+            except Exception as exc:
+                errors.append("%s/%s: %s" % (label, type(exc).__name__, exc))
+            finally:
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+        raise ObserverError("%s -> %s" % (path, " | ".join(errors)))
 
     def start(self, url, max_nodes=10, kind="http", timeout=10, cache_buster=True):
         target = url
@@ -180,8 +201,10 @@ class ObserverClient(object):
         doc = self._get(path)
         if doc.get("ok") != 1:
             raise ObserverError("observer refused request: %s" % json.dumps(doc)[:180])
-        return ObserverCheck(doc.get("request_id"), doc.get("permanent_link"),
-                             list((doc.get("nodes") or {}).keys()), kind, target)
+        check = ObserverCheck(doc.get("request_id"), doc.get("permanent_link"),
+                              list((doc.get("nodes") or {}).keys()), kind, target)
+        check.tls_mode = self.tls_mode
+        return check
 
     def result(self, request_id):
         return self._get("/check-result/" + request_id)

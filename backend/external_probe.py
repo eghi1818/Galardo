@@ -270,6 +270,8 @@ class ExternalProbe(threading.Thread):
         self.connect_ip = connect_ip
         self.use_cache_buster = use_cache_buster
         self.state_machine = state_machine or DownStateMachine(on_transition=on_transition)
+        self.max_samples = max_samples
+        self.last_error = None
         self.transport = transport_mod.Transport(timeout=timeout, max_idle=4)
         self.stop_event = threading.Event()
         self.samples = []
@@ -291,11 +293,15 @@ class ExternalProbe(threading.Thread):
         self.started_at = time.time()
         while not self.stop_event.is_set():
             self._tick += 1
-            self._record(probe_http(self._busted_url(), timeout=self.timeout,
-                                    connect_ip=self.connect_ip, transport=self.transport))
-            if self.tcp_host and self._tick % 2 == 0:
-                self._record(probe_tcp(self.tcp_host, self.tcp_port,
-                                       timeout=min(1.5, self.timeout)))
+            # A probe must never die: one bad sample is data, not a crash.
+            try:
+                self._record(probe_http(self._busted_url(), timeout=self.timeout,
+                                        connect_ip=self.connect_ip, transport=self.transport))
+                if self.tcp_host and self._tick % 2 == 0:
+                    self._record(probe_tcp(self.tcp_host, self.tcp_port,
+                                           timeout=min(1.5, self.timeout)))
+            except Exception as exc:
+                self.last_error = "%s: %s" % (type(exc).__name__, exc)
             self.stop_event.wait(self.interval)
 
     def _record(self, sample):
@@ -327,6 +333,7 @@ class ExternalProbe(threading.Thread):
         snap["error_ratio_pct"] = round(self.error_ratio(), 2)
         snap["samples_total"] = len(self.samples)
         snap["url"] = self.url
+        snap["last_error"] = self.last_error
         return snap
 
 

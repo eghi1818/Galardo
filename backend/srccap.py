@@ -368,15 +368,25 @@ def mark_proven(sid, caps, evidence=None):
 
 
 REGISTRY = SourceRegistry()
-REGISTRY.load()
 
 
 def ensure_local(url=DEFAULT_PROBE_URL):
     """Daftarkan + probe mesin ini sekali, idempoten."""
-    s = REGISTRY.get("src-local")
+    s = REGISTRY.get("src-local-laptop") or REGISTRY.get("src-local")
     if s is None:
-        s = REGISTRY.register("local-laptop", kind="local",
-                              declared=["datacenter", "high_concurrency"],
-                              note="egress utama; di-probe nyata")
+        try:
+            s = REGISTRY.register("local-laptop", kind="local",
+                                  declared=["datacenter", "high_concurrency"],
+                                  note="egress utama; di-probe nyata")
+        except SourceError:
+            s = REGISTRY.get("src-local-laptop")
+            if s is None:
+                raise
     REGISTRY.probe(s.source_id, url)
     return s
+
+
+try:
+    REGISTRY.load()
+except Exception:
+    pass

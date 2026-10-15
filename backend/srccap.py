@@ -32,6 +32,14 @@ CAPABILITIES = (
 KINDS = ("local", "vps", "worker", "proxy", "residential")
 
 DEFAULT_PROBE_URL = "https://www.cloudflare.com/cdn-cgi/trace"
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def store_path():
+    env = os.environ.get("GALARDO_SOURCES_PATH")
+    if env:
+        return env
+    return os.path.join(ROOT_DIR, ".galardo", "sources.json")
 
 
 class SourceError(Exception):
@@ -207,6 +215,21 @@ class Source:
         have = set(self.capabilities())
         return sorted(r for r in required if r not in have)
 
+    @classmethod
+    def from_dict(cls, d):
+        s = cls(d["id"], d.get("label") or d["id"], kind=d.get("kind") or "local",
+                ip=d.get("ip"), region=d.get("region"),
+                declared=d.get("declared"), note=d.get("note") or "")
+        s.proven = sorted(d.get("proven") or [])
+        s.unproven = sorted(d.get("unproven") or [])
+        s.na = sorted(d.get("na") or [])
+        s.evidence = d.get("evidence") or {}
+        s.ssl_lib = d.get("ssl_lib")
+        s.created_at = d.get("created_at") or time.time()
+        s.last_probe_at = d.get("last_probe_at")
+        s.probe_count = int(d.get("probe_count") or 0)
+        return s
+
     def to_dict(self, with_evidence=False):
         d = {"id": self.source_id, "label": self.label, "kind": self.kind, "ip": self.ip,
              "region": self.region, "note": self.note, "declared": self.declared,
@@ -225,6 +248,40 @@ class SourceRegistry:
         self.lock = threading.Lock()
         self.sources = {}
 
+    def save(self, path=None):
+        path = path or store_path()
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            tmp = path + ".tmp"
+            with open(tmp, "w") as fh:
+                json.dump({"version": 1, "at": time.time(),
+                           "sources": [x.to_dict(with_evidence=True) for x in self.list()]},
+                          fh, indent=1)
+            os.replace(tmp, path)
+            return path
+        except Exception:
+            return None
+
+    def load(self, path=None):
+        path = path or store_path()
+        if not os.path.isfile(path):
+            return 0
+        try:
+            with open(path) as fh:
+                doc = json.load(fh)
+        except Exception:
+            return 0
+        n = 0
+        with self.lock:
+            for d in (doc.get("sources") or []):
+                try:
+                    x = Source.from_dict(d)
+                    self.sources[x.source_id] = x
+                    n += 1
+                except Exception:
+                    pass
+        return n
+
     def register(self, label, kind="local", ip=None, region=None, declared=None,
                  source_id=None, note=""):
         sid = source_id or ("src-%s" % label.lower().replace(" ", "-"))[:40]
@@ -234,6 +291,7 @@ class SourceRegistry:
             s = Source(sid, label, kind=kind, ip=ip, region=region,
                        declared=declared, note=note)
             self.sources[sid] = s
+        self.save()
         return s
 
     def get(self, sid):
@@ -244,7 +302,10 @@ class SourceRegistry:
 
     def remove(self, sid):
         with self.lock:
-            return self.sources.pop(sid, None)
+            gone = self.sources.pop(sid, None)
+        if gone:
+            self.save()
+        return gone
 
     def probe(self, sid, url=DEFAULT_PROBE_URL, timeout=8.0):
         s = self.get(sid)
@@ -262,6 +323,7 @@ class SourceRegistry:
             if not s.ip:
                 ip = (r["evidence"].get("ipv6") or {}).get("addresses")
                 s.ip = ip[0] if ip else None
+        self.save()
         return r
 
     def pick(self, required, kind=None):
@@ -271,7 +333,7 @@ class SourceRegistry:
             if s.can(*required):
                 return s, []
         if not cands:
-            return None, ["tidak ada sumber dengan kind=%s" % kind]
+            return None, ["registry kosong%s" % ("" if kind is None else " untuk kind=%s" % kind)]
         best = sorted(cands, key=lambda x: len(x.missing(*required)))[0]
         return None, ["%s kurang: %s" % (best.source_id, ", ".join(best.missing(*required)))]
 
@@ -296,10 +358,12 @@ def mark_proven(sid, caps, evidence=None):
         if evidence:
             s.evidence.update(evidence)
         s.last_probe_at = time.time()
+    REGISTRY.save()
     return s
 
 
 REGISTRY = SourceRegistry()
+REGISTRY.load()
 
 
 def ensure_local(url=DEFAULT_PROBE_URL):

@@ -48,7 +48,7 @@ class ObserverError(Exception):
 
 class ObserverCheck(object):
     __slots__ = ("request_id", "permanent_link", "nodes", "kind", "target",
-                 "started_at", "tls_mode")
+                 "started_at", "tls_mode", "encoding_mode")
 
     def __init__(self, request_id, permanent_link, nodes, kind, target):
         self.request_id = request_id
@@ -58,6 +58,7 @@ class ObserverCheck(object):
         self.target = target
         self.started_at = now_iso()
         self.tls_mode = None
+        self.encoding_mode = None
 
     def to_dict(self):
         return {"request_id": self.request_id, "permanent_link": self.permanent_link,
@@ -125,7 +126,8 @@ class ObserverReport(object):
                 "permanent_link": self.check.permanent_link,
                 "kind": self.check.kind, "target": self.check.target,
                 "nodes": self.nodes, "observed_at": now_iso(),
-                "observer_tls_mode": getattr(self.check, "tls_mode", None)}
+                "observer_tls_mode": getattr(self.check, "tls_mode", None),
+                "observer_encoding_mode": getattr(self.check, "encoding_mode", None)}
 
     def __repr__(self):
         return "<ObserverReport %s ratio=%.2f answered=%d/%d>" % (
@@ -133,13 +135,26 @@ class ObserverReport(object):
 
 
 class ObserverClient(object):
-    """Minimal check-host.net client. No dependencies beyond http.client."""
+    """Minimal check-host.net client. No dependencies beyond http.client.
+
+    check-host.net is picky about how the target is percent-encoded and the
+    accepted form has changed between deployments. Rather than guessing, try
+    each known form until one actually returns nodes, then RECORD which worked.
+    A 200 response with zero nodes is a failure, not a success.
+    """
+
+    ENCODERS = (
+        ("safe=/: ", lambda value: quote(value, safe="/:")),
+        ("safe=all", lambda value: quote(value, safe="")),
+        ("raw", lambda value: value),
+    )
 
     def __init__(self, host=OBSERVER_HOST, timeout=20.0, verify_tls=True):
         self.host = host
         self.timeout = timeout
         self.verify_tls = verify_tls
         self.tls_mode = None
+        self.encoding_mode = None
 
     def _get(self, path):
         """GET with a verified-first TLS policy.
@@ -182,29 +197,42 @@ class ObserverClient(object):
 
     def start(self, url, max_nodes=10, kind="http", timeout=10, cache_buster=True):
         target = url
+        endpoint = "check-tcp" if kind == "tcp" else "check-http"
         if kind == "tcp":
             parts = urlsplit(url)
             port = parts.port or (443 if parts.scheme == "https" else 80)
             target = "%s:%d" % (parts.hostname, port)
-            path = "/check-tcp?host=%s&max_nodes=%d&timeout=%d" % (
-                quote(target, safe=""), int(max_nodes), int(timeout))
-        else:
-            if cache_buster:
-                parts = urlsplit(url)
-                busted = ep.cache_buster_path(parts.path or "/")
-                url = "%s://%s%s" % (parts.scheme, parts.netloc, busted)
-                if parts.query:
-                    url += "&" + parts.query
-                target = url
-            path = "/check-http?host=%s&max_nodes=%d&timeout=%d" % (
-                quote(target, safe=""), int(max_nodes), int(timeout))
-        doc = self._get(path)
-        if doc.get("ok") != 1:
-            raise ObserverError("observer refused request: %s" % json.dumps(doc)[:180])
-        check = ObserverCheck(doc.get("request_id"), doc.get("permanent_link"),
-                              list((doc.get("nodes") or {}).keys()), kind, target)
-        check.tls_mode = self.tls_mode
-        return check
+        elif cache_buster:
+            parts = urlsplit(url)
+            busted = ep.cache_buster_path(parts.path or "/")
+            target = "%s://%s%s" % (parts.scheme, parts.netloc, busted)
+            if parts.query:
+                target += "&" + parts.query
+
+        problems = []
+        for label, encoder in self.ENCODERS:
+            path = "/%s?host=%s&max_nodes=%d&timeout=%d" % (
+                endpoint, encoder(target), int(max_nodes), int(timeout))
+            try:
+                doc = self._get(path)
+            except ObserverError as exc:
+                problems.append("%s: %s" % (label.strip(), str(exc)[:110]))
+                continue
+            if doc.get("ok") != 1:
+                problems.append("%s: refused %s" % (label.strip(), json.dumps(doc)[:110]))
+                continue
+            nodes = list((doc.get("nodes") or {}).keys())
+            if not nodes:
+                problems.append("%s: HTTP 200 but 0 nodes" % label.strip())
+                continue
+            self.encoding_mode = label.strip()
+            check = ObserverCheck(doc.get("request_id"), doc.get("permanent_link"),
+                                  nodes, kind, target)
+            check.tls_mode = self.tls_mode
+            check.encoding_mode = self.encoding_mode
+            return check
+        raise ObserverError("no encoding produced nodes for %s (%s)" % (
+            target, " | ".join(problems)))
 
     def result(self, request_id):
         return self._get("/check-result/" + request_id)

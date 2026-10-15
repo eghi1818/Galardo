@@ -37,6 +37,9 @@ def main():
           % ("port-rotate", rot.get("answered"), rot.get("tried"), rot.get("rate_limited")))
 
     print("-" * 66)
+    bd = (r.get("dns") or {}).get("best") or {}
+    print("kombinasi DNS  :", bd.get("qname"), bd.get("qtype"), "->",
+          bd.get("response_bytes"), "byte balasan (qname/qtype pemenang)")
     print("best ratio     :", r.get("best_amplification"))
     print("reflection OK  :", r.get("reflection_capable"))
 

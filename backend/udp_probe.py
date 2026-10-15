@@ -10,6 +10,7 @@ Sekarang ada, dan yang diukur bukan kutipan dari internet melainkan:
 Protokol: DNS (UDP/53), NTP (UDP/123), SSDP (UDP/1900 multicast).
 Spoofing source IP diuji terpisah karena butuh raw socket (root).
 """
+import os
 import random
 import socket
 import struct
@@ -32,6 +33,25 @@ DNS_CANDIDATES = (
     ("facebook.com", "TXT"), ("microsoft.com", "TXT"), ("isc.org", "DNSKEY"),
     ("org", "DNSKEY"), ("isc.org", "TXT"),
 )
+
+
+def _local_ips():
+    """Semua kandidat interface: default route + hostname + override env."""
+    ips = []
+    d = _default_if_ip()
+    if d:
+        ips.append(d)
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if ip not in ips and not ip.startswith("127."):
+                ips.append(ip)
+    except Exception:
+        pass
+    forced = os.environ.get("GALARDO_SSDP_IFACE")
+    if forced:
+        ips = [forced] + [i for i in ips if i != forced]
+    return ips
 
 
 def _default_if_ip():
@@ -167,14 +187,12 @@ def probe_ntp(mode=3, servers=None, timeout=3.0):
     return _probe_many(servers, 123, lambda: ntp_packet(mode), timeout, 1)
 
 
-def probe_ssdp(timeout=4.0):
-    """SSDP butuh interface multicast eksplisit, kalau tidak paketnya hilang."""
+def _ssdp_once(iface, window):
     t0 = time.time()
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     try:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
-        iface = _default_if_ip()
         if iface:
             try:
                 sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF,
@@ -183,8 +201,8 @@ def probe_ssdp(timeout=4.0):
                 pass
         sock.bind(("", 0))
         sock.sendto(SSDP_PACKET, (SSDP_GROUP, SSDP_PORT))
-        got, deadline = [], time.time() + timeout
-        while time.time() < deadline and len(got) < 10:
+        got, deadline = [], time.time() + window
+        while time.time() < deadline and len(got) < 12:
             sock.settimeout(max(0.05, deadline - time.time()))
             try:
                 data, addr = sock.recvfrom(4096)
@@ -195,18 +213,27 @@ def probe_ssdp(timeout=4.0):
             got.append({"bytes": len(data), "from": addr[0],
                         "ms": round((time.time() - t0) * 1000.0, 2)})
         resp = sum(g["bytes"] for g in got)
-        r = {"target": SSDP_GROUP, "port": SSDP_PORT, "responded": bool(got),
-             "request_bytes": len(SSDP_PACKET), "response_bytes": resp,
-             "responses": len(got), "iface": iface,
-             "amplification": round(resp / float(len(SSDP_PACKET)), 2) if got else 0.0,
-             "rtt_ms": min([g["ms"] for g in got]) if got else None, "samples": got[:4]}
-        return {"attempts": [r], "best": r, "responded": bool(got)}
+        return {"iface": iface, "responded": bool(got), "responses": len(got),
+                "request_bytes": len(SSDP_PACKET), "response_bytes": resp,
+                "amplification": round(resp / float(len(SSDP_PACKET)), 2) if got else 0.0,
+                "rtt_ms": min([g["ms"] for g in got]) if got else None,
+                "samples": got[:4]}
     except Exception as e:
-        r = {"target": SSDP_GROUP, "responded": False, "amplification": 0.0,
-             "request_bytes": len(SSDP_PACKET), "response_bytes": 0, "error": str(e)[:160]}
-        return {"attempts": [r], "best": r, "responded": False}
+        return {"iface": iface, "responded": False, "responses": 0,
+                "request_bytes": len(SSDP_PACKET), "response_bytes": 0,
+                "amplification": 0.0, "error": str(e)[:140]}
     finally:
         sock.close()
+
+
+def probe_ssdp(timeout=4.0):
+    """SSDP butuh interface multicast yang benar. Coba SEMUA interface lokal."""
+    ifaces = _local_ips() or [None]
+    window = max(1.2, float(timeout) / max(1, len(ifaces)))
+    attempts = [_ssdp_once(i, window) for i in ifaces]
+    best = max(attempts, key=lambda r: r.get("amplification", 0.0)) if attempts else {}
+    return {"attempts": attempts, "best": best, "ifaces_tried": ifaces,
+            "responded": any(a.get("responded") for a in attempts)}
 
 
 def rotate_source_ports(target="1.1.1.1", port=53, n=8, timeout=1.5, qname=DEFAULT_QNAME):

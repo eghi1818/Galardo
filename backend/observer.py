@@ -41,6 +41,10 @@ VERDICT_UNKNOWN = "UNKNOWN"
 OBSERVER_HOST = "check-host.net"
 USER_AGENT = "Galardo/1.0 (+observer; out-of-band global down verification)"
 
+# Keys that are metadata, not node entries. check-host returns the node map
+# FLAT in /check-result, so anything outside this set is a node name.
+META_KEYS = ("ok", "request_id", "permanent_link", "nodes", "raw_keys")
+
 
 class ObserverError(Exception):
     """The observer could not be reached or refused the request."""
@@ -69,25 +73,48 @@ class ObserverCheck(object):
 class ObserverReport(object):
     """Parsed observer outcome. Pending nodes are counted, never guessed."""
 
+    @staticmethod
+    def _parse_entry(entry):
+        """check-host ships either a dict or a POSITIONAL LIST.
+
+        Observed list form: [flag, seconds, label, http_status, resolved_ip]
+        where flag == 1 means success and label carries the error text on
+        failure ("Broken pipe"). Parsed tolerantly: a format tweak must never
+        silently mark every successful node as failed, which would produce a
+        false GLOBAL_DOWN from a healthy target.
+        """
+        if entry is None:
+            return {"ok": None, "pending": True}
+        if isinstance(entry, dict):
+            error = entry.get("error")
+            return {"ok": error is None, "error": error,
+                    "time": entry.get("time"), "status": entry.get("status")}
+        if isinstance(entry, (list, tuple)):
+            if not entry:
+                return {"ok": None, "pending": True}
+            flag = entry[0]
+            seconds = entry[1] if len(entry) > 1 else None
+            label = entry[2] if len(entry) > 2 else None
+            status = entry[3] if len(entry) > 3 else None
+            ip = entry[4] if len(entry) > 4 else None
+            ok = (flag == 1) or (str(status) == "200")
+            return {"ok": bool(ok), "error": None if ok else (label or "failed"),
+                    "time": seconds, "status": status, "ip": ip}
+        return {"ok": False, "error": str(entry)}
+
     def __init__(self, check, raw):
         self.check = check
         self.raw = raw or {}
         self.nodes = {}
         for node, entries in (self.raw.get("nodes") or {}).items():
             if isinstance(entries, list):
-                entry = entries[0] if entries else None
+                if entries and isinstance(entries[0], (list, tuple, dict)):
+                    entry = entries[0]
+                else:
+                    entry = entries or None
             else:
                 entry = entries
-            if entry is None:
-                self.nodes[node] = {"ok": None, "pending": True}
-                continue
-            if isinstance(entry, dict):
-                error = entry.get("error")
-                self.nodes[node] = {"ok": error is None, "error": error,
-                                    "time": entry.get("time"),
-                                    "status": entry.get("status")}
-            else:
-                self.nodes[node] = {"ok": False, "error": str(entry)}
+            self.nodes[node] = self._parse_entry(entry)
 
         # Never report "0 of 0". If the observer accepted N nodes but none have
         # answered yet, say so explicitly: 0 answered out of N requested.
@@ -262,11 +289,18 @@ class ObserverClient(object):
         if not isinstance(doc, dict):
             return {"nodes": {}}
         if "nodes" not in doc:
-            for key in ("result", "data", "results", "checks"):
-                value = doc.get(key)
-                if isinstance(value, dict) and value:
-                    doc["nodes"] = value
-                    break
+            # Observed reality: check-host returns the node map FLAT - the node
+            # hostnames ARE the top-level keys. Anything that is not a known
+            # meta key is a node entry.
+            candidate = dict((k, v) for k, v in doc.items() if k not in META_KEYS)
+            if candidate:
+                doc["nodes"] = candidate
+            else:
+                for key in ("result", "data", "results", "checks"):
+                    value = doc.get(key)
+                    if isinstance(value, dict) and value:
+                        doc["nodes"] = value
+                        break
         doc.setdefault("nodes", {})
         doc["raw_keys"] = sorted(doc.keys())
         return doc

@@ -95,3 +95,10 @@ crypto:
 	@python3 tools/verify_crypto.py
 keygen:
 	@python3 backend/envelope.py keygen controller
+
+# --- Tier 1: kebijakan kepercayaan antar-node ---
+.PHONY: trust peer
+trust:
+	@python3 tools/verify_trust.py
+peer:
+	@python3 backend/trust.py peer-list

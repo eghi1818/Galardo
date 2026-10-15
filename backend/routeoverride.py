@@ -410,6 +410,23 @@ def _multipart(metadata, files, boundary=None):
     return b"\r\n".join(out), "multipart/form-data; boundary=" + boundary
 
 
+def _dechunk(data):
+    """Ukur isi sebenarnya, bukan framing chunked (0\r\n\r\n != 5 byte isi)."""
+    out = b""
+    while True:
+        nl = data.find(b"\r\n")
+        if nl < 0:
+            return out
+        try:
+            size = int(data[:nl].split(b";")[0], 16)
+        except Exception:
+            return out
+        if size == 0:
+            return out
+        out += data[nl + 2:nl + 2 + size]
+        data = data[nl + 2 + size + 2:]
+
+
 def _resolve_a(name, server="1.1.1.1", timeout=3.0):
     """Resolve A sendiri via DNS UDP, supaya cache NXDOMAIN resolver lokal dilewati."""
     try:
@@ -501,6 +518,8 @@ def _edge_probe_via(host, ip, path, timeout=10.0):
             if b":" in ln:
                 k, _, v = ln.partition(b":")
                 headers[k.decode(errors="replace").strip().lower()] = v.decode(errors="replace").strip()
+    if "chunked" in headers.get("transfer-encoding", "").lower():
+        body = _dechunk(body)
     return {"status": status, "header": headers.get(OVERRIDE_HEADER.lower()),
             "body_len": len(body), "latency_ms": round((time.time() - t0) * 1000, 1),
             "url": "https://%s%s" % (ip, path), "via_ip": ip}

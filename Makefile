@@ -76,3 +76,9 @@ t3:
 # --- GALARDO registry kapabilitas sumber ---
 srccap:
 	python3 tools/galardo_srccap.py
+
+# --- GALARDO probe UDP reflection/amplification ---
+udp:
+	python3 tools/galardo_udp.py
+udp-spoof:
+	sudo -E python3 tools/galardo_udp.py

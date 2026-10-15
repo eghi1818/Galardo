@@ -284,6 +284,21 @@ class SourceRegistry:
                          for c in CAPABILITIES}}
 
 
+def mark_proven(sid, caps, evidence=None):
+    """Tandai kapabilitas sebagai TERBUKTI oleh prober lain (mis. udp_probe)."""
+    s = REGISTRY.get(sid)
+    if s is None:
+        raise SourceError("sumber '%s' tidak ada" % sid)
+    with REGISTRY.lock:
+        s.proven = sorted(set(s.proven) | set(caps))
+        s.na = sorted(set(s.na) - set(caps))
+        s.unproven = sorted(set(s.unproven) - set(caps))
+        if evidence:
+            s.evidence.update(evidence)
+        s.last_probe_at = time.time()
+    return s
+
+
 REGISTRY = SourceRegistry()
 
 

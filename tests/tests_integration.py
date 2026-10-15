@@ -386,6 +386,22 @@ def main():
     st, rm = req("POST", f"/sources/{sid}/remove", {})
     check("source removed", st == 200 and rm.get("removed") == sid, str(rm)[:160])
 
+    # ---- 16. UDP reflection probe (item 13) ----
+    st, src2 = req("POST", "/sources", {"label": "it-udp", "kind": "local"})
+    sid2 = (src2 or {}).get("id") or ""
+    check("second source registered for udp test", st == 201 and sid2 == "src-it-udp",
+          str(src2)[:160])
+    st, up = req("POST", f"/sources/{sid2}/udp",
+                 {"qname": "isc.org", "timeout": 2.0, "ports_n": 2, "spoof": False})
+    check("udp probe returns amplification shape",
+          st == 200 and "best_amplification" in up and "reflection_capable" in up,
+          str(up)[:200])
+    check("udp probe reports every protocol lane",
+          st == 200 and all(k in up for k in ("dns", "ntp_mode3", "ntp_mode6", "ssdp",
+                                              "port_rotation")),
+          str(up)[:160])
+    req("POST", f"/sources/{sid2}/remove", {})
+
     # ---- summary ----
     print(f"\n{'='*60}\nRESULTS: {len(PASS)} passed, {len(FAIL)} failed")
     if FAIL:

@@ -928,6 +928,25 @@ class Handler(BaseHTTPRequestHandler):
                 r = _sc.REGISTRY.probe(m[0], url=b.get("url") or _sc.DEFAULT_PROBE_URL)
                 return self._json(200, {"source": m[0], "probe": r,
                                         "capabilities": _sc.REGISTRY.get(m[0]).capabilities()})
+            m = _match(api_path, "/sources/*/udp")
+            if m and method == "POST":
+                import srccap as _sc
+                import udp_probe as _up
+                src = _sc.REGISTRY.get(m[0])
+                if not src:
+                    return self._json(404, {"error": "source not found"})
+                b = self._body()
+                r = _up.probe_all(qname=b.get("qname") or _up.DEFAULT_QNAME,
+                                  qtype=b.get("qtype") or "TXT",
+                                  timeout=float(b.get("timeout") or 3.0),
+                                  ports_n=int(b.get("ports_n") or 6))
+                if b.get("spoof", True):
+                    r["spoof"] = _up.probe_spoof(qname=b.get("qname") or _up.DEFAULT_QNAME)
+                if r.get("reflection_capable"):
+                    _sc.mark_proven(m[0], ["udp"], {"udp": r})
+                if (r.get("spoof") or {}).get("spoof_proven"):
+                    _sc.mark_proven(m[0], ["spoof_src"], {"spoof": r["spoof"]})
+                return self._json(200, dict(r, capabilities=src.capabilities()))
             m = _match(api_path, "/sources/*/remove")
             if m and method == "POST":
                 import srccap as _sc

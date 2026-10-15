@@ -144,3 +144,27 @@ make dev-up
 Alternatif: tombol `<> Code` → `Download ZIP` di halaman repo.
 Folder `data/` (state & evidence runtime) tidak ikut ter-download by design —
 lihat `.gitignore`. Konfigurasi contoh: `.env.example`.
+
+---
+
+---
+
+## Status & Quickstart (2026-10-15)
+
+Goal 1 (verifikasi kepemilikan), Goal 2 (spike sampai DOWN + time_to_recover),
+dan Goal 3 (paksa rute 404/blank) SELESAI dan terbukti dengan bukti live.
+
+    make test        # 48/48 integration test
+    make demo        # Goal 2 + Goal 3 end-to-end, satu perintah
+    make capacity    # cari titik jenuh (knee) SEBELUM spike
+
+Port: API 8090, lab target 8095.
+
+Cara pakai yang benar (jangan spike membabi buta):
+  1. make capacity  -> dapat knee_vus / knee_rps
+  2. pasang plafon target: /control/capacity?workers=N
+  3. spike di 1,2-1,5x knee, lalu baca time_to_recover
+  4. kalau tidak DOWN: naikkan 2x, atau lutut ada di atas plafon generator
+
+Bukti terakhir: UP -> SUSPECT -> DOWN -> RECOVERING -> RECOVERED,
+ttr 43,9 s, peak_waiting 288, saturated true.

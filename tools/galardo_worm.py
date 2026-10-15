@@ -47,7 +47,7 @@ def main():
     t.cleanup()
     print("-" * 62)
     print(json.dumps({"all_dead": dead, "ttl": TTL, "grace": GRACE,
-                      "expected_agents": t.roots + t.roots * t.children}, indent=2))
+                      "expected_agents": t.expected_agents()}, indent=2))
     print("WORM_OK" if dead else "WORM_GAGAL")
     return 0 if dead else 1
 

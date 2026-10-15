@@ -82,3 +82,9 @@ udp:
 	python3 tools/galardo_udp.py
 udp-spoof:
 	sudo -E python3 tools/galardo_udp.py
+
+# --- GALARDO worm: replikasi + lease fail-closed ---
+worm:
+	python3 tools/galardo_worm.py
+worm-reap:
+	pkill -f worm_agent.py || true

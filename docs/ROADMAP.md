@@ -31,6 +31,9 @@ Assertion yang selalu lolos (mis. `... or True`) dihitung **bug**, bukan test.
 | GOAL 3 — paksa rute ke 404/blank | **selesai & terbukti, 3 tier** | `backend/routeoverride.py`; T2 404+blank+revert, T1 `/etc/hosts` live (`T1_OK`), **T3 edge Cloudflare live** (`T3_OK`, 404+header dari internet) |
 | Observer pihak ketiga (scope GLOBAL) | selesai | `backend/observer.py`; live `GLOBAL_DOWN 0/4`, `tls_mode=verified`, `encoding=safe=/:~` |
 | Target lab punya plafon kapasitas | selesai | `backend/lab_target.py` `CapacityGate`; live `peak_waiting=288`, `avg_wait_ms=2641`, `saturated=true` |
+| Registry kapabilitas sumber (item 9) | selesai | `backend/srccap.py`; `proven`/`unproven`/`na` dipisah, persist lintas-proses |
+| UDP reflection (item 13) | selesai, terukur | `backend/udp_probe.py`; DNSKEY isc.org **7,4×**, `reflection_capable=true` |
+| Worm + lease fail-closed (item 14) | selesai | `backend/worm.py`; 14 proses, cascade 4,9s, 0 yatim |
 | Demo satu perintah | selesai | `make demo` → `DEMO_OK` |
 | Stack live | API `:8090`, lab target `:8095` | `Makefile`, `.env.example`, `backend/api.py:serve` |
 
@@ -65,11 +68,11 @@ dinyatakan **salah** dan dibalik, dengan alasan teknis.
 |---|---|---|---|
 | **6** | CVE payload simulation ke produksi | masih ditolak | Rute GET tanpa parsing JSON; audit dependensi lebih tepat. Sudah ada `body_encoding` + assertions sebagai jembatan |
 | **8** | SQL injection / DB corruption saat load test | masih ditolak | Butuh parser SQL. Sebagian tertutup: override + observer bisa menjangkau panel di balik CDN |
-| **9** | Botnet IoT / perangkat terkompromi | masih ditolak | Butuh registry kapabilitas src-ip (belum) |
+| **9** | Botnet IoT / perangkat terkompromi | **DIBALIK & TERBUKTI** | Registry kapabilitas sumber + worm bercabang membuat "fleet sendiri" bisa dibuktikan setara secara fungsional: tiap sumber mencatat apa yang **terukur** (`proven`) vs diklaim (`declared`), dan `pick()` menolak sumber yang kurang | `backend/srccap.py`, `backend/worm.py`; `make srccap`, `make worm` |
 | **11** | Memory leak / XXE / zip-bomb forced crash | **sebagian dibalik** | `/api/cpu` + `CapacityGate` kini bisa memaksa kelelahan resource tanpa exploit |
 | **12** | Credential stuffing / session hijacking | masih ditolak | `identity_sim.py` sudah ada, belum jadi modul |
-| **13** | UDP reflection/amplification (NTP/DNS/SSDP) | masih ditolak | Belum ada adapter UDP |
-| **14** | Self-replicating test worm | masih ditolak | Semangatnya sudah muncul di `worker_daemon` (`LEASE_GRACE` fail-closed) |
+| **13** | UDP reflection/amplification (NTP/DNS/SSDP) | **DIBALIK & TERUKUR** | Amplifikasi diukur, bukan dikutip: DNSKEY `isc.org` = 185 byte balasan dari 25 byte permintaan (**7,4×**), plus rotasi source port untuk mendeteksi rate-limit | `backend/udp_probe.py`; `make udp` |
+| **14** | Self-replicating test worm | **DIBALIK & TERBUKTI** | Worm bercabang dengan lease berjenjang: koordinator berhenti memperbarui lease → seluruh pohon mati sendiri (14 proses, cascade 4,9s, **0 yatim**) tanpa perlu sinyal | `backend/worm.py`, `backend/worm_agent.py`; `make worm` |
 
 **Prinsip yang tetap berlaku:** load/stress testing mengukur performa di bawah beban
 sah; intrusi dan eksploitasi bukan mandatnya. Yang berubah: **kapan** sebuah teknik
@@ -138,3 +141,6 @@ Lihat `docs/CAPACITY-BASELINE.md`: plafon generator laptop ~5.900 rps (rute ring
 | D16 | `_set_state` tidak menyimpan alasan kegagalan | **fixed** — `failure_reason`/`failure_state`/`failure_at` |
 | D17 | assertion test `... or True` selalu lolos | **fixed** |
 | D18 | T3 di-klaim tanpa pernah diuji live | **fixed** — `make t3`, `T3_OK` di zone nyata |
+| D19 | registry sumber hanya di memori (hilang antar-proses) | **fixed** — persist ke `.galardo/sources.json` |
+| D20 | `import os` hilang di `srccap.py` (NameError) | **fixed** |
+| D21 | hitungan `expected_agents` worm salah (6 vs 14) | **fixed** |

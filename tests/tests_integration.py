@@ -413,6 +413,21 @@ def main():
           str(up)[:160])
     req("POST", f"/sources/{sid2}/remove", {})
 
+    # ---- 17. worm: replikasi + lease fail-closed (item 14) ----
+    import worm as _worm
+    wt = _worm.WormTree(run_id="it-worm", roots=1, children=1, max_depth=1,
+                        ttl=2.0, grace=2.0)
+    wt.build()
+    time.sleep(2.2)
+    check("worm replicated one generation",
+          len(wt.status().get("leases") or []) >= 2 and len(wt.alive()) == 1,
+          str(wt.status())[:180])
+    wt.stop_renew()
+    _dead = wt.wait_all_dead(timeout=15)
+    check("worm dies fail-closed when the lease stops being renewed", _dead,
+          str(wt.status())[:180])
+    wt.cleanup()
+
     # ---- summary ----
     print(f"\n{'='*60}\nRESULTS: {len(PASS)} passed, {len(FAIL)} failed")
     if FAIL:

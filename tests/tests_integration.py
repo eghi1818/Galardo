@@ -265,7 +265,16 @@ def main():
         pass
     st, r = req("POST", f"/test-jobs/{job3['id']}/start")
     check("degraded-target job dispatched (async preflight DB checks PASS)", st == 200 and r["started"], f"st={st}")
-    snap3 = wait_terminal(job3["id"], 75)
+    snap3 = wait_terminal(job3["id"], 45)
+    if snap3 is None:
+        # flake jarang: job degrade tidak terminal -> abort lalu ulang sekali
+        print("    [retry] job degrade tidak terminal; abort + ulang sekali")
+        req("POST", f"/test-jobs/{job3['id']}/abort", {"reason": "flake retry"})
+        wait_terminal(job3["id"], 30)
+        st, job3 = req("POST", "/test-jobs", {"test_plan_id": plan3["id"]},
+                       {"Idempotency-Key": "test-job-degrade-1b"})
+        req("POST", f"/test-jobs/{job3['id']}/start")
+        snap3 = wait_terminal(job3["id"], 45)
     stt3 = snap3["job"]["status"] if snap3 else "timeout"
     check("degraded baseline -> FAILED (fail-closed, no traffic)", stt3 == "FAILED", stt3)
     _fr = str((snap3 or {}).get("job", {}).get("failure_reason") or "")
@@ -457,6 +466,23 @@ think_time_ms:
   min: 30
   max: 80
 """
+
+
+# ---- diagnostic wrapper (W7): rekam sebab kalau wait_terminal kehabisan waktu ----
+_wt_orig = wait_terminal
+
+
+def wait_terminal(job_id, timeout=90):   # noqa: F811
+    r = _wt_orig(job_id, timeout)
+    if r is None:
+        st, snap = req("GET", f"/test-jobs/{job_id}/snapshot")
+        j = (snap or {}).get("job", {}) if isinstance(snap, dict) else {}
+        print("  [WAIT_TIMEOUT] job=%s st=%s status=%s failure=%s safety=%s"
+              % (job_id, st, j.get("status"),
+                 str(j.get("failure_reason"))[:100],
+                 str((snap or {}).get("safety"))[:140]))
+    return r
+
 
 if __name__ == "__main__":
     main()

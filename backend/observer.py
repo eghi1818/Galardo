@@ -1,347 +1,284 @@
-"""Third-party observer via check-host.net - upgrades DOWN from LOKAL to GLOBAL.
+"""GALARDO - Third-party observer via check-host.net (scope GLOBAL).
 
-A local probe can only prove "from my machine, this is down". To claim the
-target is globally down you need nodes you do not control. This module asks
-check-host.net to probe the URL from many countries and summarises the result.
+Purpose: prove a target is DOWN from OUTSIDE our own network, so the verdict
+is not an artefact of our egress path. Used only when the local probe already
+says DOWN (escalation), per the GOAL 2 design.
 
-Verdict is deliberately conservative: fewer than 20% of answering nodes OK is
-GLOBAL_DOWN, under 60% is GLOBAL_PARTIAL, above that is GLOBAL_UP. Nodes that
-never answer are excluded from the ratio and reported separately.
-
-Python 3.9 compatible.
+Three real-world traps encoded as features (all were live bugs):
+  1. TLS: check-host occasionally presents a broken chain -> try verified
+     first, fall back to unverified, and RECORD which mode was used.
+  2. URL encoding: fully percent-encoded host is rejected (0 nodes) -> try
+     encoder variants and RECORD which one worked.
+  3. Result shape: the node map comes back FLAT with positional-list entries
+     -> detect that shape and parse positionally, else every healthy node
+     would be scored FAILED (false GLOBAL_DOWN).
 """
-
-from __future__ import annotations
-
-import http.client
 import json
 import ssl
 import time
-from urllib.parse import quote, urlsplit
+from dataclasses import dataclass, field, asdict
+from typing import Any, Dict, List, Optional
+from urllib import request as urlrequest
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 
-try:
-    from . import external_probe as ep
-except ImportError:
-    import external_probe as ep
+BASE = "https://check-host.net"
+START_PATH = "/check-http"
+RESULT_PATH = "/check-result/"
 
-try:
-    from .util import now_iso
-except ImportError:
-    from util import now_iso
+META_KEYS = {"ok", "request_id", "permanent_link", "nodes", "error", "message"}
+ENCODERS = (("safe=/:~", "/:~"), ("safe=all", ""), ("raw", None))
 
-__all__ = ["ObserverError", "ObserverCheck", "ObserverReport", "ObserverClient",
-           "verify_down", "VERDICT_GLOBAL_UP", "VERDICT_GLOBAL_PARTIAL",
-           "VERDICT_GLOBAL_DOWN", "VERDICT_UNKNOWN"]
-
-VERDICT_GLOBAL_UP = "GLOBAL_UP"
-VERDICT_GLOBAL_PARTIAL = "GLOBAL_PARTIAL"
-VERDICT_GLOBAL_DOWN = "GLOBAL_DOWN"
+VERDICT_UP = "GLOBAL_UP"
+VERDICT_PARTIAL = "GLOBAL_PARTIAL"
+VERDICT_DOWN = "GLOBAL_DOWN"
 VERDICT_UNKNOWN = "UNKNOWN"
 
-OBSERVER_HOST = "check-host.net"
-USER_AGENT = "Galardo/1.0 (+observer; out-of-band global down verification)"
-
-# Keys that are metadata, not node entries. check-host returns the node map
-# FLAT in /check-result, so anything outside this set is a node name.
-META_KEYS = ("ok", "request_id", "permanent_link", "nodes", "raw_keys")
+DEFAULT_MAX_NODES = 8
+ESCALATED_MAX_NODES = 24
 
 
-class ObserverError(Exception):
-    """The observer could not be reached or refused the request."""
+def _enc(host, safe):
+    return host if safe is None else quote(host, safe=safe)
 
 
-class ObserverCheck(object):
-    __slots__ = ("request_id", "permanent_link", "nodes", "kind", "target",
-                 "started_at", "tls_mode", "encoding_mode")
+def _int(v):
+    try:
+        return int(str(v).strip())
+    except Exception:
+        return None
 
-    def __init__(self, request_id, permanent_link, nodes, kind, target):
-        self.request_id = request_id
-        self.permanent_link = permanent_link
-        self.nodes = list(nodes or [])
-        self.kind = kind
-        self.target = target
-        self.started_at = now_iso()
-        self.tls_mode = None
-        self.encoding_mode = None
+
+def _float(v):
+    try:
+        return float(v)
+    except Exception:
+        return None
+
+
+def _status_ok(status):
+    n = _int(status)
+    return n is not None and 200 <= n < 400
+
+
+@dataclass
+class ObserverCheck:
+    node: str
+    ok: bool
+    status: Optional[int] = None
+    latency_s: Optional[float] = None
+    ip: Optional[str] = None
+    error: Optional[str] = None
+    raw: Any = None
+
+
+@dataclass
+class ObserverReport:
+    check_id: Optional[str]
+    url: str
+    verdict: str
+    ratio: float
+    nodes_total: int
+    nodes_ok: int
+    nodes: List[ObserverCheck] = field(default_factory=list)
+    tls_mode: Optional[str] = None
+    encoding_mode: Optional[str] = None
+    permanent_link: Optional[str] = None
+    error: Optional[str] = None
 
     def to_dict(self):
-        return {"request_id": self.request_id, "permanent_link": self.permanent_link,
-                "node_count": len(self.nodes), "kind": self.kind,
-                "target": self.target, "started_at": self.started_at}
+        return {
+            "source": "check-host.net",
+            "scope": "GLOBAL",
+            "check_id": self.check_id,
+            "url": self.url,
+            "verdict": self.verdict,
+            "ratio": self.ratio,
+            "nodes_total": self.nodes_total,
+            "nodes_ok": self.nodes_ok,
+            "nodes_requested": self.nodes_total,
+            "nodes_answered": self.nodes_ok,
+            "nodes": [asdict(c) for c in self.nodes],
+            "tls_mode": self.tls_mode,
+            "encoding_mode": self.encoding_mode,
+            "permanent_link": self.permanent_link,
+            "error": self.error,
+        }
+
+    def proves_global_down(self):
+        return self.verdict == VERDICT_DOWN
+
+    def proves_global_up(self):
+        return self.verdict == VERDICT_UP
 
 
-class ObserverReport(object):
-    """Parsed observer outcome. Pending nodes are counted, never guessed."""
+class ObserverClient:
+    """Minimal, tolerant client. Never raises out of verify_down/escalate."""
+
+    def __init__(self, tls_verify=True, max_nodes=DEFAULT_MAX_NODES, timeout=12.0):
+        self.tls_verify = bool(tls_verify)
+        self.max_nodes = int(max_nodes)
+        self.timeout = float(timeout)
+        self.tls_mode = None
+        self.tls_fallback_reason = None
+        self.encoding_mode = None
+        self.last_error = None
+
+    # ------------------------------------------------------------------
+    def _get(self, url, timeout):
+        last = None
+        attempts = [("verified", ssl.create_default_context())]
+        if True:
+            attempts.append(("unverified", ssl._create_unverified_context()))
+        for mode, ctx in attempts:
+            try:
+                opener = urlrequest.build_opener(urlrequest.HTTPSHandler(context=ctx))
+                req = urlrequest.Request(url, headers={
+                    "Accept": "application/json",
+                    "User-Agent": "GalardoObserver/1.0"})
+                with opener.open(req, timeout=timeout) as resp:
+                    body = resp.read().decode("utf-8", "replace")
+                self.tls_mode = mode
+                return json.loads(body)
+            except Exception as e:
+                last = e
+                if mode == "verified":
+                    self.tls_fallback_reason = str(e)[:200]
+        raise last
+
+    def start(self, url, max_nodes=None, timeout=None):
+        """Create a check. Tries encoding variants until nodes appear."""
+        self.last_error = None
+        max_nodes = max_nodes or self.max_nodes
+        timeout = timeout or self.timeout
+        host = url
+        for name, safe in ENCODERS:
+            try:
+                qs = "?host=%s&max_nodes=%d&timeout=%d" % (_enc(host, safe), max_nodes, int(timeout))
+                doc = self._get(BASE + START_PATH + qs, timeout)
+            except Exception as e:
+                self.last_error = "start(%s) failed: %s" % (name, e)
+                continue
+            nodes = doc.get("nodes") or {}
+            if nodes:
+                self.encoding_mode = name
+                return doc
+            self.last_error = "encoder %s returned 0 nodes" % name
+        return None
 
     @staticmethod
-    def _parse_entry(entry):
-        """check-host ships either a dict or a POSITIONAL LIST.
-
-        Observed list form: [flag, seconds, label, http_status, resolved_ip]
-        where flag == 1 means success and label carries the error text on
-        failure ("Broken pipe"). Parsed tolerantly: a format tweak must never
-        silently mark every successful node as failed, which would produce a
-        false GLOBAL_DOWN from a healthy target.
-        """
+    def _parse_entry(node, entry):
         if entry is None:
-            return {"ok": None, "pending": True}
+            return ObserverCheck(node=node, ok=False, error="no data from node", raw=entry)
         if isinstance(entry, dict):
-            error = entry.get("error")
-            return {"ok": error is None, "error": error,
-                    "time": entry.get("time"), "status": entry.get("status")}
+            status = entry.get("status") or entry.get("code")
+            err = entry.get("error")
+            ok = _status_ok(status) and not err
+            return ObserverCheck(node=node, ok=ok, status=_int(status),
+                                 latency_s=_float(entry.get("time") or entry.get("seconds")),
+                                 ip=entry.get("ip"), error=err, raw=entry)
         if isinstance(entry, (list, tuple)):
-            if not entry:
-                return {"ok": None, "pending": True}
-            flag = entry[0]
-            seconds = entry[1] if len(entry) > 1 else None
-            label = entry[2] if len(entry) > 2 else None
+            # positional shape: [flag, seconds, label, status, ip]
             status = entry[3] if len(entry) > 3 else None
-            ip = entry[4] if len(entry) > 4 else None
-            ok = (flag == 1) or (str(status) == "200")
-            return {"ok": bool(ok), "error": None if ok else (label or "failed"),
-                    "time": seconds, "status": status, "ip": ip}
-        return {"ok": False, "error": str(entry)}
+            label = entry[2] if len(entry) > 2 else None
+            ok = _status_ok(status)
+            return ObserverCheck(node=node, ok=ok, status=_int(status),
+                                 latency_s=_float(entry[1] if len(entry) > 1 else None),
+                                 ip=entry[4] if len(entry) > 4 else None,
+                                 error=None if ok else str(label or status or "failed"),
+                                 raw=list(entry))
+        return ObserverCheck(node=node, ok=False, error="unparsable entry", raw=entry)
 
-    def __init__(self, check, raw):
-        self.check = check
-        self.raw = raw or {}
-        self.nodes = {}
-        for node, entries in (self.raw.get("nodes") or {}).items():
-            if isinstance(entries, list):
-                if entries and isinstance(entries[0], (list, tuple, dict)):
-                    entry = entries[0]
-                else:
-                    entry = entries or None
-            else:
-                entry = entries
-            self.nodes[node] = self._parse_entry(entry)
+    def result(self, check_id, timeout=None):
+        """Fetch per-node results. Handles BOTH nested and flat node maps."""
+        doc = self._get(BASE + RESULT_PATH + quote(str(check_id)), timeout or self.timeout)
+        raw_nodes = doc.get("nodes")
+        if isinstance(raw_nodes, dict) and raw_nodes:
+            nodes_map = raw_nodes
+        else:
+            nodes_map = {k: v for k, v in doc.items() if k not in META_KEYS}
+        return [self._parse_entry(n, e) for n, e in nodes_map.items()]
 
-        # Never report "0 of 0". If the observer accepted N nodes but none have
-        # answered yet, say so explicitly: 0 answered out of N requested.
-        if not self.nodes:
-            for node in (check.nodes or []):
-                self.nodes[node] = {"ok": None, "pending": True}
-
-    @property
-    def requested_nodes(self):
-        return len(self.check.nodes or [])
-
-    @property
-    def pending_nodes(self):
-        return len([n for n in self.nodes.values() if n.get("ok") is None])
-
-    @property
-    def nodes_total(self):
-        return len(self.nodes)
-
-    @property
-    def nodes_answered(self):
-        return len([n for n in self.nodes.values() if n.get("ok") is not None])
-
-    @property
-    def nodes_failed(self):
-        return len([n for n in self.nodes.values() if n.get("ok") is False])
-
-    @property
-    def ok_ratio(self):
-        answered = self.nodes_answered
-        if not answered:
-            return 0.0
-        return (answered - self.nodes_failed) / float(answered)
-
-    @property
-    def verdict(self):
-        if not self.nodes_answered:
-            return VERDICT_UNKNOWN
-        ratio = self.ok_ratio
-        if ratio <= 0.2:
-            return VERDICT_GLOBAL_DOWN
-        if ratio <= 0.6:
-            return VERDICT_GLOBAL_PARTIAL
-        return VERDICT_GLOBAL_UP
-
-    def to_dict(self):
-        return {"verdict": self.verdict, "ok_ratio": round(self.ok_ratio, 3),
-                "nodes_total": self.nodes_total, "nodes_answered": self.nodes_answered,
-                "nodes_failed": self.nodes_failed,
-                "nodes_requested": self.requested_nodes,
-                "nodes_pending": self.pending_nodes,
-                "raw_keys": self.raw.get("raw_keys"),
-                "permanent_link": self.check.permanent_link,
-                "kind": self.check.kind, "target": self.check.target,
-                "nodes": self.nodes, "observed_at": now_iso(),
-                "observer_tls_mode": getattr(self.check, "tls_mode", None),
-                "observer_encoding_mode": getattr(self.check, "encoding_mode", None)}
-
-    def __repr__(self):
-        return "<ObserverReport %s ratio=%.2f answered=%d/%d>" % (
-            self.verdict, self.ok_ratio, self.nodes_answered, self.nodes_total)
-
-
-class ObserverClient(object):
-    """Minimal check-host.net client. No dependencies beyond http.client.
-
-    check-host.net is picky about how the target is percent-encoded and the
-    accepted form has changed between deployments. Rather than guessing, try
-    each known form until one actually returns nodes, then RECORD which worked.
-    A 200 response with zero nodes is a failure, not a success.
-    """
-
-    ENCODERS = (
-        ("safe=/: ", lambda value: quote(value, safe="/:")),
-        ("safe=all", lambda value: quote(value, safe="")),
-        ("raw", lambda value: value),
-    )
-
-    def __init__(self, host=OBSERVER_HOST, timeout=20.0, verify_tls=True):
-        self.host = host
-        self.timeout = timeout
-        self.verify_tls = verify_tls
-        self.tls_mode = None
-        self.encoding_mode = None
-
-    def _get(self, path):
-        """GET with a verified-first TLS policy.
-
-        Some Python builds (notably macOS CommandLineTools 3.9) carry an empty
-        or stale trust store, so the observer's chain fails verification. We
-        try verified first, then fall back, and RECORD which mode was used.
-        """
-        attempts = []
-        if self.verify_tls:
-            attempts.append(("verified", ssl.create_default_context()))
-        attempts.append(("unverified", ssl._create_unverified_context()))
-        errors = []
-        for label, context in attempts:
-            conn = None
+    # ------------------------------------------------------------------
+    def _report(self, url, max_nodes, timeout, poll_timeout=None):
+        doc = self.start(url, max_nodes=max_nodes, timeout=timeout)
+        if not doc:
+            return ObserverReport(None, url, VERDICT_UNKNOWN, 0.0, 0, 0, [],
+                                  self.tls_mode, self.encoding_mode, None, self.last_error)
+        cid = doc.get("request_id")
+        deadline = time.time() + float(poll_timeout or 20.0)
+        checks, last_err = [], None
+        while True:
+            time.sleep(1.0)
             try:
-                conn = http.client.HTTPSConnection(self.host, timeout=self.timeout,
-                                                   context=context)
-                conn.request("GET", path, headers={
-                    "Accept": "application/json",
-                    "User-Agent": USER_AGENT,
-                })
-                resp = conn.getresponse()
-                raw = resp.read()
-                if resp.status != 200:
-                    raise ObserverError("%s -> HTTP %d %s" % (path, resp.status, raw[:140]))
-                self.tls_mode = label
-                return json.loads(raw.decode("utf-8", "replace"))
-            except ObserverError:
-                raise
-            except Exception as exc:
-                errors.append("%s/%s: %s" % (label, type(exc).__name__, exc))
-            finally:
-                if conn is not None:
-                    try:
-                        conn.close()
-                    except Exception:
-                        pass
-        raise ObserverError("%s -> %s" % (path, " | ".join(errors)))
-
-    def start(self, url, max_nodes=10, kind="http", timeout=10, cache_buster=True):
-        target = url
-        endpoint = "check-tcp" if kind == "tcp" else "check-http"
-        if kind == "tcp":
-            parts = urlsplit(url)
-            port = parts.port or (443 if parts.scheme == "https" else 80)
-            target = "%s:%d" % (parts.hostname, port)
-        elif cache_buster:
-            parts = urlsplit(url)
-            busted = ep.cache_buster_path(parts.path or "/")
-            target = "%s://%s%s" % (parts.scheme, parts.netloc, busted)
-            if parts.query:
-                target += "&" + parts.query
-
-        problems = []
-        for label, encoder in self.ENCODERS:
-            path = "/%s?host=%s&max_nodes=%d&timeout=%d" % (
-                endpoint, encoder(target), int(max_nodes), int(timeout))
-            try:
-                doc = self._get(path)
-            except ObserverError as exc:
-                problems.append("%s: %s" % (label.strip(), str(exc)[:110]))
-                continue
-            if doc.get("ok") != 1:
-                problems.append("%s: refused %s" % (label.strip(), json.dumps(doc)[:110]))
-                continue
-            nodes = list((doc.get("nodes") or {}).keys())
-            if not nodes:
-                problems.append("%s: HTTP 200 but 0 nodes" % label.strip())
-                continue
-            self.encoding_mode = label.strip()
-            check = ObserverCheck(doc.get("request_id"), doc.get("permanent_link"),
-                                  nodes, kind, target)
-            check.tls_mode = self.tls_mode
-            check.encoding_mode = self.encoding_mode
-            return check
-        raise ObserverError("no encoding produced nodes for %s (%s)" % (
-            target, " | ".join(problems)))
-
-    def result(self, request_id):
-        """Fetch one result document, tolerating nesting differences.
-
-        Deployments have shipped the payload under different keys. If "nodes"
-        is absent, adopt the first dict-of-anything that looks like a node map
-        so a shape change does not silently produce an empty report.
-        """
-        doc = self._get("/check-result/" + request_id)
-        if not isinstance(doc, dict):
-            return {"nodes": {}}
-        if "nodes" not in doc:
-            # Observed reality: check-host returns the node map FLAT - the node
-            # hostnames ARE the top-level keys. Anything that is not a known
-            # meta key is a node entry.
-            candidate = dict((k, v) for k, v in doc.items() if k not in META_KEYS)
-            if candidate:
-                doc["nodes"] = candidate
-            else:
-                for key in ("result", "data", "results", "checks"):
-                    value = doc.get(key)
-                    if isinstance(value, dict) and value:
-                        doc["nodes"] = value
-                        break
-        doc.setdefault("nodes", {})
-        doc["raw_keys"] = sorted(doc.keys())
-        return doc
-
-    def poll(self, check, timeout=30.0, interval=2.0):
-        deadline = time.time() + timeout
-        last = None
-        while time.time() < deadline:
-            last = self.result(check.request_id)
-            nodes = (last or {}).get("nodes") or {}
-            if nodes and all(v is not None for v in nodes.values()):
+                checks = self.result(cid, timeout=timeout)
+                last_err = None
+            except Exception as e:
+                checks, last_err = [], str(e)
+            if any(c.raw is not None for c in checks):
                 break
-            time.sleep(interval)
-        return ObserverReport(check, last or {})
+            if time.time() >= deadline:
+                break
+        if not checks and last_err:
+            return ObserverReport(cid, url, VERDICT_UNKNOWN, 0.0, 0, 0, [],
+                                  self.tls_mode, self.encoding_mode,
+                                  doc.get("permanent_link"), "result failed: %s" % last_err)
+        total = len(checks)
+        ok = sum(1 for c in checks if c.ok)
+        ratio = (ok / total) if total else 0.0
+        if total == 0:
+            verdict = VERDICT_UNKNOWN
+        elif ok == 0:
+            verdict = VERDICT_DOWN
+        elif ok == total:
+            verdict = VERDICT_UP
+        else:
+            verdict = VERDICT_PARTIAL
+        return ObserverReport(cid, url, verdict, round(ratio, 4), total, ok, checks,
+                              self.tls_mode, self.encoding_mode,
+                              doc.get("permanent_link"), None)
+
+    def verify_down(self, url, max_nodes=None, timeout=None, poll_timeout=None):
+        return self._report(url, max_nodes or self.max_nodes, timeout or self.timeout,
+                            poll_timeout=poll_timeout)
+
+    def escalate(self, url, max_nodes=ESCALATED_MAX_NODES, timeout=None, poll_timeout=None):
+        """Wider node fan-out when a DOWN verdict needs stronger proof."""
+        return self._report(url, max_nodes, timeout or (self.timeout + 3),
+                            poll_timeout=poll_timeout)
 
 
-def verify_down(url, max_nodes=10, kind="http", start_timeout=10,
-                poll_timeout=30.0, interval=2.0, client=None):
-    """Start a check and poll it to completion. Returns an ObserverReport.
-
-    Raises ObserverError if the observer itself is unreachable - the caller
-    must distinguish "observer down" from "target down".
-    """
-    client = client or ObserverClient()
-    check = client.start(url, max_nodes=max_nodes, kind=kind, timeout=start_timeout)
-    return client.poll(check, timeout=poll_timeout, interval=interval)
+_DEFAULT = None
 
 
-def escalate(local_verdict, url, min_local_state="DOWN", **kwargs):
-    """Only ask the third party once the LOCAL probe already says DOWN.
+def client():
+    global _DEFAULT
+    if _DEFAULT is None:
+        _DEFAULT = ObserverClient()
+    return _DEFAULT
 
-    Saves observer quota and keeps the causal order honest: local evidence
-    first, global confirmation second.
-    """
-    state = (local_verdict or {}).get("state")
-    if min_local_state and state != min_local_state and state != "RECOVERING":
-        return {"skipped": True, "reason": "local state %s < %s" % (state, min_local_state)}
-    try:
-        report = verify_down(url, **kwargs)
-    except ObserverError as exc:
-        return {"skipped": False, "error": str(exc), "verdict": VERDICT_UNKNOWN}
-    out = report.to_dict()
-    out["skipped"] = False
-    return out
+
+def _flex(verdict, url, max_nodes, timeout, wider, poll_timeout=None):
+    """Accepts both (verdict, url) and legacy (url) call shapes."""
+    if url is None and isinstance(verdict, str):
+        url, verdict = verdict, None
+    if url is None:
+        raise ValueError("observer: url is required")
+    cl = client()
+    rep = (cl.escalate(url, max_nodes=max_nodes, timeout=timeout, poll_timeout=poll_timeout)
+           if wider else
+           cl.verify_down(url, max_nodes=max_nodes, timeout=timeout, poll_timeout=poll_timeout))
+    d = rep.to_dict()
+    if isinstance(verdict, dict):
+        d["local_verdict"] = {"state": verdict.get("state"),
+                              "down_verified": verdict.get("down_verified"),
+                              "time_to_recover": verdict.get("time_to_recover")}
+    return d
+
+
+def verify_down(verdict=None, url=None, max_nodes=DEFAULT_MAX_NODES, timeout=12.0, **kw):
+    return _flex(verdict, url, max_nodes, timeout, False, kw.get("poll_timeout"))
+
+
+def escalate(verdict=None, url=None, max_nodes=ESCALATED_MAX_NODES, timeout=15.0, **kw):
+    return _flex(verdict, url, max_nodes, timeout, True, kw.get("poll_timeout"))

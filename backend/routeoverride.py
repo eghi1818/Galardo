@@ -1,580 +1,661 @@
-"""Force a chosen route to 404 / blank (Goal 3). Three tiers, stdlib only.
+"""GALARDO - GOAL 3: force a route to 404/410/503/blank on demand.
 
-T2  local intercept shim   - answers 404/blank itself. No sudo. Process-local.
-T1  /etc/hosts block       - machine-local. Needs T2 to be useful, because
-                             hosts cannot carry a port: something must own
-                             :80/:443 for the redirected hostname to answer.
-T3  Cloudflare edge rule   - global, but only for zones you own, and it needs
-                             an API token. Recorded as best-effort: Cloudflare
-                             accepts a limited set of status codes on redirect
-                             rules, so 404 is attempted first and 302 is used
-                             as a fallback, and which one was used is RECORDED.
+Three tiers, tried in order, first success wins, and EVERY attempt records
+what actually happened (no silent degradation):
 
-Every tier reports what it actually did, so evidence can distinguish
-"forced locally" from "forced globally" instead of pretending.
+  T2 local-shim  : ThreadingHTTPServer on 127.0.0.1 that returns the forced
+                   status for matched paths and proxies the rest. Proven tier.
+  T1 hosts       : append "127.0.0.1 <host> # galardo-override" to /etc/hosts
+                   so the REAL hostname resolves to the shim (needs sudo).
+  T3 cf-worker   : deploy a Cloudflare Worker that answers the forced status
+                   at the edge for the matched paths (needs a CF token).
 
-Python 3.9 compatible.
+The forced response ALWAYS carries header "X-Galardo-Override: <mode>".
+That header is the discriminator: a bare 404 from a real upstream is
+indistinguishable from a forced one without it.
 """
-
-from __future__ import annotations
-
-import fnmatch
-import http.client
 import json
 import os
 import shutil
 import socket
 import subprocess
-import tempfile
 import threading
 import time
+from dataclasses import dataclass, asdict, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Dict, List, Optional
+from urllib import request as urlrequest
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 
-try:
-    from . import transport as transport_mod
-except ImportError:
-    import transport as transport_mod
+OVERRIDE_HEADER = "X-Galardo-Override"
 
-try:
-    from .util import now_iso
-except ImportError:
-    from util import now_iso
-
-__all__ = [
-    "OverrideError", "OverrideSpec", "TierResult", "LocalShim", "HostsOverride",
-    "CloudflareEdgeOverride", "CertAuthority", "RouteOverrider",
-    "MODES", "HOSTS_MARK_BEGIN", "HOSTS_MARK_END",
-]
-
-MODES = {"404": 404, "410": 410, "503": 503, "blank": 200}
-HOSTS_PATH = "/etc/hosts"
-HOSTS_MARK_BEGIN = "# >>> galardo route override >>>"
-HOSTS_MARK_END = "# <<< galardo route override <<<"
-CF_API_HOST = "api.cloudflare.com"
-CF_PHASE = "http_request_dynamic_redirect"
+MODES = {
+    "404":   {"status": 404, "body": b"", "reason": "Not Found"},
+    "410":   {"status": 410, "body": b"", "reason": "Gone"},
+    "503":   {"status": 503, "body": b"", "reason": "Service Unavailable"},
+    "blank": {"status": 200, "body": b"", "reason": "OK"},
+}
 
 
-class OverrideError(Exception):
-    """A tier could not be applied; the caller decides whether to continue."""
+class _NoRedirect(urlrequest.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
-class OverrideSpec(object):
-    """What to force. ``paths`` are glob patterns matched against the URL path."""
+def _free_port():
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    p = s.getsockname()[1]
+    s.close()
+    return p
 
-    def __init__(self, domain, paths=None, mode="404", hosts=None, note="", ttl_seconds=None):
-        self.domain = str(domain).strip().lower().strip(".")
-        self.paths = list(paths or ["/*"])
-        self.mode = mode if mode in MODES else "404"
-        self.hosts = list(hosts or [self.domain])
-        self.note = note
-        self.ttl_seconds = ttl_seconds
-        self.created_at = now_iso()
+
+@dataclass
+class OverrideSpec:
+    origin: str
+    paths: List[str] = field(default_factory=lambda: ["/*"])
+    mode: str = "404"
+    spec_id: str = ""
+    shim_port: Optional[int] = None
+    tiers: Optional[List[str]] = None
+    upstream: Optional[str] = None
+    host_header: Optional[str] = None
+    port: Optional[int] = None
+    label: str = ""
+    hosts: Optional[List[str]] = None  # compat-w7
+    note: str = ""                     # compat-w7
+
+    def __post_init__(self):
+        if not self.spec_id:
+            self.spec_id = "ov-%d" % int(time.time() * 1000)
+        if self.port is None and self.shim_port is not None:
+            self.port = int(self.shim_port)
+        if isinstance(self.paths, str):
+            self.paths = [self.paths]
+        if self.mode not in MODES:
+            raise ValueError("mode must be one of %s" % sorted(MODES))
+        if not self.paths:
+            raise ValueError("paths must not be empty")
+
+    @property
+    def id(self):
+        return self.spec_id
+
+    def host(self):
+        return urlsplit(self.origin).hostname or self.origin
 
     def matches(self, path):
-        path = path or "/"
-        for pattern in self.paths:
-            if fnmatch.fnmatch(path, pattern):
+        """Wildcard-aware. "/blocked/*" cocok untuk /blocked, /blocked/, /blocked/x."""
+        if not path.startswith("/"):
+            path = "/" + path
+        for p in self.paths:
+            if p in ("*", "/*"):
                 return True
-            if pattern.endswith("*") and path.startswith(pattern[:-1]):
+            base = p.rstrip("*").rstrip("/")
+            if not base:
+                return True
+            if path == base or path.startswith(base + "/"):
                 return True
         return False
 
-    @property
-    def status_code(self):
-        return MODES[self.mode]
-
-    @property
-    def is_blank(self):
-        return self.mode == "blank"
+    def forced_status(self):
+        return MODES[self.mode]["status"]
 
     def to_dict(self):
-        return {"domain": self.domain, "paths": self.paths, "mode": self.mode,
-                "hosts": self.hosts, "note": self.note,
-                "ttl_seconds": self.ttl_seconds, "created_at": self.created_at}
+        return {"spec_id": self.spec_id, "origin": self.origin, "paths": list(self.paths),
+                "mode": self.mode, "upstream": self.upstream, "host_header": self.host_header,
+                "port": self.port, "label": self.label, "forced_status": self.forced_status()}
 
 
-class TierResult(object):
-    def __init__(self, tier, ok, detail, data=None):
-        self.tier = tier
-        self.ok = bool(ok)
-        self.detail = detail
-        self.data = data or {}
-        self.at = now_iso()
-
-    def to_dict(self):
-        return {"tier": self.tier, "ok": self.ok, "detail": self.detail,
-                "data": self.data, "at": self.at}
-
-    def __repr__(self):
-        return "<TierResult %s ok=%s %s>" % (self.tier, self.ok, self.detail)
+@dataclass
+class TierResult:
+    tier: str
+    ok: bool
+    detail: str = ""
+    artifact: Optional[dict] = None
+    status_code: Optional[int] = None
 
 
-# --------------------------------------------------------------------------
-# T2 - local intercept shim
-# --------------------------------------------------------------------------
-class _ShimHandler(BaseHTTPRequestHandler):
-    protocol_version = "HTTP/1.1"
-    server_version = "GalardoShim/1.0"
+# ---------------------------------------------------------------------------
+# T2 - local shim (proven)
+# ---------------------------------------------------------------------------
+class LocalShim:
+    TIER = "T2-local-shim"
 
-    def log_message(self, fmt, *args):
-        pass
-
-    def _read_body(self):
-        length = int(self.headers.get("Content-Length") or 0)
-        return self.rfile.read(length) if length else None
-
-    def _respond(self, code, body, content_type="application/json", extra=None):
-        self.send_response(code)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        for key, value in (extra or {}).items():
-            self.send_header(key, value)
-        self.end_headers()
-        if body:
-            try:
-                self.wfile.write(body)
-            except (BrokenPipeError, ConnectionResetError):
-                pass
-
-    def _handle(self):
-        shim = self.server.shim
-        parts = urlsplit(self.path)
-        path = parts.path or "/"
-        payload = self._read_body() if self.command in ("POST", "PUT", "PATCH") else None
-
-        if shim.spec.matches(path):
-            shim.note_hit(path, self.command)
-            if shim.spec.is_blank:
-                return self._respond(200, b"", "text/plain",
-                                     {"X-Galardo-Override": "blank", "Cache-Control": "no-store"})
-            body = json.dumps({"galardo": "forced", "mode": shim.spec.mode,
-                               "path": path, "method": self.command}).encode("utf-8")
-            return self._respond(shim.spec.status_code, body, "application/json",
-                                 {"X-Galardo-Override": shim.spec.mode,
-                                  "Cache-Control": "no-store"})
-
-        if not shim.upstream:
-            return self._respond(404, b'{"galardo":"shim:no-upstream"}', "application/json")
-        shim.note_pass(path, self.command)
-        url = shim.upstream.rstrip("/") + self.path
-        headers = {"Accept": self.headers.get("Accept") or "*/*"}
-        for key in ("Content-Type", "Accept-Encoding"):
-            if self.headers.get(key):
-                headers[key] = self.headers.get(key)
-        try:
-            resp = shim.transport.request(self.command, url, headers=headers, body=payload,
-                                          timeout=shim.timeout, connect_ip=shim.connect_ip)
-        except Exception as exc:
-            return self._respond(502, json.dumps({"galardo": "shim upstream error",
-                                                  "detail": str(exc)[:160]}).encode(),
-                                 "application/json")
-        if resp.error:
-            return self._respond(502, json.dumps({"galardo": "shim upstream error",
-                                                  "detail": resp.error[:160]}).encode(),
-                                 "application/json")
-        return self._respond(resp.status or 502, resp.body or b"",
-                             resp.header("content-type") or "application/octet-stream")
-
-    do_GET = _handle
-    do_POST = _handle
-    do_PUT = _handle
-    do_PATCH = _handle
-    do_DELETE = _handle
-    do_HEAD = _handle
-
-
-class LocalShim(object):
-    """T2: an HTTP server that forces matched paths and forwards the rest."""
-
-    def __init__(self, spec, upstream=None, port=8899, host="127.0.0.1",
-                 connect_ip=None, timeout=10.0):
+    def __init__(self, spec, port=None, upstream=None, connect_ip=None, **kw):
         self.spec = spec
-        self.upstream = upstream
-        self.host = host
-        self.port = port
+        self.port = int(port) if port else (spec.port or _free_port())
+        self.upstream = upstream or spec.upstream
         self.connect_ip = connect_ip
-        self.timeout = timeout
-        self.transport = transport_mod.Transport(timeout=timeout, max_idle=8)
+        self.host_header = spec.host_header or spec.host()
         self.httpd = None
         self.thread = None
-        self.hits = []
-        self.passes = []
-        self.lock = threading.Lock()
+        self.hits = 0
+        self.forced_hits = 0
 
-    def note_hit(self, path, method):
-        with self.lock:
-            self.hits.append({"at": now_iso(), "path": path, "method": method})
-            self.hits[:] = self.hits[-500:]
+    def url(self):
+        return "http://127.0.0.1:%d" % self.port
 
-    def note_pass(self, path, method):
-        with self.lock:
-            self.passes.append({"at": now_iso(), "path": path, "method": method})
-            self.passes[:] = self.passes[-500:]
+    def url_for(self, path="/"):
+        if not path.startswith("/"):
+            path = "/" + path
+        return self.url() + path
 
     def start(self):
-        self.httpd = ThreadingHTTPServer((self.host, self.port), _ShimHandler)
-        self.httpd.shim = self
-        self.thread = threading.Thread(target=self.httpd.serve_forever,
-                                       daemon=True, name="galardo-shim")
+        spec = self.spec
+        shim = self
+
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                self._serve("GET")
+
+            def do_HEAD(self):
+                self._serve("HEAD")
+
+            def do_POST(self):
+                self._serve("POST")
+
+            def _serve(self, method):
+                shim.hits += 1
+                path = urlsplit(self.path).path
+                if spec.matches(path):
+                    shim.forced_hits += 1
+                    m = MODES[spec.mode]
+                    body = m["body"]
+                    self.send_response(m["status"], m["reason"])
+                    self.send_header(OVERRIDE_HEADER, spec.mode)
+                    self.send_header("Content-Length", str(len(body)))
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.end_headers()
+                    if method != "HEAD" and body:
+                        try:
+                            self.wfile.write(body)
+                        except (BrokenPipeError, ConnectionResetError):
+                            pass
+                    return
+
+                if not shim.upstream:
+                    self.send_response(404)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+
+                target = shim.upstream.rstrip("/") + self.path
+                try:
+                    req = urlrequest.Request(target, method=method)
+                    req.add_header("User-Agent", "GalardoShim/1.0")
+                    if shim.host_header:
+                        req.add_header("Host", shim.host_header)
+                    with urlrequest.build_opener().open(req, timeout=10) as resp:
+                        data = resp.read()
+                        code = resp.getcode()
+                        ctype = resp.headers.get("Content-Type", "text/html; charset=utf-8")
+                except HTTPError as e:
+                    data = e.read()
+                    code = e.code
+                    ctype = "text/html; charset=utf-8"
+                except Exception as e:
+                    data = str(e)[:200].encode()
+                    code = 502
+                    ctype = "text/plain"
+                self.send_response(code)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                if method != "HEAD" and data:
+                    try:
+                        self.wfile.write(data)
+                    except (BrokenPipeError, ConnectionResetError):
+                        pass
+
+        try:
+            self.httpd = ThreadingHTTPServer(("127.0.0.1", self.port), Handler)
+        except OSError:
+            self.port = _free_port()
+            self.httpd = ThreadingHTTPServer(("127.0.0.1", self.port), Handler)
+        self.httpd.daemon_threads = True
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True,
+                                       name="galardo-shim-%d" % self.port)
         self.thread.start()
+        time.sleep(0.15)
         return self
 
     def stop(self):
-        if self.httpd is not None:
+        if self.httpd:
             try:
                 self.httpd.shutdown()
                 self.httpd.server_close()
             except Exception:
                 pass
+        self.httpd = None
+
+    def probe(self, path="/"):
+        url = self.url() + path
+        t0 = time.time()
         try:
-            self.transport.close()
-        except Exception:
-            pass
+            opener = urlrequest.build_opener(_NoRedirect())
+            req = urlrequest.Request(url, headers={"User-Agent": "GalardoShimProbe/1.0"})
+            with opener.open(req, timeout=5) as r:
+                body = r.read()
+                return {"status": r.getcode(), "override_header": r.headers.get(OVERRIDE_HEADER),
+                        "body_len": len(body), "forced": bool(r.headers.get(OVERRIDE_HEADER)),
+                        "latency_ms": round((time.time() - t0) * 1000, 2), "url": url}
+        except HTTPError as e:
+            body = e.read()
+            return {"status": e.code, "override_header": e.headers.get(OVERRIDE_HEADER),
+                    "body_len": len(body), "forced": bool(e.headers.get(OVERRIDE_HEADER)),
+                    "latency_ms": round((time.time() - t0) * 1000, 2), "url": url}
+        except Exception as e:
+            return {"status": None, "error": str(e)[:200], "url": url}
 
-    def proxy_tuple(self):
-        return (self.host, self.port)
+    def stats(self):
+        return {"tier": self.TIER, "port": self.port, "hits": self.hits,
+                "forced_hits": self.forced_hits, "running": bool(self.httpd)}
 
-    def url_for(self, path="/"):
-        return "http://%s:%d%s" % (self.host, self.port, path)
+
+# ---------------------------------------------------------------------------
+# T1 - /etc/hosts
+# ---------------------------------------------------------------------------
+class HostsOverride:
+    TIER = "T1-hosts"
+    PATH = "/etc/hosts"
+    MARK = "# galardo-override"
+
+    def __init__(self, path=None, hosts=None, **kw):
+        self.path = path or self.PATH
+
+    def plan(self, host, ip="127.0.0.1"):
+        return "%s\t%s\t%s" % (ip, host, self.MARK)
+
+    def current(self, host):
+        try:
+            with open(self.path) as fh:
+                return [l.rstrip("\n") for l in fh if host in l]
+        except Exception as e:
+            return ["<err %s>" % e]
+
+    def apply(self, host, ip="127.0.0.1", use_sudo=True):
+        line = self.plan(host, ip)
+        try:
+            with open(self.path) as fh:
+                txt = fh.read()
+        except Exception as e:
+            return TierResult(self.TIER, False, "read %s failed: %s" % (self.path, e))
+        if self.MARK in txt and ("\t%s\t" % host) in txt or (" %s " % host) in txt:
+            return TierResult(self.TIER, True, "already present", {"line": line, "path": self.path})
+        new = txt.rstrip("\n") + "\n" + line + "\n"
+        tmp = "/tmp/galardo-hosts-%d" % os.getpid()
+        try:
+            with open(tmp, "w") as fh:
+                fh.write(new)
+        except Exception as e:
+            return TierResult(self.TIER, False, "write tmp failed: %s" % e)
+        manual = "sudo sh -c 'echo \"%s\" >> %s'" % (line, self.path)
+        if use_sudo and not os.access(self.path, os.W_OK):
+            p = subprocess.run(["sudo", "-n", "cp", tmp, self.path],
+                               capture_output=True, text=True)
+            if p.returncode != 0:
+                return TierResult(self.TIER, False,
+                                  "sudo cp failed (need sudo): %s" % ((p.stderr or p.stdout or "")[:200]),
+                                  {"line": line, "manual": manual, "path": self.path})
+        else:
+            try:
+                shutil.copyfile(tmp, self.path)
+            except Exception as e:
+                return TierResult(self.TIER, False, str(e)[:200], {"line": line, "manual": manual})
+        return TierResult(self.TIER, True, "added to %s" % self.path,
+                          {"line": line, "path": self.path})
+
+    def revert(self, host=None):
+        try:
+            with open(self.path) as fh:
+                lines = fh.read().split("\n")
+        except Exception as e:
+            return TierResult(self.TIER, False, "read failed: %s" % e)
+        kept = [l for l in lines if not (self.MARK in l and (host is None or host in l))]
+        tmp = "/tmp/galardo-hosts-rev-%d" % os.getpid()
+        with open(tmp, "w") as fh:
+            fh.write("\n".join(kept))
+        if not os.access(self.path, os.W_OK):
+            p = subprocess.run(["sudo", "-n", "cp", tmp, self.path], capture_output=True, text=True)
+            if p.returncode != 0:
+                return TierResult(self.TIER, False, "sudo cp failed", {"manual": "sudo cp %s %s" % (tmp, self.path)})
+        else:
+            shutil.copyfile(tmp, self.path)
+        return TierResult(self.TIER, True, "override lines removed")
+
+
+# ---------------------------------------------------------------------------
+# T3 - Cloudflare Worker at the edge (best-effort, records API status)
+# ---------------------------------------------------------------------------
+WORKER_JS = """// Galardo edge override - generated
+const PATHS = %s;
+const STATUS = %d;
+const MODE = %s;
+const EMPTY = %s;
+addEventListener("fetch", event => {
+  const u = new URL(event.request.url);
+  const hit = PATHS.some(p => p === "*" || u.pathname === p || u.pathname.startsWith(p.replace(/\\/$/, "") + "/"));
+  if (!hit) return event.respondWith(fetch(event.request));
+  return event.respondWith(new Response(EMPTY ? "" : "forced " + MODE, {
+    status: STATUS,
+    headers: { "x-galardo-override": MODE, "content-type": "text/html; charset=utf-8" }
+  }));
+});
+"""
+
+
+class CloudflareEdgeOverride:
+    TIER = "T3-cf-worker"
+    API = "https://api.cloudflare.com/client/v4"
+
+    def __init__(self, token=None, account_id=None, zone_id=None, script=None, **kw):
+        self.token = token or os.environ.get("GALARDO_CF_TOKEN")
+        self.account_id = account_id or os.environ.get("GALARDO_CF_ACCOUNT_ID")
+        self.zone_id = zone_id or os.environ.get("GALARDO_CF_ZONE_ID")
+        self.script = script or "galardo-override"
+        self.last_status = None
+
+    def available(self):
+        return bool(self.token and self.account_id and self.zone_id)
+
+    def _req(self, method, path, body=None, ctype="application/json"):
+        data = json.dumps(body).encode() if (body is not None and ctype == "application/json") else body
+        req = urlrequest.Request(self.API + path, data=data, method=method)
+        req.add_header("Authorization", "Bearer " + str(self.token))
+        req.add_header("Content-Type", ctype)
+        try:
+            with urlrequest.build_opener().open(req, timeout=25) as r:
+                self.last_status = r.getcode()
+                return json.loads(r.read().decode("utf-8", "replace"))
+        except HTTPError as e:
+            self.last_status = e.code
+            try:
+                return json.loads(e.read().decode("utf-8", "replace"))
+            except Exception:
+                return {"success": False, "errors": [{"message": str(e)}]}
+        except Exception as e:
+            self.last_status = None
+            return {"success": False, "errors": [{"message": str(e)}]}
+
+    def apply(self, spec):
+        if not self.available():
+            return TierResult(self.TIER, False,
+                              "missing GALARDO_CF_TOKEN / _ACCOUNT_ID / _ZONE_ID")
+        js = WORKER_JS % (json.dumps(list(spec.paths)), spec.forced_status(),
+                          json.dumps(spec.mode), "true" if spec.mode == "blank" else "false")
+        r = self._req("PUT", "/accounts/%s/workers/scripts/%s" % (self.account_id, self.script),
+                      js.encode(), "application/javascript")
+        if not r.get("success"):
+            return TierResult(self.TIER, False, "worker upload failed: %s"
+                              % json.dumps(r.get("errors"))[:200],
+                              status_code=self.last_status)
+        upload_status = self.last_status
+        r2 = self._req("POST", "/zones/%s/workers/routes" % self.zone_id,
+                       {"pattern": spec.host() + "/*", "script": self.script})
+        route_status = self.last_status
+        if not r2.get("success"):
+            return TierResult(self.TIER, False, "route bind failed: %s"
+                              % json.dumps(r2.get("errors"))[:200],
+                              {"upload_status": upload_status}, status_code=route_status)
+        return TierResult(self.TIER, True,
+                          "edge worker deployed (upload HTTP %s, route HTTP %s)"
+                          % (upload_status, route_status),
+                          {"script": self.script, "pattern": spec.host() + "/*",
+                           "upload_status": upload_status, "route_status": route_status},
+                          status_code=route_status)
+
+
+# ---------------------------------------------------------------------------
+# Cert authority (best-effort, needed only for HTTPS on the real hostname)
+# ---------------------------------------------------------------------------
+class CertAuthority:
+    TIER = "T4-cert"
+
+    def __init__(self, base_dir=None, **kw):
+        self.base_dir = base_dir or os.path.join(os.path.expanduser("~"), ".galardo", "certs")
+
+    def available(self):
+        return bool(shutil.which("openssl"))
+
+    def generate(self, host):
+        if not self.available():
+            return TierResult(self.TIER, False, "openssl not found")
+        d = os.path.join(self.base_dir, host)
+        os.makedirs(d, exist_ok=True)
+        key = os.path.join(d, "key.pem")
+        crt = os.path.join(d, "cert.pem")
+        if not (os.path.exists(key) and os.path.exists(crt)):
+            base = ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+                    "-keyout", key, "-out", crt, "-days", "365", "-subj", "/CN=%s" % host]
+            p = subprocess.run(base + ["-addext", "subjectAltName=DNS:%s" % host],
+                               capture_output=True, text=True)
+            if p.returncode != 0:
+                p = subprocess.run(base, capture_output=True, text=True)
+            if p.returncode != 0:
+                return TierResult(self.TIER, False, (p.stderr or "")[:200])
+        return TierResult(self.TIER, True, "cert ready", {"cert": crt, "key": key, "host": host})
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator of tiers
+# ---------------------------------------------------------------------------
+class RouteOverrider:
+    """apply() tries tiers in order; the first success wins and is recorded."""
+
+    def __init__(self, spec=None, upstream=None, connect_ip=None, shim_port=None,
+                 tier_order=None, cf=None, hosts=None, certs=None, **kw):
+        self.upstream = upstream
+        self.connect_ip = connect_ip
+        self.shim_port = int(shim_port) if shim_port else None
+        self.tier_order = tuple(tier_order or ("T2", "T1", "T3"))
+        self.shims: Dict[str, LocalShim] = {}
+        self.active: Dict[str, dict] = {}
+        self.spec = spec
+        self.shim = None
+        self.attempts: List[dict] = []
+        self.lock = threading.Lock()
+        self.hosts = hosts or HostsOverride()
+        self.cf = cf or CloudflareEdgeOverride()
+        self.certs = certs or CertAuthority()
+
+    def _try(self, tier, spec):
+        if tier == "T2":
+            shim = LocalShim(spec, port=self.shim_port, upstream=self.upstream,
+                             connect_ip=self.connect_ip).start()
+            p0 = spec.paths[0].rstrip("*").rstrip("/") or "/"
+            pr = shim.probe(p0)
+            ok = pr.get("status") == spec.forced_status() and bool(pr.get("override_header"))
+            if ok:
+                with self.lock:
+                    self.shims[spec.spec_id] = shim
+            else:
+                shim.stop()
+            return TierResult(tier, ok, "shim probe: %s" % json.dumps(pr)[:200],
+                              {"shim_url": shim.url()}, status_code=pr.get("status"))
+        if tier == "T1":
+            return self.hosts.apply(spec.host())
+        if tier == "T3":
+            return self.cf.apply(spec)
+        return TierResult(tier, False, "unknown tier")
+
+    def prepare(self, spec):
+        self.spec = _coerce_spec(spec)
+        return self.spec
+
+    def apply(self, spec=None, tiers=None):
+        spec = _coerce_spec(spec) if spec is not None else self.spec
+        if spec is None:
+            raise ValueError("no spec supplied and none prepared via prepare()/self.spec")
+        self.spec = spec
+        order = tiers or spec.tiers or self.tier_order
+        results, applied, failed = [], [], []
+        for t in order:
+            r = self._try(t, spec)
+            results.append(asdict(r))
+            (applied if r.ok else failed).append(t)
+            with self.lock:
+                self.attempts.append({"spec_id": spec.spec_id, "tier": t, "ok": r.ok,
+                                      "at": time.time(), "detail": r.detail})
+            if r.ok:
+                with self.lock:
+                    self.active[spec.spec_id] = {"tier": t, "at": time.time(),
+                                                 "spec": spec.to_dict(), "artifact": r.artifact}
+                    self.shim = self.shims.get(spec.spec_id)
+                return {"ok": True, "tier": t,
+                        "applied_tiers": applied, "failed_tiers": failed,
+                        "global_scope": any(x in ("T1", "T3") for x in applied),
+                        "spec": spec.to_dict(),
+                        "shim_url": self.shim_url(spec.spec_id),
+                        "upstream": self.upstream, "connect_ip": self.connect_ip,
+                        "shim_port": self.shim_port, "results": results}
+        return {"ok": False, "tier": None, "applied_tiers": applied,
+                "failed_tiers": failed, "global_scope": False,
+                "spec": spec.to_dict(), "results": results}
+
+    def shim_url(self, spec_id):
+        s = self.shims.get(spec_id)
+        return s.url() if s else None
+
+    def probe(self, spec_id, path=None):
+        s = self.shims.get(spec_id)
+        act = self.active.get(spec_id)
+        if not s or not act:
+            return {"ok": False, "error": "no active shim override for %s" % spec_id}
+        p = path or (act["spec"]["paths"][0] if act["spec"]["paths"][0] != "*" else "/")
+        pr = s.probe(p)
+        pr["forced"] = bool(pr.get("override_header"))
+        pr["matches_spec"] = pr.get("status") == act["spec"]["forced_status"]
+        pr["tier"] = act["tier"]
+        return pr
+
+    def revert(self, spec_id=None):
+        spec_id = spec_id or (self.spec.spec_id if self.spec else None)
+        with self.lock:
+            s = self.shims.pop(spec_id, None)
+            act = self.active.pop(spec_id, None)
+            if self.shim is s:
+                self.shim = None
+        if s:
+            s.stop()
+        tier = act["tier"] if act else None
+        if act and tier == "T1":
+            self.hosts.revert()
+        return {"ok": bool(act), "spec_id": spec_id,
+                "reverted": [tier] if tier else [],
+                "reverted_tiers": [tier] if tier else [],
+                "tier": tier}
+
+    def list_active(self):
+        with self.lock:
+            return {k: dict(v, shim_url=self.shim_url(k)) for k, v in self.active.items()}
+
+    def evidence(self):
+        with self.lock:
+            return {"tier_order": list(self.tier_order),
+                    "active": list(self.active.keys()),
+                    "attempts": self.attempts[-20:],
+                    "spec": self.spec.to_dict() if self.spec else None,
+                    "upstream": self.upstream, "connect_ip": self.connect_ip,
+                    "shim_port": self.shim_port,
+                    "shim_url": self.shim.url_for("/") if self.shim else None}
 
     def stats(self):
         with self.lock:
-            return {"forced": len(self.hits), "passed": len(self.passes),
-                    "port": self.port, "mode": self.spec.mode}
+            return {"active": len(self.active), "shims": len(self.shims),
+                    "attempts": self.attempts[-20:], "tier_order": list(self.tier_order)}
 
 
-# --------------------------------------------------------------------------
-# T1 - /etc/hosts
-# --------------------------------------------------------------------------
-class HostsOverride(object):
-    """T1: point the hostname at an address. Needs sudo for /etc/hosts."""
+# ---------------------------------------------------------------------------
+# compat-w7: module-level functional API expected by api.py
+# ---------------------------------------------------------------------------
+REGISTRY = RouteOverrider()
 
-    def __init__(self, path=HOSTS_PATH):
-        self.path = path
-        self.applied = None
-
-    def _read(self):
-        with open(self.path, "r", encoding="utf-8") as handle:
-            return handle.read()
-
-    def current_block(self):
-        try:
-            text = self._read()
-        except OSError:
-            return None
-        if HOSTS_MARK_BEGIN not in text:
-            return None
-        after = text.split(HOSTS_MARK_BEGIN, 1)[1]
-        return after.split(HOSTS_MARK_END, 1)[0].strip()
-
-    def _strip_block(self, text):
-        lines = text.splitlines()
-        out, inside = [], False
-        for line in lines:
-            if line.strip() == HOSTS_MARK_BEGIN:
-                inside = True
-                continue
-            if line.strip() == HOSTS_MARK_END:
-                inside = False
-                continue
-            if not inside:
-                out.append(line)
-        while out and out[-1] == "":
-            out.pop()
-        return "\n".join(out) + "\n"
-
-    def _sudo_write(self, content):
-        handle, temp_path = tempfile.mkstemp(prefix="galardo-hosts-")
-        os.close(handle)
-        with open(temp_path, "w", encoding="utf-8") as fh:
-            fh.write(content)
-        try:
-            subprocess.run(["sudo", "cp", temp_path, self.path], check=True)
-        finally:
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
-
-    def apply(self, hosts, address="127.0.0.1"):
-        block = [HOSTS_MARK_BEGIN]
-        for host in hosts:
-            block.append("%-15s %s" % (address, host))
-        block.append(HOSTS_MARK_END)
-        try:
-            text = self._strip_block(self._read())
-        except OSError as exc:
-            raise OverrideError("cannot read %s: %s" % (self.path, exc))
-        content = text.rstrip("\n") + "\n\n" + "\n".join(block) + "\n"
-        try:
-            self._sudo_write(content)
-        except Exception as exc:
-            raise OverrideError("sudo write failed: %s" % exc)
-        self.applied = {"hosts": list(hosts), "address": address, "at": now_iso()}
-        self.flush_cache()
-        return self.applied
-
-    def revert(self):
-        try:
-            text = self._strip_block(self._read())
-        except OSError as exc:
-            raise OverrideError("cannot read %s: %s" % (self.path, exc))
-        self._sudo_write(text)
-        self.applied = None
-        self.flush_cache()
-        return True
-
-    @staticmethod
-    def flush_cache():
-        for cmd in (["sudo", "dscacheutil", "-flushcache"],
-                    ["sudo", "killall", "-HUP", "mDNSResponder"]):
-            try:
-                subprocess.run(cmd, check=False,
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except Exception:
-                pass
-
-    def status(self):
-        return {"applied": self.applied, "block": self.current_block(),
-                "path": self.path}
+# module-level mirror so `import routeoverride as ro; ro.spec = ...; ro.apply(tiers=..)`
+# and `ro.shim.url_for("/")` both work whether `ro` is the module or the registry.
+spec = None
+shim = None
 
 
-# --------------------------------------------------------------------------
-# T3 - Cloudflare edge rule (best effort)
-# --------------------------------------------------------------------------
-class CloudflareEdgeOverride(object):
-    """T3: a dynamic-redirect rule at the Cloudflare edge. Needs a token."""
-
-    def __init__(self, token=None, timeout=20.0):
-        self.token = token or os.environ.get("GALARDO_CF_TOKEN") or ""
-        self.timeout = timeout
-        self.applied = None
-
-    @property
-    def configured(self):
-        return bool(self.token)
-
-    def _request(self, method, path, body=None):
-        if not self.token:
-            raise OverrideError("GALARDO_CF_TOKEN not set")
-        conn = None
-        try:
-            conn = http.client.HTTPSConnection(CF_API_HOST, timeout=self.timeout)
-            payload = json.dumps(body).encode("utf-8") if body is not None else None
-            headers = {"Authorization": "Bearer " + self.token,
-                       "Content-Type": "application/json",
-                       "User-Agent": "Galardo/1.0 (+routeoverride)"}
-            conn.request(method, "/client/v4" + path, body=payload, headers=headers)
-            resp = conn.getresponse()
-            raw = resp.read()
-            doc = json.loads(raw.decode("utf-8", "replace") or "{}")
-            if not doc.get("success", False):
-                errors = doc.get("errors") or []
-                raise OverrideError("cloudflare %s %s: %s" % (
-                    method, path, json.dumps(errors)[:200]))
-            return doc.get("result")
-        except OverrideError:
-            raise
-        except Exception as exc:
-            raise OverrideError("cloudflare transport: %s: %s" % (type(exc).__name__, exc))
-        finally:
-            if conn is not None:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-
-    def zone_id(self, domain):
-        labels = domain.split(".")
-        for cut in range(0, max(0, len(labels) - 1)):
-            candidate = ".".join(labels[cut:])
-            result = self._request("GET", "/zones?name=" + candidate)
-            if result:
-                return result[0]["id"], candidate
-        raise OverrideError("no Cloudflare zone found for %s" % domain)
-
-    def _ruleset_path(self, zone):
-        return "/zones/%s/rulesets/phases/%s/entrypoint" % (zone, CF_PHASE)
-
-    def _description(self, spec):
-        return "galardo-forced-%s-%s" % (spec.mode, spec.domain)
-
-    def _expression(self, spec):
-        host = '(http.host eq "%s")' % spec.domain
-        if spec.paths == ["/*"]:
-            return host
-        clauses = []
-        for pattern in spec.paths:
-            if pattern.endswith("*"):
-                clauses.append('starts_with(http.request.uri.path, "%s")' % pattern[:-1])
-            else:
-                clauses.append('(http.request.uri.path eq "%s")' % pattern)
-        return "(%s and (%s))" % (host, " or ".join(clauses))
-
-    def _rule(self, spec, status_code):
-        return {
-            "description": self._description(spec),
-            "expression": self._expression(spec),
-            "action": "redirect",
-            "action_parameters": {
-                "from_value": {
-                    "status_code": status_code,
-                    "target_url": {"expression": 'concat("https://", http.host, http.request.uri.path)'},
-                    "preserve_query_string": True,
-                }
-            },
-            "enabled": True,
-        }
-
-    def apply(self, spec, status_codes=(404, 302)):
-        if not self.configured:
-            raise OverrideError("GALARDO_CF_TOKEN not set - T3 skipped")
-        zone, zone_name = self.zone_id(spec.domain)
-        existing = None
-        try:
-            existing = self._request("GET", self._ruleset_path(zone))
-        except OverrideError:
-            existing = None
-        base = [r for r in ((existing or {}).get("rules") or [])
-                if r.get("description") != self._description(spec)]
-
-        last_error = None
-        for code in status_codes:
-            rules = base + [self._rule(spec, code)]
-            try:
-                self._request("PUT", self._ruleset_path(zone),
-                              {"rules": rules, "name": "Galardo route override",
-                               "kind": "zone", "phase": CF_PHASE})
-                self.applied = {"zone_id": zone, "zone_name": zone_name,
-                                "status_code": code, "expression": self._expression(spec),
-                                "at": now_iso()}
-                return self.applied
-            except OverrideError as exc:
-                last_error = exc
-        raise OverrideError("ruleset PUT failed for every status code: %s" % last_error)
-
-    def revert(self, spec):
-        if not self.configured:
-            raise OverrideError("GALARDO_CF_TOKEN not set")
-        zone, _ = self.zone_id(spec.domain)
-        try:
-            existing = self._request("GET", self._ruleset_path(zone))
-        except OverrideError:
-            return {"removed": 0}
-        rules = [r for r in ((existing or {}).get("rules") or [])
-                 if r.get("description") != self._description(spec)]
-        removed = len(((existing or {}).get("rules") or [])) - len(rules)
-        if removed:
-            self._request("PUT", self._ruleset_path(zone),
-                          {"rules": rules, "name": "Galardo route override",
-                           "kind": "zone", "phase": CF_PHASE})
-        self.applied = None
-        return {"removed": removed, "zone_id": zone}
+def _coerce_spec(obj):
+    if isinstance(obj, OverrideSpec):
+        return obj
+    if isinstance(obj, dict):
+        d = dict(obj)
+        d.setdefault("origin", d.get("domain") or d.get("target") or d.get("url") or "")
+        d.setdefault("paths", ["/*"])
+        d.setdefault("mode", "404")
+        allowed = ("origin", "paths", "mode", "spec_id", "shim_port", "tiers", "upstream",
+                   "host_header", "port", "label", "hosts", "note")
+        d = {k: v for k, v in d.items() if k in allowed}
+        if isinstance(d.get("paths"), str):
+            d["paths"] = [d["paths"]]
+        return OverrideSpec(**d)
+    raise TypeError("cannot coerce %r to OverrideSpec" % type(obj))
 
 
-# --------------------------------------------------------------------------
-# optional: local certificate authority for an HTTPS shim
-# --------------------------------------------------------------------------
-class CertAuthority(object):
-    """Self-signed cert via openssl, for intercepting HTTPS locally."""
-
-    def __init__(self, directory=None):
-        self.directory = directory or tempfile.mkdtemp(prefix="galardo-ca-")
-        self.key_path = os.path.join(self.directory, "key.pem")
-        self.cert_path = os.path.join(self.directory, "cert.pem")
-
-    @property
-    def available(self):
-        return shutil.which("openssl") is not None
-
-    def issue(self, domain):
-        if not self.available:
-            raise OverrideError("openssl not found")
-        cmd = ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
-               "-keyout", self.key_path, "-out", self.cert_path, "-days", "30",
-               "-subj", "/CN=" + domain,
-               "-addext", "subjectAltName=DNS:" + domain]
-        try:
-            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception as exc:
-            raise OverrideError("openssl failed: %s" % exc)
-        return {"cert": self.cert_path, "key": self.key_path, "domain": domain}
+def prepare(sp):
+    global spec
+    spec = _coerce_spec(sp)
+    REGISTRY.prepare(spec)
+    return spec
 
 
-# --------------------------------------------------------------------------
-# facade
-# --------------------------------------------------------------------------
-class RouteOverrider(object):
-    """Applies the tiers you ask for and reports honestly what each one did."""
+def apply(sp=None, tiers=None, **kw):
+    global spec, shim
+    target = _coerce_spec(sp) if sp is not None else spec
+    if target is None:
+        raise ValueError("routeoverride.apply: no spec (set routeoverride.spec or pass one)")
+    spec = target
+    out = REGISTRY.apply(target, tiers=tiers)
+    shim = REGISTRY.shim
+    return out
 
-    def __init__(self, spec, upstream=None, connect_ip=None, shim_port=8899,
-                 cf_token=None, shim_host="127.0.0.1"):
-        self.spec = spec
-        self.upstream = upstream
-        self.connect_ip = connect_ip
-        self.shim_port = shim_port
-        self.shim_host = shim_host
-        self.shim = None
-        self.hosts = HostsOverride()
-        self.edge = CloudflareEdgeOverride(token=cf_token)
-        self.results = []
 
-    def apply(self, tiers=("T2",)):
-        self.results = []
-        for tier in tiers:
-            try:
-                if tier == "T2":
-                    self.shim = LocalShim(self.spec, upstream=self.upstream,
-                                          port=self.shim_port, host=self.shim_host,
-                                          connect_ip=self.connect_ip).start()
-                    self.results.append(TierResult("T2", True,
-                                                   "shim listening on %s" % self.shim.url_for("/"),
-                                                   self.shim.stats()))
-                elif tier == "T1":
-                    data = self.hosts.apply(self.spec.hosts)
-                    self.results.append(TierResult("T1", True,
-                                                   "hosts block applied for %d host(s)" % len(self.spec.hosts),
-                                                   data))
-                elif tier == "T3":
-                    data = self.edge.apply(self.spec)
-                    self.results.append(TierResult(
-                        "T3", True,
-                        "edge rule applied (status_code=%s)" % data.get("status_code"), data))
-                else:
-                    self.results.append(TierResult(tier, False, "unknown tier"))
-            except OverrideError as exc:
-                self.results.append(TierResult(tier, False, str(exc)))
-        return self.report()
+def applied():
+    return REGISTRY.list_active()
 
-    def revert(self, tiers=None):
-        tiers = tiers or [r.tier for r in self.results if r.ok]
-        for tier in tiers:
-            try:
-                if tier == "T2" and self.shim is not None:
-                    self.shim.stop()
-                    self.shim = None
-                elif tier == "T1":
-                    self.hosts.revert()
-                elif tier == "T3":
-                    self.edge.revert(self.spec)
-            except OverrideError:
-                pass
-        return {"reverted": tiers}
 
-    def report(self):
-        ok = [r for r in self.results if r.ok]
-        return {"spec": self.spec.to_dict(), "tiers": [r.to_dict() for r in self.results],
-                "applied_tiers": [r.tier for r in ok],
-                "failed_tiers": [r.tier for r in self.results if not r.ok],
-                "global_scope": "T3" in [r.tier for r in ok],
-                "at": now_iso()}
+def applied_list():
+    return [dict(v.get("spec") or {}, spec_id=k, tier=v.get("tier"))
+            for k, v in REGISTRY.list_active().items()]
 
-    def evidence(self):
-        data = self.report()
-        if self.shim is not None:
-            data["shim"] = self.shim.stats()
-            data["shim_url"] = self.shim.url_for("/")
-        data["hosts_block"] = self.hosts.current_block()
-        data["edge"] = self.edge.applied
-        return data
+
+def reverted(spec_id):
+    global shim
+    out = REGISTRY.revert(spec_id)
+    shim = REGISTRY.shim
+    return out
+
+
+def test(spec_id, path=None):
+    return REGISTRY.probe(spec_id, path)
+
+
+def get(spec_id):
+    return REGISTRY.active.get(spec_id)
+
+
+def probe(spec_id, path=None):
+    return REGISTRY.probe(spec_id, path)
+
+
+def revert(spec_id):
+    global shim
+    out = REGISTRY.revert(spec_id)
+    shim = REGISTRY.shim
+    return out
+
+
+def list_active():
+    return REGISTRY.list_active()
+
+
+def stats():
+    return REGISTRY.stats()

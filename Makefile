@@ -88,3 +88,10 @@ worm:
 	python3 tools/galardo_worm.py
 worm-reap:
 	pkill -f worm_agent.py || true
+
+# --- Tier 1: lapisan kepercayaan kripto (RFC 8032) ---
+.PHONY: crypto keygen
+crypto:
+	@python3 tools/verify_crypto.py
+keygen:
+	@python3 backend/envelope.py keygen controller

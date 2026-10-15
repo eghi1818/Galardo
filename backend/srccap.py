@@ -322,8 +322,12 @@ class SourceRegistry:
             s.last_probe_at = time.time()
             s.probe_count += 1
             if not s.ip:
-                ip = (r["evidence"].get("ipv6") or {}).get("addresses")
-                s.ip = ip[0] if ip else None
+                addrs = (r["evidence"].get("ipv6") or {}).get("addresses") or []
+                real = [a for a in addrs if not a.lower().startswith("::ffff:")]
+                if real:
+                    s.ip = real[0]
+                elif addrs:
+                    s.ip = addrs[0].split("::ffff:")[-1]
         self.save()
         return r
 

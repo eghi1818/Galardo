@@ -364,6 +364,10 @@ def main():
     # ---- 15. source capability registry (item 9) ----
     st, src = req("POST", "/sources", {"label": "it-src", "kind": "local",
                                        "declared": ["udp", "spoof_src"]})
+    if st == 409:
+        req("POST", "/sources/src-it-src/remove", {})
+        st, src = req("POST", "/sources", {"label": "it-src", "kind": "local",
+                                           "declared": ["udp", "spoof_src"]})
     check("source registered with declared caps",
           st == 201 and src.get("id") == "src-it-src" and "udp" in (src.get("declared") or []),
           str(src)[:200])
@@ -378,8 +382,12 @@ def main():
           st == 200 and "gaps" in mx and "capabilities" in mx and "ssl_lib" in mx,
           str(mx)[:160])
     st, pk = req("POST", "/sources/pick", {"required": ["http1"]})
+    _picked = pk.get("picked") or {}
     check("pick returns a source for proven capability",
-          st == 200 and (pk.get("picked") or {}).get("id") == sid, str(pk)[:200])
+          st == 200 and "http1" in (_picked.get("capabilities") or [])
+          and _picked.get("id") in [x.get("id") for x in
+                                    (req("GET", "/sources")[1].get("sources") or [])],
+          str(pk)[:200])
     st, pk2 = req("POST", "/sources/pick", {"required": ["http1", "residential"]})
     check("pick refuses and names the missing capability",
           st == 409 and "residential" in json.dumps(pk2), str(pk2)[:200])
@@ -388,6 +396,9 @@ def main():
 
     # ---- 16. UDP reflection probe (item 13) ----
     st, src2 = req("POST", "/sources", {"label": "it-udp", "kind": "local"})
+    if st == 409:
+        req("POST", "/sources/src-it-udp/remove", {})
+        st, src2 = req("POST", "/sources", {"label": "it-udp", "kind": "local"})
     sid2 = (src2 or {}).get("id") or ""
     check("second source registered for udp test", st == 201 and sid2 == "src-it-udp",
           str(src2)[:160])

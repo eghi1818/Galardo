@@ -28,7 +28,7 @@ def main():
     print("declared   :", d["declared"] or "-")
     print("kapabilitas:", d["capabilities"] or "-")
     ev = d["evidence"]
-    print("lib ssl    :", ev.get("ssl_lib"))
+    print("lib ssl    :", d.get("ssl_lib"))
     print("bukti:")
     for k in ("http1", "keepalive", "tls13", "tls12", "ipv6"):
         print("   %-10s %s" % (k, json.dumps(ev.get(k))[:120]))

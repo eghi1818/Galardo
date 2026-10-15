@@ -104,7 +104,12 @@ def _probe_tls(host, port, version_name, timeout=8.0):
         ctx.minimum_version = ver
         ctx.maximum_version = ver
     except Exception as e:
-        return {"ok": None, "reason": "ctx_tidak_mendukung", "lib": lib, "error": str(e)[:120]}
+        msg = str(e)[:140]
+        low = msg.lower()
+        unsupported = ("unsupported protocol" in low or "no protocols available" in low)
+        return {"ok": None,
+                "reason": "lib_tidak_mendukung" if unsupported else "ctx_tidak_mendukung",
+                "lib": lib, "error": msg}
     try:
         with socket.create_connection((host, port), timeout=timeout) as sock:
             with ctx.wrap_socket(sock, server_hostname=host) as ss:
@@ -184,6 +189,7 @@ class Source:
         self.unproven = []
         self.na = []
         self.evidence = {}
+        self.ssl_lib = None
         self.created_at = time.time()
         self.last_probe_at = None
         self.probe_count = 0
@@ -203,6 +209,7 @@ class Source:
         d = {"id": self.source_id, "label": self.label, "kind": self.kind, "ip": self.ip,
              "region": self.region, "note": self.note, "declared": self.declared,
              "proven": self.proven, "unproven": self.unproven, "na": self.na,
+             "ssl_lib": self.ssl_lib,
              "capabilities": self.capabilities(), "probe_count": self.probe_count,
              "last_probe_at": self.last_probe_at, "created_at": self.created_at,
              "kind_is_datacenter": self.kind in ("vps", "worker", "datacenter")}
@@ -247,6 +254,7 @@ class SourceRegistry:
             s.unproven = r["unproven"]
             s.na = r.get("na", [])
             s.evidence = r["evidence"]
+            s.ssl_lib = r.get("ssl_lib")
             s.last_probe_at = time.time()
             s.probe_count += 1
             if not s.ip:

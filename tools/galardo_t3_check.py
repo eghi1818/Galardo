@@ -78,7 +78,8 @@ def main():
     print("host uji :", host)
 
     if zi.get("status") == "active":
-        c.ensure_proxied_host(host)
+        _dns = c.ensure_proxied_host(host)
+        print("dns record:", _dns.get("ok"), "|", _dns.get("detail"))
         okdns, tries = wait_dns(host)
         print("dns host :", "resolve OK" if okdns else "TIDAK RESOLVE",
               "(percobaan %d)" % tries)

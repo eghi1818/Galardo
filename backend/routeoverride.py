@@ -18,6 +18,8 @@ import json
 import os
 import shutil
 import socket
+import ssl
+import struct
 import subprocess
 import threading
 import time
@@ -408,6 +410,102 @@ def _multipart(metadata, files, boundary=None):
     return b"\r\n".join(out), "multipart/form-data; boundary=" + boundary
 
 
+def _resolve_a(name, server="1.1.1.1", timeout=3.0):
+    """Resolve A sendiri via DNS UDP, supaya cache NXDOMAIN resolver lokal dilewati."""
+    try:
+        qid = int(time.time() * 1000) & 0xFFFF
+        header = struct.pack("!HHHHHH", qid, 0x0100, 1, 0, 0, 0)
+        body = b"".join(bytes([len(x)]) + x.encode() for x in name.split(".")) + b"\x00"
+        pkt = header + body + struct.pack("!HH", 1, 1)
+        sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sk.settimeout(timeout)
+            sk.sendto(pkt, (server, 53))
+            data, _ = sk.recvfrom(2048)
+        finally:
+            sk.close()
+    except Exception:
+        return []
+    if len(data) < 12:
+        return []
+    rid, _fl, qd, an, _ns, _ar = struct.unpack("!HHHHHH", data[:12])
+    if rid != qid or an == 0:
+        return []
+    i = 12
+    for _ in range(max(1, qd)):
+        while i < len(data) and data[i] != 0:
+            if data[i] & 0xC0 == 0xC0:
+                i += 2
+                break
+            i += data[i] + 1
+        else:
+            i += 1
+        i += 4
+    out = []
+    for _ in range(an):
+        while i < len(data):
+            ln = data[i]
+            if ln == 0:
+                i += 1
+                break
+            if ln & 0xC0 == 0xC0:
+                i += 2
+                break
+            i += ln + 1
+        if i + 10 > len(data):
+            break
+        rtype, _rc, _ttl, rdlen = struct.unpack("!HHIH", data[i:i + 10])
+        i += 10
+        if rtype == 1 and rdlen == 4:
+            out.append(".".join(str(b) for b in data[i:i + 4]))
+        i += rdlen
+    return out
+
+
+def _edge_probe_via(host, ip, path, timeout=10.0):
+    """HTTPS langsung ke IP dengan SNI/Host = hostname asli."""
+    t0 = time.time()
+    ctx = ssl.create_default_context()
+    try:
+        raw = socket.create_connection((ip, 443), timeout=timeout)
+        ss = ctx.wrap_socket(raw, server_hostname=host)
+    except Exception as e:
+        return {"status": None, "error": str(e)[:200], "error_kind": "conn",
+                "url": "https://%s%s" % (ip, path)}
+    try:
+        req = ("GET %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: GalardoEdgeProbe/1.0\r\n"
+               "Cache-Control: no-cache\r\nAccept: */*\r\nConnection: close\r\n\r\n"
+               % (path, host))
+        ss.sendall(req.encode())
+        buf = b""
+        while len(buf) < 131072:
+            chunk = ss.recv(8192)
+            if not chunk:
+                break
+            buf += chunk
+    except Exception as e:
+        return {"status": None, "error": str(e)[:200], "error_kind": "conn"}
+    finally:
+        try:
+            ss.close()
+        except Exception:
+            pass
+    head, _, body = buf.partition(b"\r\n\r\n")
+    lines = head.split(b"\r\n")
+    status, headers = None, {}
+    if lines:
+        parts = lines[0].split()
+        if len(parts) >= 2 and parts[1].isdigit():
+            status = int(parts[1])
+        for ln in lines[1:]:
+            if b":" in ln:
+                k, _, v = ln.partition(b":")
+                headers[k.decode(errors="replace").strip().lower()] = v.decode(errors="replace").strip()
+    return {"status": status, "header": headers.get(OVERRIDE_HEADER.lower()),
+            "body_len": len(body), "latency_ms": round((time.time() - t0) * 1000, 1),
+            "url": "https://%s%s" % (ip, path), "via_ip": ip}
+
+
 def _edge_probe(url, timeout=10.0):
     """HTTPS probe that never follows redirects and never raises."""
     t0 = time.time()
@@ -729,6 +827,15 @@ class CloudflareEdgeOverride:
             if last.get("status") == expect_status and last.get("header") == mode:
                 last["attempts"] = i + 1
                 return last
+            if last.get("error_kind") == "dns":
+                ips = _resolve_a(host)
+                for ip in ips[:2]:
+                    alt = _edge_probe_via(host, ip, path + "?_gcb=%d" % int(time.time() * 1000))
+                    if alt.get("status") == expect_status and alt.get("header") == mode:
+                        alt["attempts"] = i + 1
+                        alt["note"] = "resolver lokal basi; probe lewat 1.1.1.1 -> %s" % ip
+                        return alt
+                    last = alt
             time.sleep(delay)
         if last is not None:
             last["attempts"] = retries

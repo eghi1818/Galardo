@@ -25,6 +25,11 @@ from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 
+# Kapabilitas yang HANYA boleh diubah oleh probe_egress. Yang lain
+# (udp, spoof_src, redirects, ...) dibuktikan prober terpisah dan tidak
+# boleh terhapus saat probe HTTP dijalankan ulang.
+PROBE_OWNED = frozenset(("http1", "keepalive", "tls12", "tls13", "ipv6", "http2"))
+
 CAPABILITIES = (
     "http1", "http2", "tls12", "tls13", "keepalive", "redirects", "ipv6",
     "udp", "spoof_src", "residential", "datacenter", "high_concurrency",
@@ -314,10 +319,11 @@ class SourceRegistry:
             raise SourceError("sumber '%s' tidak ada" % sid)
         r = probe_egress(url, timeout)
         with self.lock:
-            s.proven = r["proven"]
-            s.unproven = r["unproven"]
-            s.na = r.get("na", [])
-            s.evidence = r["evidence"]
+            # gabungkan: buang hanya yang dimiliki prober ini, sisanya dipertahankan
+            s.proven = sorted((set(s.proven) - PROBE_OWNED) | set(r["proven"]))
+            s.unproven = sorted((set(s.unproven) - PROBE_OWNED) | set(r["unproven"]))
+            s.na = sorted((set(s.na) - PROBE_OWNED) | set(r.get("na", [])))
+            s.evidence["http_probe"] = r["evidence"]
             s.ssl_lib = r.get("ssl_lib")
             s.last_probe_at = time.time()
             s.probe_count += 1

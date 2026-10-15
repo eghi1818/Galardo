@@ -26,9 +26,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Dict, List, Optional
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, quote
 
 OVERRIDE_HEADER = "X-Galardo-Override"
+
+try:
+    import envload
+    envload.load()
+except Exception:
+    pass
 
 MODES = {
     "404":   {"status": 404, "body": b"", "reason": "Not Found"},
@@ -332,84 +338,411 @@ class HostsOverride:
 
 
 # ---------------------------------------------------------------------------
-# T3 - Cloudflare Worker at the edge (best-effort, records API status)
+# T3 - Cloudflare edge override (Worker + route + proxied hostname)
+#
+# Ini tier yang membuat override terlihat dari INTERNET, bukan cuma lokal.
+# Tiga langkah, semuanya dicatat status HTTP API-nya apa adanya:
+#   1. pastikan hostname target punya DNS record PROXIED (orange cloud)
+#   2. upload Worker (coba service-worker dulu, lalu modules multipart)
+#   3. bind route "<host>/*" ke Worker itu
+# Verifikasi dilakukan lewat HTTPS ke edge dengan retry (edge butuh beberapa detik).
+#
+# Token perlu izin: Account.Workers Scripts:Edit, Zone.Workers Routes:Edit,
+# Zone.DNS:Edit (opsional Zone.Cache Purge).
 # ---------------------------------------------------------------------------
-WORKER_JS = """// Galardo edge override - generated
-const PATHS = %s;
-const STATUS = %d;
-const MODE = %s;
-const EMPTY = %s;
-addEventListener("fetch", event => {
-  const u = new URL(event.request.url);
-  const hit = PATHS.some(p => p === "*" || u.pathname === p || u.pathname.startsWith(p.replace(/\\/$/, "") + "/"));
-  if (!hit) return event.respondWith(fetch(event.request));
-  return event.respondWith(new Response(EMPTY ? "" : "forced " + MODE, {
+CF_API = "https://api.cloudflare.com/client/v4"
+
+WORKER_SOURCE = r"""// galardo edge override - generated
+var PATHS = __PATHS__;
+var STATUS = __STATUS__;
+var MODE = __MODE__;
+var BODY = __BODY__;
+
+function galardoHit(pathname) {
+  for (var i = 0; i < PATHS.length; i++) {
+    var raw = PATHS[i];
+    if (raw === "*" || raw === "/*") return true;
+    var base = raw.replace(/\*+$/, "").replace(/\/+$/, "");
+    if (base === "") return true;
+    if (pathname === base) return true;
+    if (pathname.indexOf(base + "/") === 0) return true;
+  }
+  return false;
+}
+
+addEventListener("fetch", function (event) {
+  var url = new URL(event.request.url);
+  if (!galardoHit(url.pathname)) {
+    return event.respondWith(fetch(event.request));
+  }
+  return event.respondWith(new Response(BODY, {
     status: STATUS,
-    headers: { "x-galardo-override": MODE, "content-type": "text/html; charset=utf-8" }
+    headers: {
+      "x-galardo-override": MODE,
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store"
+    }
   }));
 });
 """
 
 
-class CloudflareEdgeOverride:
-    TIER = "T3-cf-worker"
-    API = "https://api.cloudflare.com/client/v4"
+def _multipart(metadata, files, boundary=None):
+    """Build multipart/form-data for the Workers modules upload (stdlib only)."""
+    boundary = boundary or ("----galardo%d" % int(time.time() * 1000))
+    out = []
+    out.append(("--" + boundary).encode())
+    out.append(b'Content-Disposition: form-data; name="metadata"')
+    out.append(b"Content-Type: application/json")
+    out.append(b"")
+    out.append(json.dumps(metadata).encode())
+    for fname, content in files.items():
+        out.append(("--" + boundary).encode())
+        out.append(('Content-Disposition: form-data; name="%s"; filename="%s"'
+                    % (fname, fname)).encode())
+        out.append(b"Content-Type: application/javascript+module")
+        out.append(b"")
+        out.append(content.encode())
+    out.append(("--" + boundary + "--").encode())
+    out.append(b"")
+    return b"\r\n".join(out), "multipart/form-data; boundary=" + boundary
 
-    def __init__(self, token=None, account_id=None, zone_id=None, script=None, **kw):
+
+def _edge_probe(url, timeout=10.0):
+    """HTTPS probe that never follows redirects and never raises."""
+    t0 = time.time()
+    try:
+        opener = urlrequest.build_opener(_NoRedirect())
+        req = urlrequest.Request(url, headers={"User-Agent": "GalardoEdgeProbe/1.0",
+                                               "Cache-Control": "no-cache"})
+        with opener.open(req, timeout=timeout) as r:
+            body = r.read()
+            return {"status": r.getcode(), "header": r.headers.get(OVERRIDE_HEADER),
+                    "body_len": len(body), "latency_ms": round((time.time() - t0) * 1000, 1),
+                    "url": url}
+    except HTTPError as e:
+        body = e.read()
+        return {"status": e.code, "header": e.headers.get(OVERRIDE_HEADER),
+                "body_len": len(body), "latency_ms": round((time.time() - t0) * 1000, 1),
+                "url": url}
+    except Exception as e:
+        return {"status": None, "error": str(e)[:200], "url": url}
+
+
+class CloudflareClient:
+    """Thin, auditable Cloudflare API v4 client. Every call is recorded."""
+
+    def __init__(self, token=None, account_id=None, zone_id=None, timeout=30.0):
         self.token = token or os.environ.get("GALARDO_CF_TOKEN")
         self.account_id = account_id or os.environ.get("GALARDO_CF_ACCOUNT_ID")
         self.zone_id = zone_id or os.environ.get("GALARDO_CF_ZONE_ID")
-        self.script = script or "galardo-override"
+        self.timeout = float(timeout)
+        self.calls = []
         self.last_status = None
+        self._zone_name = None
 
     def available(self):
-        return bool(self.token and self.account_id and self.zone_id)
+        return not self.missing()
 
-    def _req(self, method, path, body=None, ctype="application/json"):
-        data = json.dumps(body).encode() if (body is not None and ctype == "application/json") else body
-        req = urlrequest.Request(self.API + path, data=data, method=method)
+    def missing(self):
+        m = []
+        if not self.token:
+            m.append("GALARDO_CF_TOKEN")
+        if not self.account_id:
+            m.append("GALARDO_CF_ACCOUNT_ID")
+        if not self.zone_id:
+            m.append("GALARDO_CF_ZONE_ID")
+        return m
+
+    # ---------------- raw call ----------------
+    # ---------------- discovery ----------------
+    def discover(self, zone_name=None):
+        """Cari zone_id + account_id HANYA dari token (butuh izin Zone:Read)."""
+        zone_name = zone_name or os.environ.get("GALARDO_CF_ZONE_NAME")
+        out = {"zone_id": self.zone_id, "account_id": self.account_id,
+               "zone_name": None, "errors": [], "zones": []}
+        if not self.zone_id:
+            r = self._req("GET", "/zones?per_page=50")
+            if not r.get("_ok"):
+                out["errors"].append("GET /zones gagal: %s"
+                                     % (r.get("errors") or r.get("_http_status")))
+            else:
+                zones = r.get("result") or []
+                out["zones"] = [z.get("name") for z in zones]
+                pick = None
+                if zone_name:
+                    for z in zones:
+                        if z.get("name") == zone_name:
+                            pick = z
+                            break
+                    if pick is None:
+                        out["errors"].append("zone '%s' tidak terlihat oleh token" % zone_name)
+                elif len(zones) == 1:
+                    pick = zones[0]
+                elif zones:
+                    out["errors"].append("token melihat %d zone; set GALARDO_CF_ZONE_NAME"
+                                         % len(zones))
+                if pick:
+                    self.zone_id = out["zone_id"] = pick.get("id")
+                    out["zone_name"] = pick.get("name")
+                    if not self.account_id:
+                        self.account_id = out["account_id"] = (pick.get("account") or {}).get("id")
+        if not self.account_id:
+            r = self._req("GET", "/accounts?per_page=50")
+            if r.get("_ok") and (r.get("result") or []):
+                self.account_id = out["account_id"] = (r["result"][0] or {}).get("id")
+        out["ok"] = bool(self.zone_id and self.account_id)
+        return out
+
+    def zone_info(self):
+        """Status zone: active/pending + nameserver yang seharusnya dipakai."""
+        if not self.zone_id:
+            return {"ok": False, "detail": "zone_id belum ada"}
+        r = self._req("GET", "/zones/%s" % self.zone_id)
+        if not r.get("_ok"):
+            return {"ok": False, "status_http": r.get("_http_status"), "errors": r.get("errors")}
+        z = r.get("result") or {}
+        return {"ok": True, "status": z.get("status"), "name": z.get("name"),
+                "paused": z.get("paused"), "plan": (z.get("plan") or {}).get("name"),
+                "name_servers": z.get("name_servers"),
+                "original_ns": z.get("original_name_servers")}
+
+    def _req(self, method, path, body=None, raw=None, ctype="application/json"):
+        data = raw if raw is not None else (json.dumps(body).encode() if body is not None else None)
+        req = urlrequest.Request(CF_API + path, data=data, method=method)
         req.add_header("Authorization", "Bearer " + str(self.token))
         req.add_header("Content-Type", ctype)
+        status, txt = None, ""
         try:
-            with urlrequest.build_opener().open(req, timeout=25) as r:
-                self.last_status = r.getcode()
-                return json.loads(r.read().decode("utf-8", "replace"))
+            with urlrequest.build_opener().open(req, timeout=self.timeout) as r:
+                status = r.getcode()
+                txt = r.read().decode("utf-8", "replace")
         except HTTPError as e:
-            self.last_status = e.code
+            status = e.code
             try:
-                return json.loads(e.read().decode("utf-8", "replace"))
+                txt = e.read().decode("utf-8", "replace")
             except Exception:
-                return {"success": False, "errors": [{"message": str(e)}]}
+                txt = ""
         except Exception as e:
-            self.last_status = None
-            return {"success": False, "errors": [{"message": str(e)}]}
+            txt = json.dumps({"success": False, "errors": [{"message": str(e)}]})
+        try:
+            payload = json.loads(txt) if txt else {}
+        except Exception:
+            payload = {"success": False, "errors": [{"message": txt[:200]}]}
+        ok = bool(payload.get("success")) and status is not None and 200 <= status < 300
+        self.last_status = status
+        self.calls.append({"method": method, "path": path, "status": status, "ok": ok,
+                           "errors": [e.get("message") for e in (payload.get("errors") or [])][:2]})
+        payload["_http_status"] = status
+        payload["_ok"] = ok
+        return payload
+
+    # ---------------- helpers ----------------
+    def verify_token(self):
+        return self._req("GET", "/user/tokens/verify")
+
+    def zone_name(self):
+        if self._zone_name:
+            return self._zone_name
+        r = self._req("GET", "/zones/%s" % self.zone_id)
+        if r.get("_ok"):
+            self._zone_name = (r.get("result") or {}).get("name")
+        return self._zone_name
+
+    def ensure_proxied_host(self, host, ip="192.0.2.1"):
+        """A Worker route only fires for PROXIED hostnames. Create/fix the record."""
+        r = self._req("GET", "/zones/%s/dns_records?name=%s" % (self.zone_id, quote(host)))
+        if not r.get("_ok"):
+            return {"ok": False, "detail": "list dns_records gagal", "errors": r.get("errors"),
+                    "status": r.get("_http_status")}
+        recs = r.get("result") or []
+        if recs:
+            rec = recs[0]
+            if rec.get("proxied"):
+                return {"ok": True, "detail": "record sudah proxied", "created": False,
+                        "record_id": rec.get("id"), "ip": rec.get("content")}
+            p = self._req("PATCH", "/zones/%s/dns_records/%s" % (self.zone_id, rec["id"]),
+                          {"proxied": True})
+            return {"ok": bool(p.get("_ok")), "detail": "record di-set proxied", "created": False,
+                    "record_id": rec.get("id"), "errors": p.get("errors"),
+                    "status": p.get("_http_status")}
+        c = self._req("POST", "/zones/%s/dns_records" % self.zone_id,
+                      {"type": "A", "name": host, "content": ip, "ttl": 1, "proxied": True,
+                       "comment": "galardo override"})
+        if not c.get("_ok"):
+            return {"ok": False, "detail": "create dns_record gagal", "errors": c.get("errors"),
+                    "status": c.get("_http_status")}
+        return {"ok": True, "detail": "proxied A record dibuat -> %s" % ip, "created": True,
+                "record_id": (c.get("result") or {}).get("id")}
+
+    def upload_worker(self, name, js):
+        r1 = self._req("PUT", "/accounts/%s/workers/scripts/%s" % (self.account_id, name),
+                       raw=js.encode(), ctype="application/javascript")
+        if r1.get("_ok"):
+            return {"ok": True, "mode": "service-worker", "status": r1["_http_status"]}
+        first = r1.get("errors")
+        body, ctype = _multipart({"main_module": "worker.js"}, {"worker.js": js})
+        r2 = self._req("PUT", "/accounts/%s/workers/scripts/%s" % (self.account_id, name),
+                       raw=body, ctype=ctype)
+        if r2.get("_ok"):
+            return {"ok": True, "mode": "modules", "status": r2["_http_status"]}
+        return {"ok": False, "mode": None, "status": r2.get("_http_status"),
+                "errors": r2.get("errors"), "service_worker_errors": first}
+
+    def bind_route(self, host, script):
+        pattern = host + "/*"
+        r = self._req("POST", "/zones/%s/workers/routes" % self.zone_id,
+                      {"pattern": pattern, "script": script})
+        if r.get("_ok"):
+            return {"ok": True, "route_id": (r.get("result") or {}).get("id"),
+                    "pattern": pattern, "status": r["_http_status"]}
+        return {"ok": False, "errors": r.get("errors"), "status": r.get("_http_status"),
+                "pattern": pattern}
+
+    def delete_route(self, route_id):
+        return self._req("DELETE", "/zones/%s/workers/routes/%s" % (self.zone_id, route_id))
+
+    def delete_worker(self, name):
+        return self._req("DELETE", "/accounts/%s/workers/scripts/%s" % (self.account_id, name))
+
+    def delete_dns_record(self, record_id):
+        return self._req("DELETE", "/zones/%s/dns_records/%s" % (self.zone_id, record_id))
+
+    def purge_host(self, host):
+        return self._req("POST", "/zones/%s/purge_cache" % self.zone_id,
+                         {"files": ["https://%s/" % host, "https://%s" % host]})
+
+
+class CloudflareEdgeOverride:
+    """Tier T3. apply() = dns proxied -> upload worker -> bind route -> verify via edge."""
+
+    TIER = "T3-cf-worker"
+
+    def __init__(self, token=None, account_id=None, zone_id=None, script=None,
+                 client=None, host=None, verify=True, verify_retries=8, **kw):
+        self.client = client or CloudflareClient(token, account_id, zone_id)
+        self.script = script or os.environ.get("GALARDO_CF_SCRIPT", "galardo-override")
+        self.host = host or os.environ.get("GALARDO_CF_TEST_HOST")
+        self.verify = bool(verify)
+        self.verify_retries = int(verify_retries)
+        self.state = {}
+
+    def available(self):
+        return self.client.available()
+
+    def _worker_name(self, spec):
+        raw = "".join(c if c.isalnum() else "-" for c in spec.spec_id.lower())
+        return ("%s-%s" % (self.script, raw))[:58]
+
+    def _worker_js(self, spec):
+        body = "" if spec.mode == "blank" else ("galardo forced %s" % spec.mode)
+        return (WORKER_SOURCE
+                .replace("__PATHS__", json.dumps(list(spec.paths)))
+                .replace("__STATUS__", str(spec.forced_status()))
+                .replace("__MODE__", json.dumps(spec.mode))
+                .replace("__BODY__", json.dumps(body)))
 
     def apply(self, spec):
         if not self.available():
             return TierResult(self.TIER, False,
-                              "missing GALARDO_CF_TOKEN / _ACCOUNT_ID / _ZONE_ID")
-        js = WORKER_JS % (json.dumps(list(spec.paths)), spec.forced_status(),
-                          json.dumps(spec.mode), "true" if spec.mode == "blank" else "false")
-        r = self._req("PUT", "/accounts/%s/workers/scripts/%s" % (self.account_id, self.script),
-                      js.encode(), "application/javascript")
-        if not r.get("success"):
-            return TierResult(self.TIER, False, "worker upload failed: %s"
-                              % json.dumps(r.get("errors"))[:200],
-                              status_code=self.last_status)
-        upload_status = self.last_status
-        r2 = self._req("POST", "/zones/%s/workers/routes" % self.zone_id,
-                       {"pattern": spec.host() + "/*", "script": self.script})
-        route_status = self.last_status
-        if not r2.get("success"):
-            return TierResult(self.TIER, False, "route bind failed: %s"
-                              % json.dumps(r2.get("errors"))[:200],
-                              {"upload_status": upload_status}, status_code=route_status)
-        return TierResult(self.TIER, True,
-                          "edge worker deployed (upload HTTP %s, route HTTP %s)"
-                          % (upload_status, route_status),
-                          {"script": self.script, "pattern": spec.host() + "/*",
-                           "upload_status": upload_status, "route_status": route_status},
-                          status_code=route_status)
+                              "env belum lengkap: %s" % ", ".join(self.client.missing()))
+        zone = self.client.zone_name()
+        if not zone:
+            return TierResult(self.TIER, False,
+                              "tidak bisa baca zone (cek GALARDO_CF_ZONE_ID + izin token)")
+        host = self.host or ("galardo-edge." + zone)
+        if not host.endswith(zone):
+            return TierResult(self.TIER, False,
+                              "host %s tidak berada di zone %s" % (host, zone))
+        worker = self._worker_name(spec)
+        steps = {}
+
+        steps["dns"] = self.client.ensure_proxied_host(host)
+        if not steps["dns"].get("ok"):
+            return TierResult(self.TIER, False, "DNS: %s" % steps["dns"].get("detail"),
+                              {"host": host, "steps": steps})
+
+        steps["upload"] = self.client.upload_worker(worker, self._worker_js(spec))
+        if not steps["upload"].get("ok"):
+            return TierResult(self.TIER, False,
+                              "upload worker gagal (HTTP %s)" % steps["upload"].get("status"),
+                              {"host": host, "steps": steps},
+                              status_code=steps["upload"].get("status"))
+
+        steps["route"] = self.client.bind_route(host, worker)
+        if not steps["route"].get("ok"):
+            self.client.delete_worker(worker)
+            return TierResult(self.TIER, False,
+                              "bind route gagal (HTTP %s)" % steps["route"].get("status"),
+                              {"host": host, "steps": steps},
+                              status_code=steps["route"].get("status"))
+
+        try:
+            steps["purge"] = {"ok": bool(self.client.purge_host(host).get("_ok"))}
+        except Exception:
+            steps["purge"] = {"ok": False}
+
+        p0 = spec.paths[0].rstrip("*").rstrip("/") or "/"
+        probe = None
+        if self.verify:
+            probe = self.verify_forced(host, p0, spec.forced_status(), spec.mode)
+
+        self.state[spec.spec_id] = {"host": host, "worker": worker,
+                                    "route_id": steps["route"].get("route_id"),
+                                    "dns_record_id": steps["dns"].get("record_id"),
+                                    "dns_created": bool(steps["dns"].get("created")),
+                                    "mode": spec.mode, "paths": list(spec.paths),
+                                    "at": time.time()}
+        ok = True
+        if self.verify and probe:
+            ok = (probe.get("status") == spec.forced_status()
+                  and probe.get("header") == spec.mode)
+        detail = ("edge LIVE: https://%s%s -> %s + %s:%s (%s attempt)"
+                  % (host, p0, probe.get("status") if probe else "?",
+                     OVERRIDE_HEADER, probe.get("header") if probe else "?",
+                     probe.get("attempts") if probe else "n/a"))
+        artifact = {"host": host, "worker": worker, "route_id": steps["route"].get("route_id"),
+                    "upload_mode": steps["upload"].get("mode"),
+                    "upload_status": steps["upload"].get("status"),
+                    "route_status": steps["route"].get("status"),
+                    "dns_status": steps["dns"].get("status"),
+                    "probe": probe, "steps": steps}
+        return TierResult(self.TIER, bool(ok), detail, artifact,
+                          status_code=steps["route"].get("status"))
+
+    def verify_forced(self, host, path, expect_status, mode, retries=None, delay=3.0):
+        """Edge butuh beberapa detik untuk aktif -> retry, dan catat jumlah percobaan."""
+        retries = retries or self.verify_retries
+        last = None
+        for i in range(retries):
+            url = "https://%s%s?_gcb=%d" % (host, path, int(time.time() * 1000))
+            last = _edge_probe(url)
+            if last.get("status") == expect_status and last.get("header") == mode:
+                last["attempts"] = i + 1
+                return last
+            time.sleep(delay)
+        if last is not None:
+            last["attempts"] = retries
+        return last
+
+    def revert(self, spec_id):
+        st = self.state.pop(spec_id, None)
+        if not st:
+            return TierResult(self.TIER, False, "tidak ada state T3 untuk %s" % spec_id)
+        out = {}
+        if st.get("route_id"):
+            out["route_deleted"] = bool(self.client.delete_route(st["route_id"]).get("_ok"))
+        if st.get("worker"):
+            out["worker_deleted"] = bool(self.client.delete_worker(st["worker"]).get("_ok"))
+        if st.get("dns_record_id") and st.get("dns_created"):
+            out["dns_deleted"] = bool(self.client.delete_dns_record(st["dns_record_id"]).get("_ok"))
+        return TierResult(self.TIER, True, "T3 reverted: %s" % json.dumps(out), out)
+
+    def evidence(self):
+        return {"tier": self.TIER, "available": self.available(),
+                "missing_env": self.client.missing(), "host_override": self.host,
+                "script": self.script, "active": list(self.state.keys()),
+                "api_calls": self.client.calls[-40:]}
 
 
 # ---------------------------------------------------------------------------
@@ -547,6 +880,11 @@ class RouteOverrider:
         tier = act["tier"] if act else None
         if act and tier == "T1":
             self.hosts.revert()
+        if act and tier == "T3":
+            try:
+                self.cf.revert(spec_id)
+            except Exception:
+                pass
         return {"ok": bool(act), "spec_id": spec_id,
                 "reverted": [tier] if tier else [],
                 "reverted_tiers": [tier] if tier else [],

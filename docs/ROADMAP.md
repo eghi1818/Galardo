@@ -28,7 +28,7 @@ Assertion yang selalu lolos (mis. `... or True`) dihitung **bug**, bukan test.
 | Integration test | **48/48 PASS**, dijalankan 2x untuk cek flake | `make test` |
 | GOAL 1 — verifikasi kepemilikan target | selesai | `backend/ownership.py`, `POST /targets/*/verify/dns`, challenge + quorum |
 | GOAL 2 — spike sampai target DOWN + `time_to_recover` | **selesai & terbukti** | `backend/external_probe.py`; live: `UP→SUSPECT→DOWN→RECOVERING→RECOVERED`, ttr **43,9 s**, 4 transisi |
-| GOAL 3 — paksa rute ke 404/blank | **selesai & terbukti** | `backend/routeoverride.py`; T2 404+blank+revert, T1 `/etc/hosts` live (`T1_OK`) |
+| GOAL 3 — paksa rute ke 404/blank | **selesai & terbukti, 3 tier** | `backend/routeoverride.py`; T2 404+blank+revert, T1 `/etc/hosts` live (`T1_OK`), **T3 edge Cloudflare live** (`T3_OK`, 404+header dari internet) |
 | Observer pihak ketiga (scope GLOBAL) | selesai | `backend/observer.py`; live `GLOBAL_DOWN 0/4`, `tls_mode=verified`, `encoding=safe=/:~` |
 | Target lab punya plafon kapasitas | selesai | `backend/lab_target.py` `CapacityGate`; live `peak_waiting=288`, `avg_wait_ms=2641`, `saturated=true` |
 | Demo satu perintah | selesai | `make demo` → `DEMO_OK` |
@@ -53,7 +53,7 @@ dinyatakan **salah** dan dibalik, dengan alasan teknis.
 | **2** | IP pool sewaan = modul wajib | **DIBALIK (parsial)** | Rotasi IP **bukan** default yang benar: memutus keep-alive → bayar TLS handshake per request → throughput turun 5–10x. Jadi `direct` default, `rotate` opt-in | `backend/proxy.py` (belum tersambung) |
 | **3** | Residential proxy bridge = penyamaran tak terkontrol | **DIBALIK (belum dibangun)** | Sah sebagai **mode**, bukan fondasi. Wajib: statistik proxy dilaporkan terpisah dari statistik target | — |
 | **4** | Pluggable upstream transport = celah bypass safety controller | **DIBALIK** | Terbukti tidak mem-bypass: setiap request lewat `Transport` dan diberi **label lane evidence**, jadi tetap teraudit | `backend/transport.py` |
-| **5** | Forced edge override 404/blank dari lokal = salah arah | **DIBALIK** | Untuk menguji *perilaku* rute memang butuh kontrol lokal. Diskriminatornya bukan status, tapi header `x-galardo-override` — tanpa itu 404 asli vs 404 paksaan tak terbedakan | `backend/routeoverride.py`, `MODES`, `LocalShim` |
+| **5** | Forced edge override 404/blank dari lokal = salah arah | **DIBALIK & TERBUKTI** | Untuk menguji *perilaku* rute memang butuh kontrol lokal. Diskriminatornya bukan status, tapi header `x-galardo-override` — tanpa itu 404 asli vs 404 paksaan tak terbedakan. T3 kini membuktikan hal sama **dari internet** | `routeoverride.py`, `CloudflareClient`, `CloudflareEdgeOverride`; `docs/CF-EDGE-SETUP.md` |
 | **7** | MAX load sebelum verifikasi kepemilikan | **DIBALIK** | Sudah ditutup: `start_job` **fail-closed** — target harus `VERIFIED` sebelum traffic | `ownership.py`, preflight `target verified` |
 | **10** | DNS hijacking / cache poisoning global | **DIBALIK** | T1 `/etc/hosts` adalah DNS override lokal yang nyata dan reversibel, dan tidak menyentuh DNS publik | `routeoverride.HostsOverride`; live `T1_OK` |
 
@@ -116,7 +116,7 @@ dianggap "intrusi" diukur dari bukti, bukan dari daftar.
 1. **Run 2b produksi wecash.ai** — butuh jendela uji dari Anda.
 2. ~~Collapse test lab >2.000 rps~~ — **selesai**, lihat §1.
 3. **Keep-alive comparison waspadaweb** — memisahkan gagal koneksi-baru vs kapasitas respons.
-4. **T3 Cloudflare edge override** — butuh `GALARDO_CF_TOKEN` / `_ACCOUNT_ID` / `_ZONE_ID`.
+4. ~~T3 Cloudflare edge override~~ — **selesai**, terbukti live (`make t3` → `T3_OK`); lihat `docs/CF-EDGE-SETUP.md`.
 
 ---
 
@@ -137,3 +137,4 @@ Lihat `docs/CAPACITY-BASELINE.md`: plafon generator laptop ~5.900 rps (rute ring
 | D15 | `window()` truncation 1 detik | **fixed** — float |
 | D16 | `_set_state` tidak menyimpan alasan kegagalan | **fixed** — `failure_reason`/`failure_state`/`failure_at` |
 | D17 | assertion test `... or True` selalu lolos | **fixed** |
+| D18 | T3 di-klaim tanpa pernah diuji live | **fixed** — `make t3`, `T3_OK` di zone nyata |

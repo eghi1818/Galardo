@@ -18,6 +18,13 @@ from policy import effective_policy, load_policy_layers, resolve_scenario_layers
 from scenario import parse_scenario_yaml, save_scenario_version, ScenarioError
 from util import now_iso, gen_id, sha256_text
 
+try:
+    import envload
+    envload.load()
+except Exception:
+    pass
+
+
 BASE = os.path.dirname(os.path.abspath(__file__))
 DASH_DIR = os.path.normpath(os.path.join(BASE, "..", "dashboard"))
 DEV_TOKEN = os.environ.get("GALARDO_DEV_TOKEN", "dev-token")  # MVP lab: seeded dev users only

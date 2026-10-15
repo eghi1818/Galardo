@@ -68,3 +68,7 @@ CAP_STEPS ?= 25,50,100,200,400
 CAP_WORKERS ?= 0
 CAP_PATH ?= /healthz
 CAP_SECONDS ?= 8
+
+# --- GALARDO uji live T3 Cloudflare edge override ---
+t3:
+	python3 tools/galardo_t3_check.py

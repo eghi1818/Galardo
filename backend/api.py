@@ -752,6 +752,35 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(200, {"job_id": m[0], "aggregate": fm.get("aggregate"),
                                             "series": []})
                 return self._json(200, {"job_id": m[0], "series": ts})
+            m = _match(api_path, "/test-jobs/*/down")
+            if m and method == "GET":
+                snap = orchestrator.get_runtime_snapshot(m[0])
+                if snap is None:
+                    return self._json(404, {"error": "not found"})
+                return self._json(200, {"job_id": m[0], "down": snap.get("down"),
+                                        "observer": snap.get("observer"),
+                                        "probe": snap.get("probe")})
+            m = _match(api_path, "/test-jobs/*/observer")
+            if m and method == "POST":
+                import observer as _obs
+                job = db.get("test_jobs", m[0])
+                if not job:
+                    return self._json(404, {"error": "not found"})
+                plan = db.get("test_plans", job.get("test_plan_id") or "")
+                tgt = db.get("targets", (plan or {}).get("target_id") or "")
+                if not tgt:
+                    return self._json(422, {"error": "target not resolvable from plan"})
+                url = (tgt.get("canonical_origin") or "").rstrip("/") + "/"
+                try:
+                    report = _obs.verify_down(url, max_nodes=8, poll_timeout=30.0)
+                except Exception as exc:
+                    return self._json(502, {"error": "observer unreachable",
+                                            "detail": str(exc)[:200]})
+                out = report.to_dict()
+                db.update("test_jobs", m[0], lambda j: j.update({"observer_verdict": out}),
+                          actor=user, action="job.observer_check", resource_type="test_job",
+                          reason=f"on-demand third-party verdict {out['verdict']}")
+                return self._json(200, {"job_id": m[0], "observer": out})
 
             # ---- evidence (enriched dengan target/domain) ----
             if api_path == "/evidence" and method == "GET":

@@ -168,6 +168,11 @@ def main():
     check("assertions evaluated (soft failure recorded)", agg.get("assert_soft_fail", 0) > 0, str(agg)[:200])
     check("assertion counters present in telemetry",
           "assert_hard_fail" in agg and "assert_soft_fail" in agg)
+    check("out-of-band down verdict recorded in final metrics",
+          "state" in ((fm.get("down_verdict") or {}).get("verdict") or {}),
+          str(fm.get("down_verdict"))[:200])
+    check("tolerance report recorded in final metrics",
+          "normal_error_pct" in (fm.get("tolerance") or {}), str(fm.get("tolerance"))[:160])
     check("payload subset tracked in telemetry",
           "payload_error_pct" in agg and "payload_requests" in agg, str(agg)[:200])
 
@@ -326,6 +331,13 @@ def main():
           st == 422 and v.get("verified") is False
           and sorted((v.get("evidence") or {}).get("attempts", {}).keys()) == ["_galardo", "_galodo"],
           str(v)[:220])
+
+    # ---- 13. down verdict endpoint (W5) ----
+    st, dv = req("GET", f"/test-jobs/{job_a}/down")
+    check("down endpoint exposes out-of-band verdict",
+          st == 200 and isinstance(dv.get("down"), dict)
+          and "state" in (dv["down"].get("verdict") or {}),
+          str(dv)[:200])
 
     # ---- summary ----
     print(f"\n{'='*60}\nRESULTS: {len(PASS)} passed, {len(FAIL)} failed")

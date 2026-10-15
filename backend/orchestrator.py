@@ -90,6 +90,10 @@ def _set_state(job_id, new_state, actor="orchestrator", action=None, reason="", 
             j["abort_requested_at"] = now_iso()
         if new_state == "ABORTED":
             j["abort_confirmed_at"] = j.get("abort_confirmed_at") or now_iso()
+        if new_state in ("FAILED", "RECOVERY_FAILED", "REJECTED"):
+            j["failure_reason"] = reason or j.get("failure_reason")
+            j["failure_state"] = new_state
+            j["failure_at"] = j.get("failure_at") or now_iso()
     db.update("test_jobs", job_id, mut, actor=actor,
               action=action or f"job.state.{new_state.lower()}", resource_type="test_job",
               reason=reason or f"{old_state} -> {new_state}", correlation_id=correlation_id)

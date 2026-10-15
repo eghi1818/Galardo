@@ -268,10 +268,10 @@ def main():
     snap3 = wait_terminal(job3["id"], 75)
     stt3 = snap3["job"]["status"] if snap3 else "timeout"
     check("degraded baseline -> FAILED (fail-closed, no traffic)", stt3 == "FAILED", stt3)
+    _fr = str((snap3 or {}).get("job", {}).get("failure_reason") or "")
     check("FAILED reason mentions probe baseline",
-          bool(snap3) and ("probe baseline" in str(snap3["job"].get("preflight", ""))
-                           or "baseline" in json.dumps(snap3.get("safety") or "")),
-          str(snap3)[:160] if snap3 else "snapshot timeout")
+          bool(snap3) and "baseline" in _fr,
+          _fr[:160] or "no failure_reason recorded")
     # recover target so baseline passes, then degrade DURING the run
     with urllib.request.urlopen(TGT + "/control/recover", timeout=5) as r:
         pass

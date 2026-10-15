@@ -82,10 +82,10 @@ def seed_lab():
                 "target_id": "tgt-lab", "status": "ACTIVE", "created_at": now_iso()}
     db.insert("scenarios", scenario, action="scenario.seeded", resource_type="scenario")
 
-    yaml_text = """schema_version: "1.0"
+    yaml_text = """schema_version: "1.2"
 name: "health-smoke"
 target_ref: "galardo-lab-target"
-description: "Low volume smoke test"
+description: "Low volume smoke test - ACTIVE MODE: GET probe plus POST with body and assertions"
 profile:
   duration_seconds: 20
   virtual_users: 2
@@ -99,8 +99,24 @@ requests:
   - name: "health"
     method: "GET"
     path: "/healthz"
-    weight: 100
+    weight: 70
     timeout_ms: 1500
+    assertions:
+      - type: "status_in"
+        values: [200]
+  - name: "submit"
+    method: "POST"
+    path: "/"
+    weight: 30
+    timeout_ms: 1500
+    body: "galardo-active-probe"
+    body_encoding: "identity"
+    assertions:
+      - type: "json_contains"
+        path: "body"
+        value: "galardo-active-probe"
+      - type: "soft_body_contains"
+        value: "this-string-is-absent-xyz"
 think_time_ms:
   min: 100
   max: 250
@@ -353,6 +369,57 @@ class Handler(BaseHTTPRequestHandler):
                           actor=user, action="target.probe_contract_updated", resource_type="target",
                           reason=json.dumps(patch))
                 return self._json(200, db.get("targets", m[0]))
+            m = _match(api_path, "/targets/*/challenge")
+            if m and method == "POST":
+                import ownership as _own
+                tgt = db.get("targets", m[0])
+                if not tgt:
+                    return self._json(404, {"error": "not found"})
+                domain = _host_of(tgt.get("canonical_origin") or "")
+                if not domain or "." not in domain:
+                    return self._json(422, {"error": {"field": "canonical_origin",
+                                                      "message": "cannot derive a registrable domain"}})
+                ch = _own.Challenge(domain, user)
+                db.update("targets", m[0], lambda t: t.update({
+                    "ownership": "dns_txt_pending",
+                    "ownership_challenge": ch.to_dict(),
+                    "status": "UNVERIFIED",
+                }), actor=user, action="target.challenge_issued", resource_type="target",
+                    reason=f"TXT {ch.record_name} expected (quorum 2 of 3 resolvers)")
+                return self._json(201, {
+                    "target_id": m[0], "domain": domain,
+                    "record_name": ch.record_name, "expected_value": ch.expected_value,
+                    "ttl_seconds": ch.ttl_seconds, "instructions": list(ch.instructions()),
+                    "next": "publish the TXT record, then POST /targets/%s/verify/dns" % m[0],
+                })
+            m = _match(api_path, "/targets/*/verify/dns")
+            if m and method == "POST":
+                import ownership as _own
+                tgt = db.get("targets", m[0])
+                if not tgt:
+                    return self._json(404, {"error": "not found"})
+                stored = tgt.get("ownership_challenge")
+                if not stored:
+                    return self._json(422, {"error": "no challenge issued - POST /targets/*/challenge first"})
+                ch = _own.Challenge.from_dict(stored)
+                proof = _own.OwnershipVerifier().verify(ch)
+                db.update("targets", m[0], lambda t: t.update({
+                    "ownership_challenge": ch.to_dict(),
+                    "ownership": "dns_txt_quorum" if proof.ok else "dns_txt_pending",
+                    "ownership_proof": proof.to_dict() if proof.ok else None,
+                    "status": "VERIFIED" if proof.ok else "UNVERIFIED",
+                }), actor=user, action="target.verify_dns", resource_type="target",
+                    reason=f"quorum ok={proof.ok} label={proof.label} attempts={ch.attempts}")
+                if not proof.ok:
+                    return self._json(422, {"verified": False, "target_id": m[0],
+                                            "record_name": ch.record_name,
+                                            "expected_value": ch.expected_value,
+                                            "attempts": ch.attempts,
+                                            "evidence": proof.evidence})
+                return self._json(200, {"verified": True, "target_id": m[0],
+                                        "record_name": proof.record, "label": proof.label,
+                                        "fingerprint": proof.fingerprint(),
+                                        "proof": proof.to_dict()})
             m = _match(api_path, "/targets/*/verify")
             if m and method == "POST":
                 tgt = db.get("targets", m[0])

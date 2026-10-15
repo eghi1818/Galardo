@@ -316,6 +316,17 @@ def main():
     st2, raw2 = req("GET", f"/evidence/{ev['id']}/download", expect_json=False)
     check("evidence downloadable", raw2 and len(raw2) > 500)
 
+    # ---- 12. DNS TXT ownership challenge (W4) ----
+    st, ch = req("POST", "/targets/tgt-lab/challenge", {})
+    check("ownership challenge issued with _galardo TXT record",
+          st == 201 and ch.get("record_name", "").startswith("_galardo.")
+          and bool(ch.get("expected_value")), str(ch)[:200])
+    st, v = req("POST", "/targets/tgt-lab/verify/dns", {})
+    check("dns verify 422 with quorum evidence while TXT unpublished",
+          st == 422 and v.get("verified") is False
+          and sorted((v.get("evidence") or {}).get("attempts", {}).keys()) == ["_galardo", "_galodo"],
+          str(v)[:220])
+
     # ---- summary ----
     print(f"\n{'='*60}\nRESULTS: {len(PASS)} passed, {len(FAIL)} failed")
     if FAIL:

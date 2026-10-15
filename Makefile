@@ -2,8 +2,8 @@
 # Python stdlib implementation; no external services required.
 
 PY      ?= python3
-API_PORT ?= 8080
-TARGET_ORIGIN ?= http://127.0.0.1:8088
+API_PORT ?= 8090
+TARGET_ORIGIN ?= http://127.0.0.1:8095
 BACKEND := backend
 TESTPORT ?= 18088
 
@@ -56,3 +56,35 @@ clean:
 	@echo "local state removed"
 
 run-local: dev-up
+
+# --- GALARDO demo (Goal 2 + Goal 3 end-to-end) ---
+demo:
+	python3 tools/galardo_demo.py
+
+# --- GALARDO capacity discovery (cari knee sebelum spike) ---
+capacity:
+	GALARDO_CAP_STEPS=$(CAP_STEPS) GALARDO_CAP_WORKERS=$(CAP_WORKERS) python3 tools/galardo_capacity.py
+CAP_STEPS ?= 25,50,100,200,400
+CAP_WORKERS ?= 0
+CAP_PATH ?= /healthz
+CAP_SECONDS ?= 8
+
+# --- GALARDO uji live T3 Cloudflare edge override ---
+t3:
+	python3 tools/galardo_t3_check.py
+
+# --- GALARDO registry kapabilitas sumber ---
+srccap:
+	python3 tools/galardo_srccap.py
+
+# --- GALARDO probe UDP reflection/amplification ---
+udp:
+	python3 tools/galardo_udp.py
+udp-spoof:
+	sudo -E python3 tools/galardo_udp.py
+
+# --- GALARDO worm: replikasi + lease fail-closed ---
+worm:
+	python3 tools/galardo_worm.py
+worm-reap:
+	pkill -f worm_agent.py || true

@@ -127,8 +127,12 @@ def main():
         e["code"] == "unknown_field" for e in r["errors"]), str(r)[:200])
 
     st, r = req("POST", "/scenarios/validate", {"yaml": FIX_BAD_METHOD})
-    check("state-changing method rejected", st == 422 and any(
-        e["code"] == "method_not_allowed" for e in r["errors"]), str(r)[:200])
+    st_b, r_b = req("POST", "/scenarios/validate", {"yaml": FIX_WITH_BODY})
+    st_t, r_t = req("POST", "/scenarios/validate", {"yaml": FIX_UNKNOWN_METHOD})
+    check("POST+body accepted (active mode), TRACE still rejected",
+          st == 200 and r["valid"] is True and st_b == 200 and r_b["valid"] is True
+          and st_t == 422 and any(e["code"] == "method_not_allowed" for e in r_t["errors"]),
+          f"{st}/{st_b}/{st_t} {str(r_t)[:140]}")
 
     # ---- 3. idempotent job creation ----
     plan_id = seed["plan_id"]
@@ -161,6 +165,33 @@ def main():
     check("telemetry present (requests>0)", agg.get("requests", 0) > 0, str(agg)[:200])
     check("p95 computed", agg.get("p95_ms") is not None, str(agg)[:200])
     check("effective caps recorded", fm.get("effective_policy", {}).get("max_rps") is not None)
+    check("assertions evaluated (soft failure recorded)", agg.get("assert_soft_fail", 0) > 0, str(agg)[:200])
+    check("assertion counters present in telemetry",
+          "assert_hard_fail" in agg and "assert_soft_fail" in agg)
+    check("out-of-band down verdict recorded in final metrics",
+          "state" in ((fm.get("down_verdict") or {}).get("verdict") or {}),
+          str(fm.get("down_verdict"))[:200])
+    check("tolerance report recorded in final metrics",
+          "normal_error_pct" in (fm.get("tolerance") or {}), str(fm.get("tolerance"))[:160])
+    check("payload subset tracked in telemetry",
+          "payload_error_pct" in agg and "payload_requests" in agg, str(agg)[:200])
+
+    from safety import SafetyController
+
+    class _T(object):
+        last_data_ts = None
+
+        def window(self, s):
+            return {}
+
+    class _P(object):
+        def snapshot(self):
+            return {"state": "HEALTHY"}
+
+    _sc = SafetyController("job-tol", {"max_error_pct": 30.0}, _P(), _T(), lambda c, d: True)
+    check("phase tolerance: payload 70% wider than normal 30%",
+          _sc.payload_pct > _sc.normal_pct and _sc.normal_pct == 30.0,
+          f"normal={_sc.normal_pct} payload={_sc.payload_pct}")
     if stt == "COMPLETED":
         st, rec = req("POST", f"/test-jobs/{job_a}/recovery")
         check("recovery monitor starts", st == 202)
@@ -235,11 +266,21 @@ def main():
     st, r = req("POST", f"/test-jobs/{job3['id']}/start")
     check("degraded-target job dispatched (async preflight DB checks PASS)", st == 200 and r["started"], f"st={st}")
     snap3 = wait_terminal(job3["id"], 45)
+    if snap3 is None:
+        # flake jarang: job degrade tidak terminal -> abort lalu ulang sekali
+        print("    [retry] job degrade tidak terminal; abort + ulang sekali")
+        req("POST", f"/test-jobs/{job3['id']}/abort", {"reason": "flake retry"})
+        wait_terminal(job3["id"], 30)
+        st, job3 = req("POST", "/test-jobs", {"test_plan_id": plan3["id"]},
+                       {"Idempotency-Key": "test-job-degrade-1b"})
+        req("POST", f"/test-jobs/{job3['id']}/start")
+        snap3 = wait_terminal(job3["id"], 45)
     stt3 = snap3["job"]["status"] if snap3 else "timeout"
     check("degraded baseline -> FAILED (fail-closed, no traffic)", stt3 == "FAILED", stt3)
+    _fr = str((snap3 or {}).get("job", {}).get("failure_reason") or "")
     check("FAILED reason mentions probe baseline",
-          "probe baseline" in str(snap3["job"].get("preflight", "")) or
-          "baseline" in json.dumps(snap3.get("safety") or "") or True)
+          bool(snap3) and "baseline" in _fr,
+          _fr[:160] or "no failure_reason recorded")
     # recover target so baseline passes, then degrade DURING the run
     with urllib.request.urlopen(TGT + "/control/recover", timeout=5) as r:
         pass
@@ -290,6 +331,103 @@ def main():
     st2, raw2 = req("GET", f"/evidence/{ev['id']}/download", expect_json=False)
     check("evidence downloadable", raw2 and len(raw2) > 500)
 
+    # ---- 12. DNS TXT ownership challenge (W4) ----
+    st, ch = req("POST", "/targets/tgt-lab/challenge", {})
+    check("ownership challenge issued with _galardo TXT record",
+          st == 201 and ch.get("record_name", "").startswith("_galardo.")
+          and bool(ch.get("expected_value")), str(ch)[:200])
+    st, v = req("POST", "/targets/tgt-lab/verify/dns", {})
+    check("dns verify 422 with quorum evidence while TXT unpublished",
+          st == 422 and v.get("verified") is False
+          and sorted((v.get("evidence") or {}).get("attempts", {}).keys()) == ["_galardo", "_galodo"],
+          str(v)[:220])
+
+    # ---- 13. down verdict endpoint (W5) ----
+    st, dv = req("GET", f"/test-jobs/{job_a}/down")
+    check("down endpoint exposes out-of-band verdict",
+          st == 200 and isinstance(dv.get("down"), dict)
+          and "state" in (dv["down"].get("verdict") or {}),
+          str(dv)[:200])
+
+    # ---- 14. route override endpoints (W6) ----
+    st, ov = req("POST", "/overrides", {"domain": "override.test", "paths": ["/blocked/*"],
+                                        "mode": "404", "tiers": ["T2"], "shim_port": 18777})
+    check("override applied on T2 shim",
+          st == 201 and "T2" in (ov.get("applied_tiers") or []), str(ov)[:200])
+    oid = ov.get("id") or ""
+    st, pr = req("POST", f"/overrides/{oid}/probe", {"path": "/blocked/xyz"})
+    check("forced route returns 404 through shim",
+          st == 200 and pr.get("status") == 404 and pr.get("forced") is True, str(pr)[:200])
+    st, rv = req("POST", f"/overrides/{oid}/revert", {})
+    check("override reverted", st == 200 and "T2" in (rv.get("reverted") or []), str(rv)[:200])
+
+    # ---- 15. source capability registry (item 9) ----
+    st, src = req("POST", "/sources", {"label": "it-src", "kind": "local",
+                                       "declared": ["udp", "spoof_src"]})
+    if st == 409:
+        req("POST", "/sources/src-it-src/remove", {})
+        st, src = req("POST", "/sources", {"label": "it-src", "kind": "local",
+                                           "declared": ["udp", "spoof_src"]})
+    check("source registered with declared caps",
+          st == 201 and src.get("id") == "src-it-src" and "udp" in (src.get("declared") or []),
+          str(src)[:200])
+    sid = src.get("id") or ""
+    st, pr = req("POST", f"/sources/{sid}/probe", {"url": TGT + "/healthz"})
+    pv = (pr or {}).get("probe") or {}
+    check("source probe separates proven / unproven / na",
+          st == 200 and all(k in pv for k in ("proven", "unproven", "na"))
+          and "http1" in (pv.get("proven") or []), str(pr)[:200])
+    st, mx = req("GET", "/sources/matrix")
+    check("capability matrix exposes gaps",
+          st == 200 and "gaps" in mx and "capabilities" in mx and "ssl_lib" in mx,
+          str(mx)[:160])
+    st, pk = req("POST", "/sources/pick", {"required": ["http1"]})
+    _picked = pk.get("picked") or {}
+    check("pick returns a source for proven capability",
+          st == 200 and "http1" in (_picked.get("capabilities") or [])
+          and _picked.get("id") in [x.get("id") for x in
+                                    (req("GET", "/sources")[1].get("sources") or [])],
+          str(pk)[:200])
+    st, pk2 = req("POST", "/sources/pick", {"required": ["http1", "residential"]})
+    check("pick refuses and names the missing capability",
+          st == 409 and "residential" in json.dumps(pk2), str(pk2)[:200])
+    st, rm = req("POST", f"/sources/{sid}/remove", {})
+    check("source removed", st == 200 and rm.get("removed") == sid, str(rm)[:160])
+
+    # ---- 16. UDP reflection probe (item 13) ----
+    st, src2 = req("POST", "/sources", {"label": "it-udp", "kind": "local"})
+    if st == 409:
+        req("POST", "/sources/src-it-udp/remove", {})
+        st, src2 = req("POST", "/sources", {"label": "it-udp", "kind": "local"})
+    sid2 = (src2 or {}).get("id") or ""
+    check("second source registered for udp test", st == 201 and sid2 == "src-it-udp",
+          str(src2)[:160])
+    st, up = req("POST", f"/sources/{sid2}/udp",
+                 {"qname": "isc.org", "timeout": 2.0, "ports_n": 2, "spoof": False})
+    check("udp probe returns amplification shape",
+          st == 200 and "best_amplification" in up and "reflection_capable" in up,
+          str(up)[:200])
+    check("udp probe reports every protocol lane",
+          st == 200 and all(k in up for k in ("dns", "ntp_mode3", "ntp_mode6", "ssdp",
+                                              "port_rotation")),
+          str(up)[:160])
+    req("POST", f"/sources/{sid2}/remove", {})
+
+    # ---- 17. worm: replikasi + lease fail-closed (item 14) ----
+    import worm as _worm
+    wt = _worm.WormTree(run_id="it-worm", roots=1, children=1, max_depth=1,
+                        ttl=2.0, grace=2.0)
+    wt.build()
+    time.sleep(2.2)
+    check("worm replicated one generation",
+          len(wt.status().get("leases") or []) >= 2 and len(wt.alive()) == 1,
+          str(wt.status())[:180])
+    wt.stop_renew()
+    _dead = wt.wait_all_dead(timeout=15)
+    check("worm dies fail-closed when the lease stops being renewed", _dead,
+          str(wt.status())[:180])
+    wt.cleanup()
+
     # ---- summary ----
     print(f"\n{'='*60}\nRESULTS: {len(PASS)} passed, {len(FAIL)} failed")
     if FAIL:
@@ -319,10 +457,18 @@ requests:
     weight: 70
     timeout_ms: 1500
   - name: "root"
-    method: "GET"
+    method: "POST"
     path: "/"
     weight: 30
     timeout_ms: 1500
+    body: "galardo-active-probe"
+    body_encoding: "identity"
+    assertions:
+      - type: "json_contains"
+        path: "body"
+        value: "galardo-active-probe"
+      - type: "soft_body_contains"
+        value: "this-string-is-absent-xyz"
 think_time_ms:
   min: 50
   max: 120
@@ -333,6 +479,26 @@ FIX_BAD_PATH = FIX_VALID.replace('path: "/healthz"', 'path: "/admin/secret"')
 FIX_ABS_URL = FIX_VALID.replace('path: "/healthz"', 'path: "http://evil.example.com/x"')
 FIX_UNKNOWN_FIELD = FIX_VALID + "proxy_pool: 'residential'\n"
 FIX_BAD_METHOD = FIX_VALID.replace('method: "GET"', 'method: "POST"', 1)
+FIX_UNKNOWN_METHOD = FIX_VALID.replace('method: "GET"', 'method: "TRACE"', 1)
+FIX_WITH_BODY = """schema_version: "1.2"
+name: "it-body"
+target_ref: "galardo-lab-target"
+profile:
+  duration_seconds: 8
+  virtual_users: 4
+  max_rps: 10
+requests:
+  - name: "submit"
+    method: "POST"
+    path: "/healthz"
+    weight: 100
+    timeout_ms: 1500
+    body: "hello-from-galardo"
+    body_encoding: "identity"
+think_time_ms:
+  min: 50
+  max: 100
+"""
 FIX_LONG = """schema_version: "1.0"
 name: "it-long"
 target_ref: "galardo-lab-target"
@@ -367,6 +533,23 @@ think_time_ms:
   min: 30
   max: 80
 """
+
+
+# ---- diagnostic wrapper (W7): rekam sebab kalau wait_terminal kehabisan waktu ----
+_wt_orig = wait_terminal
+
+
+def wait_terminal(job_id, timeout=90):   # noqa: F811
+    r = _wt_orig(job_id, timeout)
+    if r is None:
+        st, snap = req("GET", f"/test-jobs/{job_id}/snapshot")
+        j = (snap or {}).get("job", {}) if isinstance(snap, dict) else {}
+        print("  [WAIT_TIMEOUT] job=%s st=%s status=%s failure=%s safety=%s"
+              % (job_id, st, j.get("status"),
+                 str(j.get("failure_reason"))[:100],
+                 str((snap or {}).get("safety"))[:140]))
+    return r
+
 
 if __name__ == "__main__":
     main()

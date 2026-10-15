@@ -24,6 +24,16 @@ from engine import LoadEngine, TelemetryRing
 from safety import HealthProbe, SafetyController
 from util import now_iso, now_ts, gen_id, gen_correlation_id
 
+try:
+    import external_probe as down_probe
+except ImportError:
+    from . import external_probe as down_probe
+
+try:
+    import observer as observer_mod
+except ImportError:
+    from . import observer as observer_mod
+
 JOBS = {}          # job_id -> RuntimeCtx
 JOBS_LOCK = threading.Lock()
 
@@ -50,6 +60,9 @@ class RuntimeCtx:
         self.worker = None
         self.worker_required = []
         self.worker_score = 0
+        self.down = None
+        self.down_verdict = None
+        self.observer = None
 
 
 def _set_state(job_id, new_state, actor="orchestrator", action=None, reason="", correlation_id=None):
@@ -77,6 +90,10 @@ def _set_state(job_id, new_state, actor="orchestrator", action=None, reason="", 
             j["abort_requested_at"] = now_iso()
         if new_state == "ABORTED":
             j["abort_confirmed_at"] = j.get("abort_confirmed_at") or now_iso()
+        if new_state in ("FAILED", "RECOVERY_FAILED", "REJECTED"):
+            j["failure_reason"] = reason or j.get("failure_reason")
+            j["failure_state"] = new_state
+            j["failure_at"] = j.get("failure_at") or now_iso()
     db.update("test_jobs", job_id, mut, actor=actor,
               action=action or f"job.state.{new_state.lower()}", resource_type="test_job",
               reason=reason or f"{old_state} -> {new_state}", correlation_id=correlation_id)
@@ -84,10 +101,14 @@ def _set_state(job_id, new_state, actor="orchestrator", action=None, reason="", 
                    f"state: {old_state} -> {new_state}" + (f" ({reason})" if reason else ""),
                    correlation_id=correlation_id)
     # external webhook hooks (fire-and-forget, never blocks the state machine)
-    if webhooks and new_state in ("COMPLETED", "ABORTED", "FAILED", "RECOVERY_FAILED"):
+    if webhooks and new_state in ("COMPLETED", "ABORTED", "FAILED", "RECOVERY_FAILED",
+                                  "RECOVERY_WAIT"):
         j = db.get("test_jobs", job_id) or {}
+        _evt = {"COMPLETED": "job.completed", "ABORTED": "job.aborted",
+                "FAILED": "job.failed", "RECOVERY_FAILED": "job.failed",
+                "RECOVERY_WAIT": "job.recovery"}.get(new_state, "job.failed")   # D8
         webhooks.fire(
-            "job.completed" if new_state == "COMPLETED" else "job.aborted" if new_state == "ABORTED" else "job.failed",
+            _evt,
             {"job_id": job_id, "status": new_state, "plan": j.get("test_plan_id"),
              "abort_code": j.get("abort_code"), "abort_reason": j.get("abort_reason"),
              "started_at": j.get("started_at"), "ended_at": j.get("ended_at"),
@@ -473,6 +494,22 @@ def _execute(job_id):
         if ctx.probe.state != "HEALTHY":
             raise RuntimeError(f"probe baseline not HEALTHY (state={ctx.probe.state}); fail-closed")
 
+        # Out-of-band DOWN watch (Goal 2). Own thread, own Transport: generator
+        # exhaustion must never be mistaken for a target DOWN.
+        def on_down_transition(event):
+            db.observation(job_id, "down-watch", "WARN",
+                           f"down state {event['from']} -> {event['to']}: {event['reason']}",
+                           correlation_id=correlation_id)
+
+        down_url = (target.get("canonical_origin") or "").rstrip("/") + "/"
+        ctx.down = down_probe.DownWatcher(down_url, interval=1.0, timeout=6.0,
+                                          failure_threshold=4, min_down_seconds=6.0,
+                                          on_transition=on_down_transition)
+        ctx.down.start()
+        db.observation(job_id, "down-watch", "INFO",
+                       f"out-of-band watch started on {down_url} (streak>=4 sustained>=6s)",
+                       correlation_id=correlation_id)
+
         def on_safety_event(sev, msg, snap):
             db.observation(job_id, "safety", sev, msg, metric_snapshot=snap,
                            correlation_id=correlation_id)
@@ -488,6 +525,9 @@ def _execute(job_id):
                     ctx.engine.stop.set()
             db.observation(job_id, "safety", "CRIT", f"safety abort dispatched [{reason_code}] {detail}",
                            correlation_id=correlation_id)
+            if webhooks:
+                webhooks.fire("safety.abort", {"job_id": job_id, "reason_code": reason_code,
+                                               "detail": detail, "correlation_id": correlation_id})
             _set_state(job_id, "ABORT_REQUESTED", actor="safety-controller",
                        reason=f"[{reason_code}] {detail}", correlation_id=correlation_id)
             # persist abort reason onto the job immediately so finalization
@@ -528,12 +568,17 @@ def _execute(job_id):
                    correlation_id=correlation_id)
         ctx.safety.stop_controller()  # no further evaluation once traffic stopped
 
+        if ctx.down is not None:
+            ctx.down.stop()
+            ctx.down_verdict = ctx.down.evidence()
         final = {
             "aggregate": ctx.telemetry.window(max(5, int(result["duration_actual"]) or 5)),
             "engine": result,
             "effective_policy": dict(eff),
             "probe_final": ctx.probe.snapshot(),
             "safety_decisions": ctx.safety.decisions[-50:],
+            "down_verdict": ctx.down_verdict,
+            "tolerance": ctx.safety.tolerance_report(),
         }
         ctx.probe_series = ctx.probe.history[:]
         ctx.timeline = [{"at": d["at"], "severity": d["severity"], "message": d["message"]}
@@ -557,6 +602,25 @@ def _execute(job_id):
         if ctx.worker:
             fleet.set_status(ctx.worker["id"], "IDLE", job_id=None)
 
+        # Goal 2 scope escalation: ask the third party ONLY when the local probe
+        # already says DOWN. Local evidence first, global confirmation second.
+        if ctx.down_verdict and (ctx.down_verdict.get("verdict") or {}).get("down_verified"):
+            try:
+                ctx.observer = observer_mod.escalate(ctx.down_verdict["verdict"], down_url,
+                                                     poll_timeout=25.0, max_nodes=8)
+                db.observation(job_id, "observer", "WARN",
+                               "third-party verdict: %s (%s/%s nodes answered)" % (
+                                   ctx.observer.get("verdict"),
+                                   ctx.observer.get("nodes_answered"),
+                                   ctx.observer.get("nodes_requested")),
+                               correlation_id=correlation_id)
+            except Exception as exc:
+                ctx.observer = {"error": str(exc)[:200]}
+                db.observation(job_id, "observer", "WARN",
+                               f"observer escalation failed: {exc}", correlation_id=correlation_id)
+            db.update("test_jobs", job_id, lambda j: j.update({
+                "observer_verdict": ctx.observer}), audit=False)
+
         # FR-08: after normal stop/abort the system waits for recovery automatically
         _begin_recovery(job_id, actor="orchestrator")
     except Exception as e:
@@ -571,6 +635,8 @@ def _execute(job_id):
                 ctx.probe.stop.set()
             if ctx.safety:
                 ctx.safety.stop_controller()
+            if ctx.down:
+                ctx.down.stop()
 
 
 def get_runtime_snapshot(job_id):
@@ -582,7 +648,9 @@ def get_runtime_snapshot(job_id):
     snap = {
         "job": job, "live": False, "telemetry": None, "timeseries": None,
         "probe": None, "vus": None, "safety": None, "recovery": None,
+        "down": None, "observer": None,
     }
+    snap["observer"] = job.get("observer_verdict")
     recs = db.list("recoveries", lambda r: r.get("job_id") == job_id)
     if recs:
         snap["recovery"] = sorted(recs, key=lambda r: r.get("started_at") or "")[-1]
@@ -595,6 +663,10 @@ def get_runtime_snapshot(job_id):
         snap["timeseries"] = ctx.telemetry.timeseries(90, 2)
         if ctx.probe:
             snap["probe"] = ctx.probe.snapshot()
+        if ctx.down:
+            # Same shape as the terminal branch: a consumer must not have to
+            # guess whether "state" sits at the top or under "verdict".
+            snap["down"] = ctx.down.evidence()
         with JOBS_LOCK:
             snap["vus"] = max([s for _, s in ctx.telemetry.series.get("active_vus", [])[-20:]] or [0])
         if ctx.safety:
@@ -604,6 +676,7 @@ def get_runtime_snapshot(job_id):
         fm = job.get("final_metrics") or {}
         snap["telemetry"] = fm.get("aggregate")
         snap["probe"] = fm.get("probe_final")
+        snap["down"] = fm.get("down_verdict")
         runs = db.list("test_runs", lambda r: r.get("job_id") == job_id)
         if runs:
             last = sorted(runs, key=lambda r: r.get("started_at") or "")[-1]

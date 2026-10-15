@@ -18,11 +18,24 @@ from policy import effective_policy, load_policy_layers, resolve_scenario_layers
 from scenario import parse_scenario_yaml, save_scenario_version, ScenarioError
 from util import now_iso, gen_id, sha256_text
 
+try:
+    import envload
+    envload.load()
+except Exception:
+    pass
+
+
 BASE = os.path.dirname(os.path.abspath(__file__))
 DASH_DIR = os.path.normpath(os.path.join(BASE, "..", "dashboard"))
 DEV_TOKEN = os.environ.get("GALARDO_DEV_TOKEN", "dev-token")  # MVP lab: seeded dev users only
 MAX_BODY = 262144
 
+# Goal 3: route overrides live in THIS process (the intercept shim is a local
+# server owned by the API). Registry is process-local by design.
+OVERRIDES = {}
+OVERRIDES_LOCK = threading.Lock()
+
+SOURCES_LOCK = threading.Lock()   # item 9: registry kapabilitas sumber
 MIME = {".html": "text/html", ".js": "application/javascript", ".css": "text/css",
         ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png"}
 
@@ -82,10 +95,10 @@ def seed_lab():
                 "target_id": "tgt-lab", "status": "ACTIVE", "created_at": now_iso()}
     db.insert("scenarios", scenario, action="scenario.seeded", resource_type="scenario")
 
-    yaml_text = """schema_version: "1.0"
+    yaml_text = """schema_version: "1.2"
 name: "health-smoke"
 target_ref: "galardo-lab-target"
-description: "Low volume smoke test"
+description: "Low volume smoke test - ACTIVE MODE: GET probe plus POST with body and assertions"
 profile:
   duration_seconds: 20
   virtual_users: 2
@@ -99,8 +112,24 @@ requests:
   - name: "health"
     method: "GET"
     path: "/healthz"
-    weight: 100
+    weight: 70
     timeout_ms: 1500
+    assertions:
+      - type: "status_in"
+        values: [200]
+  - name: "submit"
+    method: "POST"
+    path: "/"
+    weight: 30
+    timeout_ms: 1500
+    body: "galardo-active-probe"
+    body_encoding: "identity"
+    assertions:
+      - type: "json_contains"
+        path: "body"
+        value: "galardo-active-probe"
+      - type: "soft_body_contains"
+        value: "this-string-is-absent-xyz"
 think_time_ms:
   min: 100
   max: 250
@@ -146,9 +175,17 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
     def _auth(self):
-        tok = self.headers.get("Authorization", "")
-        if tok == f"Bearer {DEV_TOKEN}" or tok == "":
-            return "usr-operator"  # MVP lab: seeded dev user; production uses SSO/MFA (BLOCKER per Prolog §6)
+        # D14: header ABSENT (lab anonymous) vs header PRESENT but EMPTY (reject).
+        raw = self.headers.get("Authorization")
+        if raw is None:
+            if os.environ.get("GALARDO_REQUIRE_AUTH"):
+                return None
+            return "usr-operator"  # MVP lab: seeded dev user; production uses SSO/MFA
+        tok = raw.strip()
+        if not tok:
+            return None            # D14: empty header must NOT authenticate
+        if tok == f"Bearer {DEV_TOKEN}" or tok == DEV_TOKEN:
+            return "usr-operator"
         return None
 
     def _body(self):
@@ -164,9 +201,13 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---- static --------------------------------------------------------
     def _static(self, path):
-        if path == "/":
-            path = "/index.html"
-        fp = os.path.normpath(os.path.join(DASH_DIR, path.lstrip("/")))
+        # D11: normalise separators, drop query/fragment, block traversal.
+        path = path.split("?")[0].split("#")[0].replace("\\", "/")
+        parts = [seg for seg in path.split("/") if seg not in ("", ".")]
+        root = os.path.normpath(DASH_DIR)
+        fp = os.path.normpath(os.path.join(root, *parts)) if parts else os.path.join(root, "index.html")
+        if fp != root and not fp.startswith(root + os.sep):
+            fp = os.path.join(root, "index.html")
         if not fp.startswith(DASH_DIR) or not os.path.isfile(fp):
             self._json(404, {"error": "not found"})
             return
@@ -353,48 +394,57 @@ class Handler(BaseHTTPRequestHandler):
                           actor=user, action="target.probe_contract_updated", resource_type="target",
                           reason=json.dumps(patch))
                 return self._json(200, db.get("targets", m[0]))
-            m = _match(api_path, "/targets/*/verify/dns")
+            m = _match(api_path, "/targets/*/challenge")
             if m and method == "POST":
+                import ownership as _own
                 tgt = db.get("targets", m[0])
                 if not tgt:
                     return self._json(404, {"error": "not found"})
-                host = _host_of(tgt.get("canonical_origin") or "")
-                if not host:
+                domain = _host_of(tgt.get("canonical_origin") or "")
+                if not domain or "." not in domain:
                     return self._json(422, {"error": {"field": "canonical_origin",
-                                                      "message": "cannot parse host"}})
-                # Challenge: deterministic per-target token, rotateable by operator.
-                expected = tgt.get("dns_challenge") or sha256_text("galardo-dns:" + tgt["id"])[:40]
-                if not tgt.get("dns_challenge"):
-                    db.update("targets", m[0], lambda t: t.update({"dns_challenge": expected}),
-                              actor=user, action="target.dns_challenge_issued", resource_type="target",
-                              reason="auto-issued deterministic challenge")
-                record_name = f"_galardo.{host}"
-                found, values, err = _dns_txt_lookup(record_name)
-                matched = any(v.strip() == expected for v in values)
-                now = now_iso()
-                if matched:
-                    window = (datetime.now(timezone.utc) + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
-                    db.update("targets", m[0], lambda t: t.update({
-                        "status": "VERIFIED",
-                        "ownership": "dns_txt_challenge",
-                        "valid_from": now, "valid_until": window,
-                        "dns_verification": {"record": record_name, "verified_at": now,
-                                             "values_seen": values[:5]}}),
-                        actor=user, action="target.verified_dns", resource_type="target",
-                        reason=f"TXT {record_name} matched challenge")
-                else:
-                    db.update("targets", m[0], lambda t: t.update({
-                        "dns_verification": {"record": record_name, "checked_at": now,
-                                             "values_seen": values[:5], "error": err,
-                                             "matched": False}}),
-                        actor=user, action="target.dns_check_failed", resource_type="target",
-                        reason=f"TXT {record_name} no match")
-                return self._json(matched and 200 or 422, {
-                    "target_id": m[0], "record": record_name,
-                    "expected_value": expected,
-                    "matched": matched, "values_seen": values[:5],
-                    "error": err,
-                    "status": (db.get("targets", m[0]) or {}).get("status")})
+                                                      "message": "cannot derive a registrable domain"}})
+                ch = _own.Challenge(domain, user)
+                db.update("targets", m[0], lambda t: t.update({
+                    "ownership": "dns_txt_pending",
+                    "ownership_challenge": ch.to_dict(),
+                    "status": "UNVERIFIED",
+                }), actor=user, action="target.challenge_issued", resource_type="target",
+                    reason=f"TXT {ch.record_name} expected (quorum 2 of 3 resolvers)")
+                return self._json(201, {
+                    "target_id": m[0], "domain": domain,
+                    "record_name": ch.record_name, "expected_value": ch.expected_value,
+                    "ttl_seconds": ch.ttl_seconds, "instructions": list(ch.instructions()),
+                    "next": "publish the TXT record, then POST /targets/%s/verify/dns" % m[0],
+                })
+            m = _match(api_path, "/targets/*/verify/dns")
+            if m and method == "POST":
+                import ownership as _own
+                tgt = db.get("targets", m[0])
+                if not tgt:
+                    return self._json(404, {"error": "not found"})
+                stored = tgt.get("ownership_challenge")
+                if not stored:
+                    return self._json(422, {"error": "no challenge issued - POST /targets/*/challenge first"})
+                ch = _own.Challenge.from_dict(stored)
+                proof = _own.OwnershipVerifier().verify(ch)
+                db.update("targets", m[0], lambda t: t.update({
+                    "ownership_challenge": ch.to_dict(),
+                    "ownership": "dns_txt_quorum" if proof.ok else "dns_txt_pending",
+                    "ownership_proof": proof.to_dict() if proof.ok else None,
+                    "status": "VERIFIED" if proof.ok else "UNVERIFIED",
+                }), actor=user, action="target.verify_dns", resource_type="target",
+                    reason=f"quorum ok={proof.ok} label={proof.label} attempts={ch.attempts}")
+                if not proof.ok:
+                    return self._json(422, {"verified": False, "target_id": m[0],
+                                            "record_name": ch.record_name,
+                                            "expected_value": ch.expected_value,
+                                            "attempts": ch.attempts,
+                                            "evidence": proof.evidence})
+                return self._json(200, {"verified": True, "target_id": m[0],
+                                        "record_name": proof.record, "label": proof.label,
+                                        "fingerprint": proof.fingerprint(),
+                                        "proof": proof.to_dict()})
             m = _match(api_path, "/targets/*/verify")
             if m and method == "POST":
                 tgt = db.get("targets", m[0])
@@ -727,6 +777,35 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(200, {"job_id": m[0], "aggregate": fm.get("aggregate"),
                                             "series": []})
                 return self._json(200, {"job_id": m[0], "series": ts})
+            m = _match(api_path, "/test-jobs/*/down")
+            if m and method == "GET":
+                snap = orchestrator.get_runtime_snapshot(m[0])
+                if snap is None:
+                    return self._json(404, {"error": "not found"})
+                return self._json(200, {"job_id": m[0], "down": snap.get("down"),
+                                        "observer": snap.get("observer"),
+                                        "probe": snap.get("probe")})
+            m = _match(api_path, "/test-jobs/*/observer")
+            if m and method == "POST":
+                import observer as _obs
+                job = db.get("test_jobs", m[0])
+                if not job:
+                    return self._json(404, {"error": "not found"})
+                plan = db.get("test_plans", job.get("test_plan_id") or "")
+                tgt = db.get("targets", (plan or {}).get("target_id") or "")
+                if not tgt:
+                    return self._json(422, {"error": "target not resolvable from plan"})
+                url = (tgt.get("canonical_origin") or "").rstrip("/") + "/"
+                try:
+                    report = _obs.verify_down(url, max_nodes=8, poll_timeout=30.0)
+                except Exception as exc:
+                    return self._json(502, {"error": "observer unreachable",
+                                            "detail": str(exc)[:200]})
+                out = report.to_dict()
+                db.update("test_jobs", m[0], lambda j: j.update({"observer_verdict": out}),
+                          actor=user, action="job.observer_check", resource_type="test_job",
+                          reason=f"on-demand third-party verdict {out['verdict']}")
+                return self._json(200, {"job_id": m[0], "observer": out})
 
             # ---- evidence (enriched dengan target/domain) ----
             if api_path == "/evidence" and method == "GET":
@@ -802,6 +881,165 @@ class Handler(BaseHTTPRequestHandler):
                             key=lambda d: d.get("at") or "", reverse=True)[:100]
                 return self._json(200, dl)
 
+            # ---- source capability registry (item 9) ----
+            if api_path == "/sources/matrix" and method == "GET":
+                import srccap as _sc
+                return self._json(200, _sc.REGISTRY.matrix())
+            if api_path == "/sources/pick" and method == "POST":
+                import srccap as _sc
+                b = self._body()
+                src, why = _sc.REGISTRY.pick(b.get("required") or [], kind=b.get("kind"))
+                if not src:
+                    return self._json(409, {"error": "no source satisfies requirement",
+                                            "required": b.get("required"), "reasons": why})
+                return self._json(200, {"picked": src.to_dict(), "required": b.get("required")})
+            if api_path == "/sources" and method == "GET":
+                import srccap as _sc
+                with SOURCES_LOCK:
+                    items = [x.to_dict() for x in _sc.REGISTRY.list()]
+                return self._json(200, {"sources": items,
+                                        "capabilities": list(_sc.CAPABILITIES),
+                                        "ssl_lib": _sc.ssl.OPENSSL_VERSION})
+            if api_path == "/sources" and method == "POST":
+                import srccap as _sc
+                b = self._body()
+                label = (b.get("label") or "").strip()
+                if not label:
+                    return self._json(422, {"error": {"field": "label", "message": "required"}})
+                try:
+                    src = _sc.REGISTRY.register(label, kind=b.get("kind") or "local",
+                                                ip=b.get("ip"), region=b.get("region"),
+                                                declared=b.get("declared"),
+                                                note=b.get("note") or "")
+                except _sc.SourceError as e:
+                    return self._json(409, {"error": str(e)})
+                try:
+                    db.insert("sources", src.to_dict(), actor=user, action="source.registered",
+                              resource_type="source", reason="label=%s kind=%s" % (label, src.kind))
+                except Exception:
+                    pass
+                return self._json(201, src.to_dict())
+            m = _match(api_path, "/sources/*/probe")
+            if m and method == "POST":
+                import srccap as _sc
+                b = self._body()
+                if not _sc.REGISTRY.get(m[0]):
+                    return self._json(404, {"error": "source not found"})
+                r = _sc.REGISTRY.probe(m[0], url=b.get("url") or _sc.DEFAULT_PROBE_URL)
+                return self._json(200, {"source": m[0], "probe": r,
+                                        "capabilities": _sc.REGISTRY.get(m[0]).capabilities()})
+            m = _match(api_path, "/sources/*/udp")
+            if m and method == "POST":
+                import srccap as _sc
+                import udp_probe as _up
+                src = _sc.REGISTRY.get(m[0])
+                if not src:
+                    return self._json(404, {"error": "source not found"})
+                b = self._body()
+                r = _up.probe_all(qname=b.get("qname") or _up.DEFAULT_QNAME,
+                                  qtype=b.get("qtype") or "TXT",
+                                  timeout=float(b.get("timeout") or 3.0),
+                                  ports_n=int(b.get("ports_n") or 6))
+                if b.get("spoof", True):
+                    r["spoof"] = _up.probe_spoof(qname=b.get("qname") or _up.DEFAULT_QNAME)
+                if r.get("reflection_capable"):
+                    _sc.mark_proven(m[0], ["udp"], {"udp": r})
+                if (r.get("spoof") or {}).get("spoof_proven"):
+                    _sc.mark_proven(m[0], ["spoof_src"], {"spoof": r["spoof"]})
+                return self._json(200, dict(r, capabilities=src.capabilities()))
+            m = _match(api_path, "/sources/*/remove")
+            if m and method == "POST":
+                import srccap as _sc
+                gone = _sc.REGISTRY.remove(m[0])
+                if not gone:
+                    return self._json(404, {"error": "source not found"})
+                return self._json(200, {"removed": m[0]})
+            m = _match(api_path, "/sources/*")
+            if m and method == "GET":
+                import srccap as _sc
+                src = _sc.REGISTRY.get(m[0])
+                if not src:
+                    return self._json(404, {"error": "source not found"})
+                return self._json(200, src.to_dict(with_evidence=True))
+
+            # ---- route override (Goal 3) ----
+            if api_path == "/overrides" and method == "GET":
+                with OVERRIDES_LOCK:
+                    items = [{"id": o["id"], "spec": o["spec"].to_dict(),
+                              "applied_tiers": o["report"].get("applied_tiers"),
+                              "global_scope": o["report"].get("global_scope"),
+                              "created_at": o["created_at"]} for o in OVERRIDES.values()]
+                return self._json(200, sorted(items, key=lambda i: i["created_at"], reverse=True))
+            if api_path == "/overrides" and method == "POST":
+                import routeoverride as _ro
+                b = self._body()
+                domain = (b.get("domain") or "").strip().lower().strip(".")
+                if not domain:
+                    return self._json(422, {"error": {"field": "domain", "message": "required"}})
+                mode = b.get("mode") or "404"
+                if mode not in _ro.MODES:
+                    return self._json(422, {"error": {"field": "mode",
+                                                      "message": "must be one of %s" % sorted(_ro.MODES)}})
+                spec = _ro.OverrideSpec(domain, paths=b.get("paths") or ["/*"], mode=mode,
+                                        hosts=b.get("hosts") or [domain], note=b.get("note") or "")
+                oid = gen_id("ovr")
+                ro = _ro.RouteOverrider(spec, upstream=b.get("upstream"),
+                                        connect_ip=b.get("connect_ip"),
+                                        shim_port=int(b.get("shim_port") or 8899))
+                report = ro.apply(tiers=tuple(b.get("tiers") or ("T2",)))
+                with OVERRIDES_LOCK:
+                    OVERRIDES[oid] = {"id": oid, "spec": spec, "ro": ro, "report": report,
+                                      "created_at": now_iso(), "created_by": user}
+                db.insert("overrides", {"id": oid, "domain": domain, "paths": spec.paths,
+                                        "mode": mode, "tiers": report.get("applied_tiers"),
+                                        "failed_tiers": report.get("failed_tiers"),
+                                        "global_scope": report.get("global_scope"),
+                                        "shim_url": (ro.shim.url_for("/") if ro.shim else None),
+                                        "created_at": now_iso(), "created_by": user,
+                                        "status": "ACTIVE"},
+                          actor=user, action="override.applied", resource_type="override",
+                          reason="tiers=%s mode=%s domain=%s" % (report.get("applied_tiers"), mode, domain))
+                return self._json(201, dict(report, id=oid))
+            m = _match(api_path, "/overrides/*/probe")
+            if m and method == "POST":
+                with OVERRIDES_LOCK:
+                    rec = OVERRIDES.get(m[0])
+                if not rec or rec["ro"].shim is None:
+                    return self._json(404, {"error": "override or shim not found"})
+                import transport as _tr
+                b = self._body()
+                path = b.get("path") or (rec["spec"].paths[0].rstrip("*") or "/")
+                client = _tr.Transport(timeout=6)
+                try:
+                    resp = client.request(b.get("method", "GET"), rec["ro"].shim.url_for(path))
+                finally:
+                    client.close()
+                return self._json(200, {"override_id": m[0], "path": path,
+                                        "status": resp.status, "error": resp.error,
+                                        "override_header": resp.header("x-galardo-override"),
+                                        "forced": rec["spec"].matches(path),
+                                        "shim": rec["ro"].shim.stats()})
+            m = _match(api_path, "/overrides/*/revert")
+            if m and method == "POST":
+                with OVERRIDES_LOCK:
+                    rec = OVERRIDES.pop(m[0], None)
+                if not rec:
+                    return self._json(404, {"error": "not found"})
+                out = rec["ro"].revert()
+                db.update("overrides", m[0], lambda o: o.update({"status": "REVERTED",
+                                                                 "reverted_at": now_iso()}),
+                          actor=user, action="override.reverted", resource_type="override",
+                          reason="tiers=%s" % out.get("reverted"))
+                return self._json(200, dict(out, id=m[0]))
+            m = _match(api_path, "/overrides/*")
+            if m and method == "GET" and len(m) == 1:
+                with OVERRIDES_LOCK:
+                    rec = OVERRIDES.get(m[0])
+                if not rec:
+                    return self._json(404, {"error": "not found"})
+                return self._json(200, {"id": m[0], "created_at": rec["created_at"],
+                                        "evidence": rec["ro"].evidence()})
+
             # ---- audit ----
             if api_path == "/audit" and method == "GET":
                 events = db.list("audit_logs")
@@ -815,86 +1053,6 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             db.audit_event("api", "api.error", "route", path, reason=str(e)[:200])
             return self._json(500, {"error": "internal error", "detail": str(e)[:200]})
-
-
-def _dns_txt_lookup(record_name):
-    """Query TXT records for record_name using stdlib DNS over UDP (zero-dependency).
-    Returns (found_bool, values_list, error_or_None). Minimal DNS packet builder/parser
-    limited to TXT (type 16) queries — no subprocess, no external deps.
-    """
-    import socket, struct, random
-    try:
-        parts = record_name.rstrip(".").split(".")
-        qname = b"".join(bytes([len(p)]) + p.encode("idna") if not p.isascii() else bytes([len(p)]) + p.encode() for p in parts) + b"\x00"
-        txid = random.randint(0, 65535)
-        header = struct.pack(">HHHHHH", txid, 0x0100, 1, 0, 0, 0)
-        question = qname + struct.pack(">HH", 16, 1)  # TXT, IN
-        packet = header + question
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(4.0)
-        try:
-            resolver = socket.gethostbyname("resolver1.opendns.com") if False else None
-            servers = []
-            try:
-                import subprocess as _sp
-                sc = _sp.run(["scutil", "--dns"], capture_output=True, text=True, timeout=3)
-                for line in sc.stdout.splitlines():
-                    line = line.strip()
-                    if line.startswith("nameserver[") and "]" in line:
-                        ip = line.split("]", 1)[1].strip().split("#")[0]
-                        if ip and ":" not in ip:
-                            servers.append(ip)
-            except Exception:
-                pass
-            servers = servers or ["1.1.1.1", "8.8.8.8"]
-            last_err = None
-            for srv in servers[:3]:
-                try:
-                    s.sendto(packet, (srv, 53))
-                    data, _ = s.recvfrom(4096)
-                    break
-                except Exception as e:
-                    last_err = str(e)
-                    data = None
-            if data is None:
-                return False, [], last_err or "no resolver responded"
-        finally:
-            s.close()
-        # parse response
-        rid, flags, qd, an, ns, ar = struct.unpack(">HHHHHH", data[:12])
-        if rid != txid:
-            return False, [], "transaction id mismatch"
-        if (flags & 0x000F) != 0:
-            return False, [], f"DNS rcode={(flags & 0x000F)}"
-        idx = 12
-        # skip questions
-        for _ in range(qd):
-            while data[idx] != 0:
-                idx += data[idx] + 1
-            idx += 5
-        values = []
-        for _ in range(an):
-            # name (possibly compressed)
-            if data[idx] & 0xC0 == 0xC0:
-                idx += 2
-            else:
-                while data[idx] != 0:
-                    idx += data[idx] + 1
-                idx += 1
-            rtype, rclass, ttl, rdlen = struct.unpack(">HHIH", data[idx:idx + 10])
-            idx += 10
-            rd = data[idx:idx + rdlen]
-            idx += rdlen
-            if rtype == 16:
-                pos, chunks = 0, []
-                while pos < len(rd):
-                    ln = rd[pos]
-                    chunks.append(rd[pos + 1:pos + 1 + ln].decode("utf-8", "replace"))
-                    pos += 1 + ln
-                values.append("".join(chunks))
-        return (len(values) > 0), values, None
-    except Exception as e:
-        return False, [], str(e)
 
 
 def _match(path, pattern):
@@ -1004,7 +1162,8 @@ def _count_by_status(jobs):
     return out
 
 
-def serve(host="127.0.0.1", port=8080):
+def serve(host="127.0.0.1", port=None):
+    port = int(port or os.environ.get("GALARDO_API_PORT", "8090"))  # D12
     seed_lab()
     import fleet
     fleet.register_all()
@@ -1018,6 +1177,6 @@ if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, default=8080)
+    ap.add_argument("--port", type=int, default=int(os.environ.get("GALARDO_API_PORT", "8090")))
     args = ap.parse_args()
     serve(args.host, args.port)

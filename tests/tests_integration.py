@@ -165,6 +165,28 @@ def main():
     check("telemetry present (requests>0)", agg.get("requests", 0) > 0, str(agg)[:200])
     check("p95 computed", agg.get("p95_ms") is not None, str(agg)[:200])
     check("effective caps recorded", fm.get("effective_policy", {}).get("max_rps") is not None)
+    check("assertions evaluated (soft failure recorded)", agg.get("assert_soft_fail", 0) > 0, str(agg)[:200])
+    check("assertion counters present in telemetry",
+          "assert_hard_fail" in agg and "assert_soft_fail" in agg)
+    check("payload subset tracked in telemetry",
+          "payload_error_pct" in agg and "payload_requests" in agg, str(agg)[:200])
+
+    from safety import SafetyController
+
+    class _T(object):
+        last_data_ts = None
+
+        def window(self, s):
+            return {}
+
+    class _P(object):
+        def snapshot(self):
+            return {"state": "HEALTHY"}
+
+    _sc = SafetyController("job-tol", {"max_error_pct": 30.0}, _P(), _T(), lambda c, d: True)
+    check("phase tolerance: payload 70% wider than normal 30%",
+          _sc.payload_pct > _sc.normal_pct and _sc.normal_pct == 30.0,
+          f"normal={_sc.normal_pct} payload={_sc.payload_pct}")
     if stt == "COMPLETED":
         st, rec = req("POST", f"/test-jobs/{job_a}/recovery")
         check("recovery monitor starts", st == 202)
@@ -323,10 +345,18 @@ requests:
     weight: 70
     timeout_ms: 1500
   - name: "root"
-    method: "GET"
+    method: "POST"
     path: "/"
     weight: 30
     timeout_ms: 1500
+    body: "galardo-active-probe"
+    body_encoding: "identity"
+    assertions:
+      - type: "json_contains"
+        path: "body"
+        value: "galardo-active-probe"
+      - type: "soft_body_contains"
+        value: "this-string-is-absent-xyz"
 think_time_ms:
   min: 50
   max: 120

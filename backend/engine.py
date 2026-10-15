@@ -21,6 +21,13 @@ import urllib.request
 
 from util import now_iso
 
+try:
+    from . import assertions as assertions_mod
+    from . import transport as transport_mod
+except ImportError:
+    import assertions as assertions_mod
+    import transport as transport_mod
+
 # Larger implied context for SSL certificates (not used for http lab targets)
 ssl_ctx = None
 try:
@@ -41,6 +48,8 @@ class TelemetryRing:
         self.buckets = {}
         self.series = {}  # metric -> list[(ts, value)]
         self.last_data_ts = None  # freshness signal for safety controller
+        self.assert_samples = []  # bounded ring of failed-assertion details
+        self.assert_lock = threading.Lock()
 
     def _bucket(self, ts=None):
         ts = ts or time.time()
@@ -49,14 +58,19 @@ class TelemetryRing:
             b = self.buckets.setdefault(sec, {
                 "requests": 0, "ok": 0, "err_4xx": 0, "err_5xx": 0,
                 "timeouts": 0, "conn_errors": 0, "bytes_sent": 0, "bytes_recv": 0,
+                "assert_hard": 0, "assert_soft": 0,
+                "pay_requests": 0, "pay_err": 0,
                 "lat_sum": 0.0, "lat_max": 0.0, "latencies": [],
             })
         return b
 
-    def record(self, status=None, error=None, latency=0.0, sent=0, recv=0, ts=None):
+    def record(self, status=None, error=None, latency=0.0, sent=0, recv=0, ts=None,
+               assert_hard=0, assert_soft=0, payload=False):
         b = self._bucket(ts)
         with self.lock:
             self.last_data_ts = time.time()
+            b["assert_hard"] += assert_hard
+            b["assert_soft"] += assert_soft
             b["requests"] += 1
             b["lat_sum"] += latency
             b["lat_max"] = max(b["lat_max"], latency)
@@ -75,6 +89,10 @@ class TelemetryRing:
                     b["err_4xx"] += 1
                 else:
                     b["err_5xx"] += 1
+            if payload:
+                b["pay_requests"] += 1
+                if error or (isinstance(status, int) and status >= 400):
+                    b["pay_err"] += 1
 
     def vu_sample(self, vus):
         ts = time.time()
@@ -83,18 +101,33 @@ class TelemetryRing:
             cut = ts - self.max
             self.series["active_vus"] = [x for x in self.series["active_vus"] if x[0] >= cut]
 
+    def record_assertions(self, report, req_name=None, max_samples=200):
+        """Keep a bounded trace of failed assertions for the evidence bundle."""
+        with self.assert_lock:
+            for outcome in report.hard_failures + report.soft_failures:
+                if len(self.assert_samples) >= max_samples:
+                    break
+                self.assert_samples.append({
+                    "ts": now_iso(), "request": req_name, "type": outcome.type,
+                    "severity": outcome.severity, "detail": outcome.detail,
+                })
+
     def window(self, last_seconds):
         """Aggregate over the trailing window -> dict."""
         now = time.time()
         lo = int(now - last_seconds)
         agg = {"requests": 0, "ok": 0, "err_4xx": 0, "err_5xx": 0, "timeouts": 0,
                "conn_errors": 0, "bytes_sent": 0, "bytes_recv": 0,
+               "assert_hard": 0, "assert_soft": 0,
+               "pay_requests": 0, "pay_err": 0,
                "lat_sum": 0.0, "lat_max": 0.0, "latencies": []}
         with self.lock:
             for sec, b in self.buckets.items():
                 if sec >= lo:
                     for k in ("requests", "ok", "err_4xx", "err_5xx", "timeouts",
-                              "conn_errors", "bytes_sent", "bytes_recv"):
+                              "conn_errors", "bytes_sent", "bytes_recv",
+                              "assert_hard", "assert_soft",
+                              "pay_requests", "pay_err"):
                         agg[k] += b[k]
                     agg["lat_sum"] += b["lat_sum"]
                     agg["lat_max"] = max(agg["lat_max"], b["lat_max"])
@@ -127,6 +160,12 @@ class TelemetryRing:
             "bytes_sent": agg["bytes_sent"],
             "bytes_recv": agg["bytes_recv"],
             "bandwidth_bps": round((agg["bytes_sent"] + agg["bytes_recv"]) / max(1e-9, last_seconds), 1),
+            "assert_hard_fail": agg["assert_hard"],
+            "assert_soft_fail": agg["assert_soft"],
+            "payload_requests": agg["pay_requests"],
+            "payload_errors": agg["pay_err"],
+            "payload_error_pct": round(100.0 * agg["pay_err"] / agg["pay_requests"], 2) if agg["pay_requests"] else 0.0,
+            "assert_fail_pct": round(100.0 * (agg["assert_hard"] + agg["assert_soft"]) / total, 2) if total else 0.0,
         }
 
     def timeseries(self, last_seconds=120, step=2):
@@ -197,10 +236,16 @@ class TokenBucket:
 class LoadEngine:
     """Runs a bounded scenario against a single resolved origin."""
 
-    def __init__(self, job_id, run_id, origin, normalized, effective, telemetry, abort_check, on_event=None):
+    def __init__(self, job_id, run_id, origin, normalized, effective, telemetry, abort_check,
+                 on_event=None, connect_ip=None, verify_tls=True):
         self.job_id = job_id
         self.run_id = run_id
         self.origin = origin  # "http://host:port"
+        self.connect_ip = connect_ip
+        self.keep_alive = normalized.get("keep_alive", True)
+        self.transport = transport_mod.Transport(verify_tls=verify_tls)
+        self.assert_fail_hard = 0
+        self.assert_fail_soft = 0
         self.norm = normalized
         self.eff = effective  # dict with max_rps/max_vus/max_duration_sec/max_concurrency
         self.telemetry = telemetry
@@ -231,27 +276,41 @@ class LoadEngine:
         q = req.get("query") or {}
         if q:
             url += ("&" if "?" in url else "?") + urllib.parse.urlencode(q)
-        headers = {"User-Agent": "galardo-worker/1.0 (bounded lab run)",
-                   "Accept": "*/*", "Connection": "close"}
+        headers = {"User-Agent": "galardo-worker/1.0 (bounded lab run)", "Accept": "*/*"}
+        if not self.keep_alive:
+            headers["Connection"] = "close"
         for k, v in (req.get("headers") or {}).items():
             headers[k] = str(v)
         timeout = req.get("timeout_ms", 1000) / 1000.0
-        r = urllib.request.Request(url, method=req["method"], headers=headers)
-        sent = len(url) + sum(len(k) + len(v) for k, v in headers.items())
         t0 = time.time()
-        try:
-            with urllib.request.urlopen(r, timeout=timeout, context=ssl_ctx) as resp:
-                body = resp.read(65536)  # bounded read
-                dt = time.time() - t0
-                self.telemetry.record(status=resp.status, latency=dt, sent=sent, recv=len(body))
-                return
-        except urllib.error.HTTPError as e:
-            dt = time.time() - t0
-            self.telemetry.record(status=e.code, latency=dt, sent=sent, recv=0)
-        except (socket.timeout, TimeoutError):
-            self.telemetry.record(error="timeout", latency=time.time() - t0, sent=sent)
-        except Exception:
-            self.telemetry.record(error="conn", latency=time.time() - t0, sent=sent)
+        resp = self.transport.request(
+            req["method"], url, headers=headers,
+            body=req.get("body"), body_encoding=req.get("body_encoding") or "identity",
+            connect_ip=self.connect_ip, timeout=timeout)
+        dt = time.time() - t0
+
+        hard = soft = 0
+        specs = req.get("assertions") or []
+        if specs:
+            report = assertions_mod.evaluate_all(specs, resp, elapsed_ms=dt)
+            hard = len(report.hard_failures)
+            soft = len(report.soft_failures)
+            if hard or soft:
+                self.telemetry.record_assertions(report, req.get("name"))
+                self.assert_fail_hard += hard
+                self.assert_fail_soft += soft
+
+        is_payload = bool(req.get("body"))
+        if resp.error:
+            kind = "timeout" if "timeout" in resp.error.lower() else "conn"
+            self.telemetry.record(error=kind, latency=dt,
+                                  sent=resp.bytes_sent or 0, recv=resp.bytes_received or 0,
+                                  assert_hard=hard, assert_soft=soft, payload=is_payload)
+        else:
+            self.telemetry.record(status=resp.status, latency=dt,
+                                  sent=resp.bytes_sent or 0, recv=resp.bytes_received or 0,
+                                  assert_hard=hard, assert_soft=soft, payload=is_payload)
+        return resp
 
     # ---- worker loop -----------------------------------------------------
     def _vu_loop(self, vu_id, deadline):
@@ -326,5 +385,11 @@ class LoadEngine:
         ctrl.join(timeout=5)
         time.sleep(1.0)  # brief drain window for in-flight requests
         self.ended_at = time.time()
+        try:
+            self.transport.close()
+        except Exception:
+            pass
         return {"started_at": now_iso(), "duration_actual": round(self.ended_at - self.started_at, 2),
-                "abort_reason": self.abort_reason}
+                "abort_reason": self.abort_reason,
+                "assert_hard_fail": self.assert_fail_hard,
+                "assert_soft_fail": self.assert_fail_soft}

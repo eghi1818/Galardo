@@ -27,6 +27,14 @@ except Exception:
     pass
 
 
+# Phase tolerance (locked decision): normal traffic 30%, payload traffic 70%.
+# Payload phases are expected to be noisier; holding them to the normal bar
+# would abort every legitimate payload run. Measured on the payload subset only.
+TOLERANCE_NORMAL_PCT = 30.0
+TOLERANCE_PAYLOAD_PCT = 70.0
+TOLERANCE_ASSERT_HARD_PCT = 30.0
+
+
 class HealthProbe(threading.Thread):
     """Independent probe: does NOT follow redirects, bounded timeout."""
 
@@ -121,7 +129,10 @@ class SafetyController:
         self.thread = threading.Thread(target=self._loop, daemon=True, name=f"safety-{job_id[:12]}")
         self.decisions = []
         self.p95_limit_ms = self.policy.get("max_p95_ms")
-        self.err_pct_limit = self.policy.get("max_error_pct", 10.0)
+        self.normal_pct = float(self.policy.get("max_error_pct") or TOLERANCE_NORMAL_PCT)
+        self.payload_pct = float(self.policy.get("max_error_pct_payload") or TOLERANCE_PAYLOAD_PCT)
+        self.assert_hard_pct = float(self.policy.get("max_assert_hard_pct") or TOLERANCE_ASSERT_HARD_PCT)
+        self.err_pct_limit = self.normal_pct  # kept for backwards compatibility
         self.abort_requested = False
 
     def start(self):
@@ -184,7 +195,33 @@ class SafetyController:
             if self.p95_limit_ms and agg["p95_ms"] and agg["p95_ms"] > self.p95_limit_ms:
                 self._issue_abort("P95_BREACH",
                                   f"p95={agg['p95_ms']}ms > {self.p95_limit_ms}ms over 5s window")
+
+        # 4. Phase tolerance: payload traffic gets the wider bar, evaluated on the
+        # payload subset only so payload noise cannot mask a normal-phase regression.
+        pay_requests = agg.get("payload_requests", 0)
+        if pay_requests >= 10 and agg.get("payload_error_pct", 0.0) > self.payload_pct:
+            self._issue_abort("ERROR_RATE_PAYLOAD",
+                              f"payload_error_pct={agg['payload_error_pct']} > {self.payload_pct} "
+                              f"over 5s window ({pay_requests} payload requests)")
+
+        # 5. Hard assertion failures: the run is not measuring what it claims to.
+        hard = agg.get("assert_hard_fail", 0)
+        if agg["requests"] >= 10 and hard:
+            hard_pct = 100.0 * hard / agg["requests"]
+            if hard_pct > self.assert_hard_pct:
+                self._issue_abort("ASSERT_HARD",
+                                  f"hard assertion failure rate {round(hard_pct, 2)}% > "
+                                  f"{self.assert_hard_pct}% over 5s window ({hard} failures)")
         return snap
+
+    def tolerance_report(self):
+        """Exposed for evidence and the dashboard: which bar applied where."""
+        return {
+            "normal_error_pct": self.normal_pct,
+            "payload_error_pct": self.payload_pct,
+            "assert_hard_pct": self.assert_hard_pct,
+            "p95_limit_ms": self.p95_limit_ms,
+        }
 
     def _running_expected(self):
         return not self.abort_requested

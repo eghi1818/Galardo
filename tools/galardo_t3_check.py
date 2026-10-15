@@ -6,7 +6,10 @@ Zone ID dan Account ID ditemukan otomatis dari token.
 """
 import json
 import os
+import socket
+import subprocess
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -22,6 +25,18 @@ def mask(v):
     if not v:
         return "-"
     return (v[:6] + "..." + v[-4:]) if len(v) > 12 else (v[:4] + "...")
+
+
+def wait_dns(host, tries=12, delay=3.0):
+    """Host harus resolve sebelum diuji; flush cache DNS macOS kalau perlu."""
+    for i in range(tries):
+        try:
+            socket.getaddrinfo(host, 443)
+            return True, i + 1
+        except Exception:
+            subprocess.run(["dscacheutil", "-flushcache"], capture_output=True)
+            time.sleep(delay)
+    return False, tries
 
 
 def main():
@@ -61,6 +76,14 @@ def main():
     zone = c.zone_name()
     host = os.environ.get("GALARDO_CF_TEST_HOST") or ("galardo-edge." + zone)
     print("host uji :", host)
+
+    if zi.get("status") == "active":
+        c.ensure_proxied_host(host)
+        okdns, tries = wait_dns(host)
+        print("dns host :", "resolve OK" if okdns else "TIDAK RESOLVE",
+              "(percobaan %d)" % tries)
+        if not okdns:
+            print("  -> host belum bisa di-resolve; T3 akan gagal walau API sukses")
 
     report = {"zone": zone, "host": host, "zone_status": zi.get("status"), "steps": []}
     ok_all = True

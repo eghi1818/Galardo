@@ -426,7 +426,11 @@ def _edge_probe(url, timeout=10.0):
                 "body_len": len(body), "latency_ms": round((time.time() - t0) * 1000, 1),
                 "url": url}
     except Exception as e:
-        return {"status": None, "error": str(e)[:200], "url": url}
+        msg = str(e)[:200]
+        low = msg.lower()
+        kind = "dns" if ("nodename" in low or "servname" in low
+                         or "name or service" in low or "temporary failure" in low) else "conn"
+        return {"status": None, "error": msg, "error_kind": kind, "url": url}
 
 
 class CloudflareClient:
@@ -619,12 +623,17 @@ class CloudflareEdgeOverride:
     TIER = "T3-cf-worker"
 
     def __init__(self, token=None, account_id=None, zone_id=None, script=None,
-                 client=None, host=None, verify=True, verify_retries=8, **kw):
+                 client=None, host=None, verify=True, verify_retries=8,
+                 keep_dns=None, **kw):
         self.client = client or CloudflareClient(token, account_id, zone_id)
         self.script = script or os.environ.get("GALARDO_CF_SCRIPT", "galardo-override")
         self.host = host or os.environ.get("GALARDO_CF_TEST_HOST")
         self.verify = bool(verify)
         self.verify_retries = int(verify_retries)
+        # Record DNS dipertahankan secara default: kalau dihapus, resolver OS
+        # menyimpan cache NXDOMAIN dan run berikutnya gagal resolve.
+        self.keep_dns = (os.environ.get("GALARDO_CF_KEEP_DNS", "1") != "0") \
+            if keep_dns is None else bool(keep_dns)
         self.state = {}
 
     def available(self):
@@ -734,8 +743,10 @@ class CloudflareEdgeOverride:
             out["route_deleted"] = bool(self.client.delete_route(st["route_id"]).get("_ok"))
         if st.get("worker"):
             out["worker_deleted"] = bool(self.client.delete_worker(st["worker"]).get("_ok"))
-        if st.get("dns_record_id") and st.get("dns_created"):
+        if st.get("dns_record_id") and st.get("dns_created") and not self.keep_dns:
             out["dns_deleted"] = bool(self.client.delete_dns_record(st["dns_record_id"]).get("_ok"))
+        else:
+            out["dns_kept"] = bool(st.get("dns_record_id"))
         return TierResult(self.TIER, True, "T3 reverted: %s" % json.dumps(out), out)
 
     def evidence(self):

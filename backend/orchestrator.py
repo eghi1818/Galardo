@@ -653,7 +653,9 @@ def get_runtime_snapshot(job_id):
         if ctx.probe:
             snap["probe"] = ctx.probe.snapshot()
         if ctx.down:
-            snap["down"] = ctx.down.verdict()
+            # Same shape as the terminal branch: a consumer must not have to
+            # guess whether "state" sits at the top or under "verdict".
+            snap["down"] = ctx.down.evidence()
         with JOBS_LOCK:
             snap["vus"] = max([s for _, s in ctx.telemetry.series.get("active_vus", [])[-20:]] or [0])
         if ctx.safety:

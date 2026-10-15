@@ -22,7 +22,7 @@ TOP_LEVEL = {"schema_version", "name", "description", "target_ref", "profile",
              "requests", "think_time_ms", "identity_sim", "keep_alive"}
 PROFILE_FIELDS = {"duration_seconds", "virtual_users", "max_rps", "max_concurrency", "ramp"}
 REQUEST_FIELDS = {"name", "method", "path", "weight", "timeout_ms", "headers", "query",
-                 "body", "body_encoding"}
+                 "body", "body_encoding", "assertions"}
 RAMP_FIELDS = {"after_seconds", "virtual_users"}
 MAX_BODY_BYTES = 1048576
 ALLOWED_BODY_ENCODINGS = {"identity", "gzip", "base64", "base64+gzip"}
@@ -168,6 +168,19 @@ def parse_scenario_yaml(yaml_text, targets_by_name):
             elif body is None:
                 errors.append({"field": f"requests[{i}].body_encoding", "code": "invalid",
                                "message": "body_encoding requires body"})
+        specs = r.get("assertions")
+        if specs is not None:
+            if not isinstance(specs, list):
+                errors.append({"field": f"requests[{i}].assertions", "code": "schema",
+                               "message": "assertions must be a list"})
+            else:
+                for j, spec in enumerate(specs):
+                    if not isinstance(spec, (dict, str)):
+                        errors.append({"field": f"requests[{i}].assertions[{j}]", "code": "schema",
+                                       "message": "each assertion must be a mapping or a string"})
+                    elif isinstance(spec, dict) and not spec.get("type"):
+                        errors.append({"field": f"requests[{i}].assertions[{j}].type", "code": "required",
+                                       "message": "assertion requires a type"})
 
     identity_spec = doc.get("identity_sim") or {}
     if not isinstance(identity_spec, dict):
@@ -218,6 +231,7 @@ def parse_scenario_yaml(yaml_text, targets_by_name):
                 "query": r.get("query") or {},
                 "body": r.get("body"),
                 "body_encoding": r.get("body_encoding") or "identity",
+                "assertions": r.get("assertions") or [],
             }
             for i, r in enumerate(requests)
         ],

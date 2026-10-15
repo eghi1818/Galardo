@@ -16,12 +16,33 @@ import struct
 import time
 
 DNS_SERVERS = ("1.1.1.1", "8.8.8.8")
-NTP_SERVERS = ("time.cloudflare.com", "time.google.com")
+NTP_SERVERS = ("time.cloudflare.com", "time.google.com", "pool.ntp.org",
+               "ntp.ubuntu.com", "time.nist.gov")
+NTP_CTRL_SERVERS = ("ntp.ubuntu.com", "time.nist.gov", "pool.ntp.org",
+                    "time.cloudflare.com")
 SSDP_GROUP = "239.255.255.250"
 SSDP_PORT = 1900
 
-DNS_QTYPE = {"A": 1, "TXT": 16, "ANY": 255, "MX": 15, "SOA": 6}
+DNS_QTYPE = {"A": 1, "TXT": 16, "ANY": 255, "MX": 15, "SOA": 6, "DNSKEY": 48}
 DEFAULT_QNAME = "isc.org"
+
+# Kombinasi yang secara historis memberi amplifikasi besar. Diukur, bukan dikutip.
+DNS_CANDIDATES = (
+    ("isc.org", "ANY"), ("google.com", "TXT"), ("cloudflare.com", "TXT"),
+    ("facebook.com", "TXT"), ("microsoft.com", "TXT"), ("isc.org", "DNSKEY"),
+    ("org", "DNSKEY"), ("isc.org", "TXT"),
+)
+
+
+def _default_if_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -121,13 +142,71 @@ def probe_dns(qname=DEFAULT_QNAME, qtype="TXT", servers=DNS_SERVERS, timeout=3.0
     return _probe_many(servers, 53, lambda: dns_packet(qname, qtype)[1], timeout, 1)
 
 
-def probe_ntp(mode=3, servers=NTP_SERVERS, timeout=3.0):
+def probe_dns_best(timeout=3.0, candidates=DNS_CANDIDATES):
+    """Coba beberapa kombinasi qname/qtype, kembalikan yang amplifikasinya terbesar."""
+    tried = []
+    best = None
+    for qname, qtype in candidates:
+        r = _probe_many(DNS_SERVERS, 53, lambda q=qname, t=qtype: dns_packet(q, t)[1],
+                        min(timeout, 2.5), 1)
+        b = r.get("best") or {}
+        tried.append({"qname": qname, "qtype": qtype,
+                      "responded": b.get("responded"),
+                      "amplification": b.get("amplification"),
+                      "response_bytes": b.get("response_bytes")})
+        if b.get("responded") and (best is None
+                                   or b.get("amplification", 0) > best.get("amplification", 0)):
+            best = dict(b, qname=qname, qtype=qtype)
+    return {"attempts": tried, "best": best or {},
+            "responded": bool(best),
+            "qname": (best or {}).get("qname"), "qtype": (best or {}).get("qtype")}
+
+
+def probe_ntp(mode=3, servers=None, timeout=3.0):
+    servers = servers or (NTP_CTRL_SERVERS if mode == 6 else NTP_SERVERS)
     return _probe_many(servers, 123, lambda: ntp_packet(mode), timeout, 1)
 
 
-def probe_ssdp(timeout=3.0):
-    r = _exchange(SSDP_GROUP, SSDP_PORT, SSDP_PACKET, timeout=timeout, expect=6)
-    return {"attempts": [r], "best": r, "responded": bool(r.get("responded"))}
+def probe_ssdp(timeout=4.0):
+    """SSDP butuh interface multicast eksplisit, kalau tidak paketnya hilang."""
+    t0 = time.time()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
+        iface = _default_if_ip()
+        if iface:
+            try:
+                sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF,
+                                socket.inet_aton(iface))
+            except Exception:
+                pass
+        sock.bind(("", 0))
+        sock.sendto(SSDP_PACKET, (SSDP_GROUP, SSDP_PORT))
+        got, deadline = [], time.time() + timeout
+        while time.time() < deadline and len(got) < 10:
+            sock.settimeout(max(0.05, deadline - time.time()))
+            try:
+                data, addr = sock.recvfrom(4096)
+            except socket.timeout:
+                break
+            except OSError:
+                break
+            got.append({"bytes": len(data), "from": addr[0],
+                        "ms": round((time.time() - t0) * 1000.0, 2)})
+        resp = sum(g["bytes"] for g in got)
+        r = {"target": SSDP_GROUP, "port": SSDP_PORT, "responded": bool(got),
+             "request_bytes": len(SSDP_PACKET), "response_bytes": resp,
+             "responses": len(got), "iface": iface,
+             "amplification": round(resp / float(len(SSDP_PACKET)), 2) if got else 0.0,
+             "rtt_ms": min([g["ms"] for g in got]) if got else None, "samples": got[:4]}
+        return {"attempts": [r], "best": r, "responded": bool(got)}
+    except Exception as e:
+        r = {"target": SSDP_GROUP, "responded": False, "amplification": 0.0,
+             "request_bytes": len(SSDP_PACKET), "response_bytes": 0, "error": str(e)[:160]}
+        return {"attempts": [r], "best": r, "responded": False}
+    finally:
+        sock.close()
 
 
 def rotate_source_ports(target="1.1.1.1", port=53, n=8, timeout=1.5, qname=DEFAULT_QNAME):
@@ -146,7 +225,11 @@ def rotate_source_ports(target="1.1.1.1", port=53, n=8, timeout=1.5, qname=DEFAU
 
 
 def probe_all(qname=DEFAULT_QNAME, qtype="TXT", timeout=3.0, ports_n=6):
-    dns = probe_dns(qname, qtype, timeout=timeout)
+    if qname and qname != DEFAULT_QNAME:
+        dns = probe_dns(qname, qtype, timeout=timeout)
+        dns["best"] = dict(dns.get("best") or {}, qname=qname, qtype=qtype)
+    else:
+        dns = probe_dns_best(timeout=timeout)
     ntp3 = probe_ntp(3, timeout=timeout)
     ntp6 = probe_ntp(6, timeout=timeout)
     ssdp = probe_ssdp(timeout=timeout)

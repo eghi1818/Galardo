@@ -23,6 +23,11 @@ DASH_DIR = os.path.normpath(os.path.join(BASE, "..", "dashboard"))
 DEV_TOKEN = os.environ.get("GALARDO_DEV_TOKEN", "dev-token")  # MVP lab: seeded dev users only
 MAX_BODY = 262144
 
+# Goal 3: route overrides live in THIS process (the intercept shim is a local
+# server owned by the API). Registry is process-local by design.
+OVERRIDES = {}
+OVERRIDES_LOCK = threading.Lock()
+
 MIME = {".html": "text/html", ".js": "application/javascript", ".css": "text/css",
         ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png"}
 
@@ -855,6 +860,84 @@ class Handler(BaseHTTPRequestHandler):
                 dl = sorted(_db.list("webhook_deliveries"),
                             key=lambda d: d.get("at") or "", reverse=True)[:100]
                 return self._json(200, dl)
+
+            # ---- route override (Goal 3) ----
+            if api_path == "/overrides" and method == "GET":
+                with OVERRIDES_LOCK:
+                    items = [{"id": o["id"], "spec": o["spec"].to_dict(),
+                              "applied_tiers": o["report"].get("applied_tiers"),
+                              "global_scope": o["report"].get("global_scope"),
+                              "created_at": o["created_at"]} for o in OVERRIDES.values()]
+                return self._json(200, sorted(items, key=lambda i: i["created_at"], reverse=True))
+            if api_path == "/overrides" and method == "POST":
+                import routeoverride as _ro
+                b = self._body()
+                domain = (b.get("domain") or "").strip().lower().strip(".")
+                if not domain:
+                    return self._json(422, {"error": {"field": "domain", "message": "required"}})
+                mode = b.get("mode") or "404"
+                if mode not in _ro.MODES:
+                    return self._json(422, {"error": {"field": "mode",
+                                                      "message": "must be one of %s" % sorted(_ro.MODES)}})
+                spec = _ro.OverrideSpec(domain, paths=b.get("paths") or ["/*"], mode=mode,
+                                        hosts=b.get("hosts") or [domain], note=b.get("note") or "")
+                oid = gen_id("ovr")
+                ro = _ro.RouteOverrider(spec, upstream=b.get("upstream"),
+                                        connect_ip=b.get("connect_ip"),
+                                        shim_port=int(b.get("shim_port") or 8899))
+                report = ro.apply(tiers=tuple(b.get("tiers") or ("T2",)))
+                with OVERRIDES_LOCK:
+                    OVERRIDES[oid] = {"id": oid, "spec": spec, "ro": ro, "report": report,
+                                      "created_at": now_iso(), "created_by": user}
+                db.insert("overrides", {"id": oid, "domain": domain, "paths": spec.paths,
+                                        "mode": mode, "tiers": report.get("applied_tiers"),
+                                        "failed_tiers": report.get("failed_tiers"),
+                                        "global_scope": report.get("global_scope"),
+                                        "shim_url": (ro.shim.url_for("/") if ro.shim else None),
+                                        "created_at": now_iso(), "created_by": user,
+                                        "status": "ACTIVE"},
+                          actor=user, action="override.applied", resource_type="override",
+                          reason="tiers=%s mode=%s domain=%s" % (report.get("applied_tiers"), mode, domain))
+                return self._json(201, dict(report, id=oid))
+            m = _match(api_path, "/overrides/*/probe")
+            if m and method == "POST":
+                with OVERRIDES_LOCK:
+                    rec = OVERRIDES.get(m[0])
+                if not rec or rec["ro"].shim is None:
+                    return self._json(404, {"error": "override or shim not found"})
+                import transport as _tr
+                b = self._body()
+                path = b.get("path") or (rec["spec"].paths[0].rstrip("*") or "/")
+                client = _tr.Transport(timeout=6)
+                try:
+                    resp = client.request(b.get("method", "GET"), rec["ro"].shim.url_for(path))
+                finally:
+                    client.close()
+                return self._json(200, {"override_id": m[0], "path": path,
+                                        "status": resp.status, "error": resp.error,
+                                        "override_header": resp.header("x-galardo-override"),
+                                        "forced": rec["spec"].matches(path),
+                                        "shim": rec["ro"].shim.stats()})
+            m = _match(api_path, "/overrides/*/revert")
+            if m and method == "POST":
+                with OVERRIDES_LOCK:
+                    rec = OVERRIDES.pop(m[0], None)
+                if not rec:
+                    return self._json(404, {"error": "not found"})
+                out = rec["ro"].revert()
+                db.update("overrides", m[0], lambda o: o.update({"status": "REVERTED",
+                                                                 "reverted_at": now_iso()}),
+                          actor=user, action="override.reverted", resource_type="override",
+                          reason="tiers=%s" % out.get("reverted"))
+                return self._json(200, dict(out, id=m[0]))
+            m = _match(api_path, "/overrides/*")
+            if m and method == "GET" and len(m) == 1:
+                with OVERRIDES_LOCK:
+                    rec = OVERRIDES.get(m[0])
+                if not rec:
+                    return self._json(404, {"error": "not found"})
+                return self._json(200, {"id": m[0], "created_at": rec["created_at"],
+                                        "evidence": rec["ro"].evidence()})
 
             # ---- audit ----
             if api_path == "/audit" and method == "GET":

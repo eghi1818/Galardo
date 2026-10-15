@@ -339,6 +339,18 @@ def main():
           and "state" in (dv["down"].get("verdict") or {}),
           str(dv)[:200])
 
+    # ---- 14. route override endpoints (W6) ----
+    st, ov = req("POST", "/overrides", {"domain": "override.test", "paths": ["/blocked/*"],
+                                        "mode": "404", "tiers": ["T2"], "shim_port": 18777})
+    check("override applied on T2 shim",
+          st == 201 and "T2" in (ov.get("applied_tiers") or []), str(ov)[:200])
+    oid = ov.get("id") or ""
+    st, pr = req("POST", f"/overrides/{oid}/probe", {"path": "/blocked/xyz"})
+    check("forced route returns 404 through shim",
+          st == 200 and pr.get("status") == 404 and pr.get("forced") is True, str(pr)[:200])
+    st, rv = req("POST", f"/overrides/{oid}/revert", {})
+    check("override reverted", st == 200 and "T2" in (rv.get("reverted") or []), str(rv)[:200])
+
     # ---- summary ----
     print(f"\n{'='*60}\nRESULTS: {len(PASS)} passed, {len(FAIL)} failed")
     if FAIL:

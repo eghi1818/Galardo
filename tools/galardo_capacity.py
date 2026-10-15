@@ -111,10 +111,16 @@ def main():
                "max_rps_observed": max(r["rps"] for r in rows),
                "ceiling_kind": "generator" if WORKERS == 0 else "target"}
         if knee:
+            want = knee["rps"] * 1.3
+            capped = want > out["max_rps_observed"]
             out["recommendation"] = {
-                "spike_rps": round(knee["rps"] * 1.3, 1),
                 "spike_vus": int(knee["vus"] * 1.3),
-                "note": "spike 1,2-1,5x knee; kalau tidak DOWN -> naikkan 2x lagi"}
+                "spike_rps_target": round(want, 1),
+                "spike_rps_expected": round(min(want, out["max_rps_observed"]), 1),
+                "capped_by_generator": bool(capped and WORKERS == 0),
+                "note": ("spike 1,2-1,5x knee; kalau tidak DOWN -> naikkan 2x lagi"
+                         + (" | PERHATIAN: rps di atas %.0f tidak bisa dicapai laptop ini"
+                            % out["max_rps_observed"] if capped else ""))}
 
         print("-" * 68)
         print(" plafon terukur: %.0f rps (%s)"
@@ -123,8 +129,12 @@ def main():
         if knee:
             print(" KNEE ditemukan di %d VU (%.0f rps) - sebab: %s"
                   % (knee["vus"], knee["rps"], knee["reason"]))
-            print(" Rekomendasi spike: %d VU / ~%.0f rps"
-                  % (out["recommendation"]["spike_vus"], out["recommendation"]["spike_rps"]))
+            rc = out["recommendation"]
+            print(" Rekomendasi spike: %d VU, target ~%.0f rps (realistis ~%.0f rps)"
+                  % (rc["spike_vus"], rc["spike_rps_target"], rc["spike_rps_expected"]))
+            if rc["capped_by_generator"]:
+                print(" PERHATIAN: target rps di atas plafon generator laptop ini (%.0f rps)"
+                      % out["max_rps_observed"])
             if WORKERS == 0:
                 print(" CATATAN: workers=0 -> ini plafon GENERATOR, bukan target.")
                 print("          ulangi dengan CAP_WORKERS=<n> untuk plafon target.")

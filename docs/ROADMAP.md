@@ -120,7 +120,11 @@ dianggap "intrusi" diukur dari bukti, bukan dari daftar.
 
 ---
 
-## 6. Defect register
+## 6. Baseline kapasitas
+
+Lihat `docs/CAPACITY-BASELINE.md`: plafon generator laptop ~5.900 rps (rute ringan), contoh plafon target 94 rps. Dipakai untuk memutuskan kapan VPS benar-benar perlu.
+
+## 7. Defect register
 
 | ID | Isu | Status |
 |---|---|---|

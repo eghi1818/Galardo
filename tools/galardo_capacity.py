@@ -27,7 +27,7 @@ import scenario as sc  # noqa: E402
 
 PORT = int(os.environ.get("GALARDO_CAP_PORT", "18096"))
 BASE = "http://127.0.0.1:%d" % PORT
-STEPS = [int(x) for x in os.environ.get("GALARDO_CAP_STEPS", "25,50,100,200,400").split(",")]
+STEPS = [int(x) for x in os.environ.get("GALARDO_CAP_STEPS", "5,10,20,40,80,160").split(",")]
 SECS = int(os.environ.get("GALARDO_CAP_SECONDS", "8"))
 WORKERS = int(os.environ.get("GALARDO_CAP_WORKERS", "0"))
 PATH = os.environ.get("GALARDO_CAP_PATH", "/healthz")
@@ -91,19 +91,25 @@ def main():
 
         base = rows[0]
         knee = None
+        flat_streak = 0
         for i in range(1, len(rows)):
             cur, prev = rows[i], rows[i - 1]
-            p95_break = cur["p95_ms"] and base["p95_ms"] and cur["p95_ms"] > max(3 * base["p95_ms"], 200)
+            p95_break = bool(cur["p95_ms"] and base["p95_ms"]
+                             and cur["p95_ms"] > max(3 * base["p95_ms"], 200))
             err_break = cur["error_pct"] > 1.0 or cur["timeouts"] > 0 or cur["conn_errors"] > 0
-            flat = cur["rps"] < prev["rps"] * 1.15
-            if p95_break or err_break or flat:
+            gain = (cur["rps"] / prev["rps"] - 1.0) if prev["rps"] else 0.0
+            flat_streak = flat_streak + 1 if gain < 0.15 else 0
+            if p95_break or err_break or flat_streak >= 2:
                 knee = {"vus": cur["vus"], "rps": cur["rps"], "p95_ms": cur["p95_ms"],
                         "reason": ("p95 meledak" if p95_break else
-                                   "error/timeout" if err_break else "rps tidak naik lagi")}
+                                   "error/timeout" if err_break else
+                                   "rps tidak naik 2 langkah berturut-turut")}
                 break
 
         out = {"target": BASE, "path": PATH, "workers": WORKERS, "steps": rows,
-               "baseline": base, "knee": knee}
+               "baseline": base, "knee": knee,
+               "max_rps_observed": max(r["rps"] for r in rows),
+               "ceiling_kind": "generator" if WORKERS == 0 else "target"}
         if knee:
             out["recommendation"] = {
                 "spike_rps": round(knee["rps"] * 1.3, 1),
@@ -111,6 +117,9 @@ def main():
                 "note": "spike 1,2-1,5x knee; kalau tidak DOWN -> naikkan 2x lagi"}
 
         print("-" * 68)
+        print(" plafon terukur: %.0f rps (%s)"
+              % (out["max_rps_observed"],
+                 "GENERATOR laptop" if WORKERS == 0 else "TARGET (workers=%d)" % WORKERS))
         if knee:
             print(" KNEE ditemukan di %d VU (%.0f rps) - sebab: %s"
                   % (knee["vus"], knee["rps"], knee["reason"]))

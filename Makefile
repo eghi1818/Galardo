@@ -66,3 +66,5 @@ capacity:
 	GALARDO_CAP_STEPS=$(CAP_STEPS) GALARDO_CAP_WORKERS=$(CAP_WORKERS) python3 tools/galardo_capacity.py
 CAP_STEPS ?= 25,50,100,200,400
 CAP_WORKERS ?= 0
+CAP_PATH ?= /healthz
+CAP_SECONDS ?= 8

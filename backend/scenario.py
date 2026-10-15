@@ -17,12 +17,15 @@ from util import sha256_text, parse_origin
 
 MAX_YAML_BYTES = 65536
 MAX_DEPTH = 12
-ALLOWED_METHODS = {"GET", "HEAD", "OPTIONS"}
+ALLOWED_METHODS = {"GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"}
 TOP_LEVEL = {"schema_version", "name", "description", "target_ref", "profile",
              "requests", "think_time_ms", "identity_sim", "keep_alive"}
 PROFILE_FIELDS = {"duration_seconds", "virtual_users", "max_rps", "max_concurrency", "ramp"}
-REQUEST_FIELDS = {"name", "method", "path", "weight", "timeout_ms", "headers", "query"}
+REQUEST_FIELDS = {"name", "method", "path", "weight", "timeout_ms", "headers", "query",
+                 "body", "body_encoding"}
 RAMP_FIELDS = {"after_seconds", "virtual_users"}
+MAX_BODY_BYTES = 1048576
+ALLOWED_BODY_ENCODINGS = {"identity", "gzip", "base64", "base64+gzip"}
 
 
 class ScenarioError(Exception):
@@ -72,9 +75,9 @@ def parse_scenario_yaml(yaml_text, targets_by_name):
     _reject_unknown(set(doc.keys()), TOP_LEVEL, "", errors)
 
     schema_version = doc.get("schema_version")
-    if schema_version not in ("1.0", "1.1"):
+    if schema_version not in ("1.0", "1.1", "1.2"):
         errors.append({"field": "schema_version", "code": "unsupported",
-                       "message": "schema_version must be '1.0' or '1.1'"})
+                       "message": "schema_version must be '1.0', '1.1' or '1.2'"})
     name = doc.get("name")
     if not isinstance(name, str) or not (1 <= len(name) <= 80):
         errors.append({"field": "name", "code": "required", "message": "name required (1..80 chars)"})
@@ -121,7 +124,7 @@ def parse_scenario_yaml(yaml_text, targets_by_name):
         if method not in ALLOWED_METHODS:
             errors.append({"field": f"requests[{i}].method", "code": "method_not_allowed",
                            "message": f"Method {method} not allowed (allowed: {sorted(ALLOWED_METHODS)}). "
-                                      f"State-changing methods require explicit authorization workflow."})
+                                      f"Active mode: state-changing methods are executed and verified."})
         path = r.get("path") or "/"
         if not isinstance(path, str) or not path.startswith("/"):
             errors.append({"field": f"requests[{i}].path", "code": "invalid_path",
@@ -149,6 +152,22 @@ def parse_scenario_yaml(yaml_text, targets_by_name):
                 if hk.lower() in ("cookie", "authorization", "set-cookie", "proxy-authorization"):
                     errors.append({"field": f"requests[{i}].headers.{hk}", "code": "sensitive_header",
                                    "message": f"Header '{hk}' is forbidden in scenarios (secret hygiene)"})
+        body = r.get("body")
+        if body is not None:
+            if not isinstance(body, str):
+                errors.append({"field": f"requests[{i}].body", "code": "schema",
+                               "message": "body must be a string"})
+            elif len(body.encode("utf-8")) > MAX_BODY_BYTES:
+                errors.append({"field": f"requests[{i}].body", "code": "too_large",
+                               "message": f"body exceeds {MAX_BODY_BYTES} bytes"})
+        enc = r.get("body_encoding")
+        if enc is not None:
+            if enc not in ALLOWED_BODY_ENCODINGS:
+                errors.append({"field": f"requests[{i}].body_encoding", "code": "invalid",
+                               "message": f"body_encoding must be one of {sorted(ALLOWED_BODY_ENCODINGS)}"})
+            elif body is None:
+                errors.append({"field": f"requests[{i}].body_encoding", "code": "invalid",
+                               "message": "body_encoding requires body"})
 
     identity_spec = doc.get("identity_sim") or {}
     if not isinstance(identity_spec, dict):
@@ -175,7 +194,7 @@ def parse_scenario_yaml(yaml_text, targets_by_name):
         raise ScenarioError(errors)
 
     normalized = {
-        "schema_version": "1.0",
+        "schema_version": schema_version,
         "name": name,
         "description": doc.get("description", ""),
         "target_ref": target_ref,
@@ -197,6 +216,8 @@ def parse_scenario_yaml(yaml_text, targets_by_name):
                 "timeout_ms": r.get("timeout_ms", 1000),
                 "headers": r.get("headers") or {},
                 "query": r.get("query") or {},
+                "body": r.get("body"),
+                "body_encoding": r.get("body_encoding") or "identity",
             }
             for i, r in enumerate(requests)
         ],
@@ -213,7 +234,7 @@ def parse_scenario_yaml(yaml_text, targets_by_name):
                            "message": "keep_alive must be a boolean"})
         else:
             normalized["keep_alive"] = ka
-    if schema_version == "1.1" and (identity_spec or {}).get("enabled"):
+    if schema_version in ("1.1", "1.2") and (identity_spec or {}).get("enabled"):
         import identity_sim as _isim
         _ok, _e, inorm = _isim.validate_identity_spec(identity_spec)
         if _ok:
@@ -280,7 +301,7 @@ def save_scenario_version(db, scenario_id, normalized, created_by):
         "id": f"scv-{scenario_id}-{version_no}",
         "scenario_id": scenario_id,
         "version_no": version_no,
-        "schema_version": "1.0",
+        "schema_version": normalized.get("schema_version", "1.0"),
         "yaml_text": None,  # raw YAML not stored in version; canonical form is the truth
         "normalized_json": normalized,
         "content_sha256": normalized["scenario_sha256"],

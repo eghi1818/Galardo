@@ -127,8 +127,12 @@ def main():
         e["code"] == "unknown_field" for e in r["errors"]), str(r)[:200])
 
     st, r = req("POST", "/scenarios/validate", {"yaml": FIX_BAD_METHOD})
-    check("state-changing method rejected", st == 422 and any(
-        e["code"] == "method_not_allowed" for e in r["errors"]), str(r)[:200])
+    st_b, r_b = req("POST", "/scenarios/validate", {"yaml": FIX_WITH_BODY})
+    st_t, r_t = req("POST", "/scenarios/validate", {"yaml": FIX_UNKNOWN_METHOD})
+    check("POST+body accepted (active mode), TRACE still rejected",
+          st == 200 and r["valid"] is True and st_b == 200 and r_b["valid"] is True
+          and st_t == 422 and any(e["code"] == "method_not_allowed" for e in r_t["errors"]),
+          f"{st}/{st_b}/{st_t} {str(r_t)[:140]}")
 
     # ---- 3. idempotent job creation ----
     plan_id = seed["plan_id"]
@@ -333,6 +337,26 @@ FIX_BAD_PATH = FIX_VALID.replace('path: "/healthz"', 'path: "/admin/secret"')
 FIX_ABS_URL = FIX_VALID.replace('path: "/healthz"', 'path: "http://evil.example.com/x"')
 FIX_UNKNOWN_FIELD = FIX_VALID + "proxy_pool: 'residential'\n"
 FIX_BAD_METHOD = FIX_VALID.replace('method: "GET"', 'method: "POST"', 1)
+FIX_UNKNOWN_METHOD = FIX_VALID.replace('method: "GET"', 'method: "TRACE"', 1)
+FIX_WITH_BODY = """schema_version: "1.2"
+name: "it-body"
+target_ref: "galardo-lab-target"
+profile:
+  duration_seconds: 8
+  virtual_users: 4
+  max_rps: 10
+requests:
+  - name: "submit"
+    method: "POST"
+    path: "/healthz"
+    weight: 100
+    timeout_ms: 1500
+    body: "hello-from-galardo"
+    body_encoding: "identity"
+think_time_ms:
+  min: 50
+  max: 100
+"""
 FIX_LONG = """schema_version: "1.0"
 name: "it-long"
 target_ref: "galardo-lab-target"

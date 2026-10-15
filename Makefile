@@ -72,3 +72,7 @@ CAP_SECONDS ?= 8
 # --- GALARDO uji live T3 Cloudflare edge override ---
 t3:
 	python3 tools/galardo_t3_check.py
+
+# --- GALARDO registry kapabilitas sumber ---
+srccap:
+	python3 tools/galardo_srccap.py

@@ -69,3 +69,10 @@ git reset --hard checkpoint/galardo-v1.1-mulai
 - Perbaikan: SSL_CERT_FILE di .env + backend/netssl.py (pemilih CA + konteks)
 - Diagnosis cepat: python3 -c "import sys;sys.path.insert(0,'backend');import netssl;print(netssl.verify_probe())"
 - Semua modul yang pakai HTTPS ke luar WAJIB pakai netssl.context()
+
+## TLS — KOREKSI (penting)
+- Python TIDAK rusak. urllib melempar HTTPError untuk 4xx -> itu BUKAN kegagalan TLS.
+- Yang rusak: bundle CA sistem /private/etc/ssl/cert.pem. Yang bekerja: certifi.
+- SEMUA modul HTTPS ke luar WAJIB pakai backend/netssl.context().
+- Diagnosis: python3 tools/tls_doctor.py   (jangan menilai dari HTTPError)
+- SSL_CERT_FILE di .env + tools/ca_env.sh sebagai jalur cepat

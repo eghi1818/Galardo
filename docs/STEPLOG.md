@@ -23,5 +23,8 @@
 | 18 | atribusi lapisan verdict | 32/0 hijau |
 | 19 | satukan penanda cache buster ke __gb | 18/0 hijau |
 | 20 | bersihkan _gcb sisa + atribusi lapisan di probe | lihat HASIL-20 |
+| 21 | verifikasi token CF + status zone + uji tulis DNS | hijau (TLS salah diagnosa) |
+| 22 | TLS doctor awal + netssl + catat STEPLOG 21 | hijau |
+| 23 | TLS doctor benar + netssl wired ke probe | lihat HASIL-23 |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

@@ -58,7 +58,8 @@ ekor backup chat, dokumen REA lanjutan, isi 14 poin list kendala per-item.
 
 ## 8. PENDING BERIKUTNYA (urut, jangan dilompati)
 1. Auto-knee sebelum spike (ukur plafon dulu) -> butuh tools/galardo_capacity.py
-2. Probe multi-jalur + kesiapan residential (field proxy_pool)
+2. Probe multi-jalur: observer.py (check-host.net) SUDAH ADA; sisa = jalur residential
+   + field proxy_pool (masih ditolak sebagai field asing)
 3. Atribusi lapisan verdict: DNS / edge / origin / app
 4. Satukan GALARDO_LOCAL_DEV ke tangga kepemilikan
 5. Tier 1 sisa: RBAC+MFA, backup otomatis, Docker Compose

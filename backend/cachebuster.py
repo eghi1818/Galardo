@@ -25,10 +25,13 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 __all__ = [
     "BUSTER_KEY", "NO_CACHE_HEADERS", "new_run_id", "counter_nonce",
     "random_nonce", "decorate", "strip", "is_decorated", "cache_verdict",
+    "LEGACY_KEYS",
     "detect_cdn", "pierce_ok", "Piercer", "CACHE_HIT_VERDICTS",
 ]
 
 BUSTER_KEY = "__gb"
+# penanda lama yang masih dipakai external_probe sebelum disatukan
+LEGACY_KEYS = ("_gcb",)
 NO_CACHE_HEADERS = {
     "Cache-Control": "no-cache, no-store, max-age=0",
     "Pragma": "no-cache",
@@ -71,12 +74,13 @@ def decorate(url, key=BUSTER_KEY, value=None):
 
 
 def strip(url, key=BUSTER_KEY):
-    """Buang param buster. Kembalikan (url_tanpa_buster, nilai_atau_None)."""
+    """Buang param buster (termasuk penanda lama). Kembalikan (url, nilai_atau_None)."""
     parts = urlsplit(url)
     kept, found = [], None
     for k, x in parse_qsl(parts.query, keep_blank_values=True):
-        if k == key:
-            found = x
+        if k == key or k in LEGACY_KEYS:
+            if k == key:
+                found = x
         else:
             kept.append((k, x))
     return urlunsplit((parts.scheme, parts.netloc, parts.path,
@@ -84,7 +88,8 @@ def strip(url, key=BUSTER_KEY):
 
 
 def is_decorated(url, key=BUSTER_KEY):
-    return any(k == key for k, _ in parse_qsl(urlsplit(url).query, keep_blank_values=True))
+    keys = set(k for k, _ in parse_qsl(urlsplit(url).query, keep_blank_values=True))
+    return key in keys or any(lk in keys for lk in LEGACY_KEYS)
 
 
 def _lower(headers):

@@ -18,6 +18,9 @@
 | 13 | cache buster + deteksi cache HIT | 36/0 hijau |
 | 14 | handoff darurat + wiring cache buster | hijau (engine/scenario/step_load) |
 | 15 | fix import os step_load + smoke.sh | 59/0 + smoke OK |
-| 16 | first-prompt ke repo + selaraskan dokumen | lihat HASIL-16 |
+| 16 | first-prompt ke repo + selaraskan dokumen | hijau |
+| 17 | ONBOARDING_PROMPT.md sumber tunggal | hijau |
+| 18 | atribusi lapisan verdict | 32/0 hijau |
+| 19 | satukan penanda cache buster ke __gb | lihat HASIL-19 |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

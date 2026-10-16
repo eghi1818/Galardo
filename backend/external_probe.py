@@ -82,17 +82,27 @@ def _pct(vals, p):
 _BC_SEQ = [0]
 _BC_LOCK = threading.Lock()
 
+try:
+    from . import cachebuster as _cb
+except ImportError:
+    import cachebuster as _cb
+
+
+def cache_buster_token():
+    with _BC_LOCK:
+        _BC_SEQ[0] += 1
+        return "%d.%d.%d" % (int(time.time() * 1000), _BC_SEQ[0], random.randint(0, 9999))
+
 
 def cache_buster_path(url, token=None):
-    """Unique query param so no CDN/edge cache can serve a stale body."""
-    parts = urlsplit(url)
-    if token is None:
-        with _BC_LOCK:
-            _BC_SEQ[0] += 1
-            token = "%d.%d.%d" % (int(time.time() * 1000), _BC_SEQ[0], random.randint(0, 9999))
-    q = parts.query
-    q = (q + "&" if q else "") + urlencode({"_gcb": token})
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, q, parts.fragment))
+    """Param nonce unik supaya cache CDN tak menyajikan body basi.
+
+    Penanda KANONIK = cachebuster.BUSTER_KEY ("__gb"), disatukan dengan engine
+    dan cachebuster.py supaya evidence tidak bercampur dua penanda berbeda.
+    """
+    tok = token or cache_buster_token()
+    decorated, _ = _cb.decorate(url, _cb.BUSTER_KEY, tok)
+    return decorated
 
 
 def probe_http(url, timeout=1.5, expected_status=(200,), tls_verify=True,

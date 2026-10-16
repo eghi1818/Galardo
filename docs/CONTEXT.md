@@ -41,3 +41,8 @@ git reset --hard checkpoint/galardo-v1.1-mulai
 - backend/proxy.py TIDAK ADA dan tidak perlu: transport.py sudah punya proxy + set_tunnel
 - Hook residential: field `proxy_pool` (kini ditolak sebagai field asing)
 - Registry /sources sudah memodelkan `residential` sebagai capability hilang
+
+## Aturan terminal
+- Satu STEP = satu terminal (disarankan terminal BARU setiap STEP)
+- Setiap blok berdiri sendiri: path absolut + subshell -> aman walau terminal sama
+- Kalau satu STEP gagal karena env aneh, buka terminal baru lalu ulangi

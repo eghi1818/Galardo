@@ -14,6 +14,7 @@ from urllib.parse import urlparse, parse_qs
 import db
 import orchestrator
 import evidence as evidence_mod
+import ownership_ladder as _ladder
 from policy import effective_policy, load_policy_layers, resolve_scenario_layers, validate_against_policy
 from scenario import parse_scenario_yaml, save_scenario_version, ScenarioError
 from util import now_iso, gen_id, sha256_text
@@ -38,6 +39,9 @@ OVERRIDES_LOCK = threading.Lock()
 SOURCES_LOCK = threading.Lock()   # item 9: registry kapabilitas sumber
 MIME = {".html": "text/html", ".js": "application/javascript", ".css": "text/css",
         ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png"}
+
+_LADDER_SHORT = {"well_known_file": "file", "http_echo": "echo",
+                 "operator_attestation": "attest"}
 
 
 def seed_lab():
@@ -198,6 +202,100 @@ class Handler(BaseHTTPRequestHandler):
     def _route(self):
         p = urlparse(self.path)
         return p.path.rstrip("/") or "/", parse_qs(p.query)
+
+    # ---- tangga verifikasi kepemilikan (Fase A) ------------------------
+    def _ladder_handle(self, target_id, method, body, user):
+        # Fail-closed: promosi VERIFIED hanya kalau gate lulus pada min_level
+        # yang dipilih eksplisit. Attestasi TIDAK pernah diam-diam dianggap bukti.
+        tgt = db.get("targets", target_id)
+        if not tgt:
+            return self._json(404, {"error": "not found"})
+        domain = _host_of(tgt.get("canonical_origin") or "")
+        if not domain or "." not in domain:
+            return self._json(422, {"error": {"field": "canonical_origin",
+                                              "message": "cannot derive a domain"}})
+        min_level = body.get("min_level") or method
+        if min_level not in _ladder.LEVELS:
+            return self._json(422, {"error": {"field": "min_level",
+                                              "message": "must be one of %s" % list(_ladder.LEVELS)}})
+        base_url = (body.get("base_url") or ("https://" + domain)).rstrip("/")
+        store = dict(tgt.get("ownership_ladder") or {})
+
+        # rung 4: tidak ada yang perlu dipasang -> verifikasi langsung
+        if method == "operator_attestation" and not body.get("reset"):
+            proof = _ladder.attest(domain, user,
+                                   ttl_seconds=int(body.get("ttl_seconds") or _ladder.DEFAULT_ATTEST_TTL),
+                                   note=body.get("note") or "")
+            proof.min_level = min_level
+            ok, why = _ladder.OwnershipLadder(min_level=min_level).gate(proof)
+            db.update("targets", target_id, lambda t: t.update({
+                "ownership": method if ok else "operator_attestation_declined",
+                "ownership_level": proof.rank, "ownership_min_level": min_level,
+                "ownership_proof": proof.to_dict() if ok else None,
+                "proof_expires_at": proof.expires_at,
+                "status": "VERIFIED" if ok else "UNVERIFIED"}),
+                actor=user, action="target.ladder_attest", resource_type="target",
+                reason="min_level=%s ok=%s why=%s" % (min_level, ok, why))
+            if not ok:
+                return self._json(422, {"verified": False, "target_id": target_id,
+                                        "method": method, "min_level": min_level,
+                                        "reason": why, "evidence": proof.evidence})
+            return self._json(200, {"verified": True, "target_id": target_id, "method": method,
+                                    "level": proof.rank, "min_level": min_level,
+                                    "is_proof": proof.is_proof, "expires_at": proof.expires_at,
+                                    "fingerprint": proof.fingerprint(), "reason": why,
+                                    "proof": proof.to_dict()})
+
+        rec = store.get(method)
+        if body.get("reset") or not rec:
+            if method == "http_echo":
+                ch = _ladder.EchoChallenge(domain, user, base_url=base_url)
+            else:
+                ch = _ladder.WellKnownChallenge(domain, user, base_url=base_url)
+            store[method] = {"token": ch.token, "base_url": base_url, "min_level": min_level,
+                             "issued_at": now_iso(), "attempts": 0}
+            db.update("targets", target_id, lambda t: t.update({
+                "ownership_ladder": store, "ownership": "%s_pending" % method,
+                "ownership_min_level": min_level, "status": "UNVERIFIED"}),
+                actor=user, action="target.ladder_challenge_issued", resource_type="target",
+                reason="method=%s min_level=%s base_url=%s" % (method, min_level, base_url))
+            return self._json(201, {
+                "target_id": target_id, "method": method, "min_level": min_level,
+                "domain": domain, "token": ch.token,
+                "instructions": list(ch.instructions()),
+                "next": "pasang token lalu POST ulang ke /targets/%s/verify/%s"
+                        % (target_id, _LADDER_SHORT[method])})
+
+        rec = dict(rec)
+        rec["attempts"] = int(rec.get("attempts") or 0) + 1
+        store[method] = rec
+        if method == "http_echo":
+            ch = _ladder.EchoChallenge(domain, user, token=rec["token"], base_url=rec["base_url"])
+            proof = _ladder.verify_http_echo(ch)
+        else:
+            ch = _ladder.WellKnownChallenge(domain, user, token=rec["token"], base_url=rec["base_url"])
+            proof = _ladder.verify_well_known(ch)
+        proof.min_level = min_level
+        ok, why = _ladder.OwnershipLadder(min_level=min_level).gate(proof)
+        db.update("targets", target_id, lambda t: t.update({
+            "ownership_ladder": store,
+            "ownership": method if ok else "%s_pending" % method,
+            "ownership_level": proof.rank, "ownership_min_level": min_level,
+            "ownership_proof": proof.to_dict() if ok else None,
+            "proof_expires_at": proof.expires_at,
+            "status": "VERIFIED" if ok else "UNVERIFIED"}),
+            actor=user, action="target.ladder_verify", resource_type="target",
+            reason="method=%s min_level=%s ok=%s why=%s" % (method, min_level, ok, why))
+        if not ok:
+            return self._json(422, {"verified": False, "target_id": target_id, "method": method,
+                                    "min_level": min_level, "reason": why,
+                                    "evidence": proof.evidence, "attempts": rec["attempts"]})
+        return self._json(200, {"verified": True, "target_id": target_id, "method": method,
+                                "level": proof.rank, "min_level": min_level,
+                                "is_proof": proof.is_proof, "expires_at": proof.expires_at,
+                                "fingerprint": proof.fingerprint(), "reason": why,
+                                "proof": proof.to_dict()})
+
 
     # ---- static --------------------------------------------------------
     def _static(self, path):
@@ -445,6 +543,34 @@ class Handler(BaseHTTPRequestHandler):
                                         "record_name": proof.record, "label": proof.label,
                                         "fingerprint": proof.fingerprint(),
                                         "proof": proof.to_dict()})
+            # ---- tangga verifikasi kepemilikan (Fase A) ----
+            m = _match(api_path, "/targets/*/verify/file")
+            if m and method == "POST":
+                return self._ladder_handle(m[0], "well_known_file", self._body(), user)
+            m = _match(api_path, "/targets/*/verify/echo")
+            if m and method == "POST":
+                return self._ladder_handle(m[0], "http_echo", self._body(), user)
+            m = _match(api_path, "/targets/*/verify/attest")
+            if m and method == "POST":
+                return self._ladder_handle(m[0], "operator_attestation", self._body(), user)
+            m = _match(api_path, "/targets/*/ownership")
+            if m and method == "GET":
+                tgt = db.get("targets", m[0])
+                if not tgt:
+                    return self._json(404, {"error": "not found"})
+                store = tgt.get("ownership_ladder") or {}
+                return self._json(200, {
+                    "target_id": m[0], "status": tgt.get("status"),
+                    "ownership": tgt.get("ownership"),
+                    "ownership_level": tgt.get("ownership_level"),
+                    "ownership_min_level": tgt.get("ownership_min_level"),
+                    "proof_expires_at": tgt.get("proof_expires_at"),
+                    "proof": tgt.get("ownership_proof"),
+                    "rungs": [{"method": k, "rank": _ladder.LEVEL_RANK.get(k),
+                               "is_proof": _ladder.LEVEL_IS_PROOF.get(k),
+                               "issued_at": v.get("issued_at"), "attempts": v.get("attempts")}
+                              for k, v in sorted(store.items())],
+                    "available_levels": list(_ladder.LEVELS)})
             m = _match(api_path, "/targets/*/verify")
             if m and method == "POST":
                 tgt = db.get("targets", m[0])

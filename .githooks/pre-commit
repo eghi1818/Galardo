@@ -1,0 +1,12 @@
+#!/bin/bash
+# Tolak commit kalau ada file .py yang tidak bisa dikompilasi.
+rc=0
+list="$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.py$' || true)"
+for f in $list; do
+  if ! python3 -m py_compile "$f" 2>/dev/null; then
+    echo "[pre-commit] GAGAL KOMPILASI: $f"
+    rc=1
+  fi
+done
+if [ "$rc" = "0" ]; then echo "[pre-commit] OK"; else echo "[pre-commit] COMMIT DIBATALKAN"; fi
+exit $rc

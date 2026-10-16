@@ -1,0 +1,13 @@
+#!/bin/bash
+# Auto-backup: setiap commit langsung di-push ke origin.
+b="$(git symbolic-ref --short HEAD 2>/dev/null || echo '')"
+[ -z "$b" ] && exit 0
+if ! git remote get-url origin >/dev/null 2>&1; then
+  echo "[post-commit] tidak ada remote origin; lewati push"; exit 0
+fi
+echo "[post-commit] auto-push origin $b ..."
+if git push origin "$b"; then
+  echo "[post-commit] PUSH_OK"
+else
+  echo "[post-commit] PUSH_GAGAL - jalankan manual: git push origin $b"
+fi

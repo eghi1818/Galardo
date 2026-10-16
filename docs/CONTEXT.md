@@ -46,3 +46,11 @@ git reset --hard checkpoint/galardo-v1.1-mulai
 - Satu STEP = satu terminal (disarankan terminal BARU setiap STEP)
 - Setiap blok berdiri sendiri: path absolut + subshell -> aman walau terminal sama
 - Kalau satu STEP gagal karena env aneh, buka terminal baru lalu ulangi
+
+## Disiplin Git (dipaksa oleh repo, bukan ingatan)
+- .githooks/pre-commit  : tolak commit kalau ada .py tidak bisa dikompilasi
+- .githooks/post-commit : auto-push origin <branch> setiap commit
+- tools/git_discipline.sh : audit tree bersih + ahead=0 + behind=0
+- STEP tidak dihitung SELESAI sebelum audit lolos
+- Push gagal -> STOP, lapor, jangan lanjut
+- Repo hasil clone ulang: jalankan `git config core.hooksPath .githooks`

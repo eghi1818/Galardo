@@ -1,38 +1,62 @@
-# Peta Celah UI vs API — v3 (STEP-44)
+# Peta Celah UI vs API — v4 (STEP-45) + Backlog P2
 
-Sumber: `dashboard/index.html` vs SELURUH fungsi `_dispatch` di `backend/api.py` (baris 348..1308).
-Normalisasi: `${...}` `<...>` `{...}` angka -> `*`; prefix `/api/vN` dibuang.
+Sumber: `dashboard/index.html` vs SELURUH `_dispatch` (`api.py` baris 348..1308).
 
 ## Ringkasan
 
 - Path dipanggil UI: **25**
-- Route di backend: **57**
-- Cocok: **22**
-- UI memanggil, TIDAK ada di backend: **3**
-- Route backend belum dipakai UI: **35**
-- Kemungkinan salah method: **0**
+- Route backend: **57**
+- Cocok: **23**
+- UI memanggil, backend belum ada: **2**
+- Route backend belum tampil di UI: **34**
 
-## A. UI memanggil, tidak ada padanan backend (PRIORITAS)
+## A. UI memanggil, backend belum ada
 
-| Path | UI pakai |
-|---|---|
-| `/admin/secret` | GET |
-| `/audit?limit=*` | GET |
-| `/healthz` | GET |
+| Path | UI pakai | Status |
+|---|---|---|
+| `/admin/secret` | GET | BELUM DIBERESKAN |
+| `/healthz` | GET | BELUM DIBERESKAN |
 
-## B. Route backend belum dipakai UI
+## B. Backlog P2 — route backend yang belum tampil di UI
+
+Urutan mengikuti tiga goal, bukan kemudahan.
+
+### Goal: buktikan kepemilikan
 
 | Path | Method |
 |---|---|
-| `/audit` | GET |
-| `/config/remote-dispatch` | GET,POST |
+| `/targets/*/challenge` | POST |
+| `/targets/*/ownership` | GET |
+| `/targets/*/verify/attest` | POST |
+| `/targets/*/verify/dns` | POST |
+| `/targets/*/verify/echo` | POST |
+| `/targets/*/verify/file` | POST |
+
+### Goal: buktikan DOWN + bukti
+
+| Path | Method |
+|---|---|
 | `/evidence/*/download` | GET |
-| `/identity-pool` | GET |
+| `/test-jobs/*/down` | GET |
+| `/test-jobs/*/observer` | POST |
+| `/test-jobs/*/reconcile` | POST |
+| `/test-jobs/*/telemetry` | GET |
+
+### Goal: paksa 404/blank
+
+| Path | Method |
+|---|---|
 | `/overrides` | GET,POST |
 | `/overrides/*` | GET |
 | `/overrides/*/probe` | POST |
 | `/overrides/*/revert` | POST |
-| `/seed` | POST |
+| `/targets/*/probe-contract` | POST |
+
+### P1.3 residential
+
+| Path | Method |
+|---|---|
+| `/identity-pool` | GET |
 | `/sources` | GET,POST |
 | `/sources/*` | GET |
 | `/sources/*/probe` | POST |
@@ -40,33 +64,36 @@ Normalisasi: `${...}` `<...>` `{...}` angka -> `*`; prefix `/api/vN` dibuang.
 | `/sources/*/udp` | POST |
 | `/sources/matrix` | GET |
 | `/sources/pick` | POST |
-| `/targets/*/challenge` | POST |
-| `/targets/*/ownership` | GET |
-| `/targets/*/probe-contract` | POST |
-| `/targets/*/verify/attest` | POST |
-| `/targets/*/verify/dns` | POST |
-| `/targets/*/verify/echo` | POST |
-| `/targets/*/verify/file` | POST |
-| `/test-jobs/*` | GET |
-| `/test-jobs/*/down` | GET |
-| `/test-jobs/*/observer` | POST |
-| `/test-jobs/*/reconcile` | POST |
-| `/test-jobs/*/telemetry` | GET |
-| `/webhooks` | GET,POST |
-| `/webhooks/*` | DELETE |
-| `/webhooks/*/test` | POST |
-| `/webhooks/deliveries` | GET |
+
+### Fleet / worker
+
+| Path | Method |
+|---|---|
+| `/config/remote-dispatch` | GET,POST |
 | `/workers/*/ack` | POST |
 | `/workers/*/claim` | POST |
 | `/workers/*/heartbeat` | POST |
 
-## C. Kemungkinan salah method
+### Notifikasi
 
-(tidak ada)
+| Path | Method |
+|---|---|
+| `/webhooks` | GET,POST |
+| `/webhooks/*` | DELETE |
+| `/webhooks/*/test` | POST |
+| `/webhooks/deliveries` | GET |
 
-## D. Cocok
+### Lain
+
+| Path | Method |
+|---|---|
+| `/seed` | POST |
+| `/test-jobs/*` | GET |
+
+## C. Cocok (UI <-> backend)
 
 ```
+/audit
 /engagements
 /engagements/*/approve
 /evidence
@@ -89,66 +116,4 @@ Normalisasi: `${...}` `<...>` `{...}` angka -> `*`; prefix `/api/vN` dibuang.
 /test-plans
 /test-plans/*/approve
 /workers
-```
-
-## E. Daftar mentah backend
-
-```
-/audit                             GET
-/config/remote-dispatch            GET,POST
-/engagements                       GET,POST
-/engagements/*/approve             POST
-/evidence                          GET
-/evidence/*/build                  POST
-/evidence/*/download               GET
-/evidence/*/verify                 POST
-/health                            GET
-/identity-pool                     GET
-/overrides                         GET,POST
-/overrides/*                       GET
-/overrides/*/probe                 POST
-/overrides/*/revert                POST
-/overview                          GET
-/policies                          GET,POST
-/scenarios                         GET,POST
-/scenarios/validate                POST
-/scenarios/visual-to-yaml          POST
-/seed                              POST
-/sources                           GET,POST
-/sources/*                         GET
-/sources/*/probe                   POST
-/sources/*/remove                  POST
-/sources/*/udp                     POST
-/sources/matrix                    GET
-/sources/pick                      POST
-/targets                           GET,POST
-/targets/*/challenge               POST
-/targets/*/ownership               GET
-/targets/*/probe-contract          POST
-/targets/*/verify                  POST
-/targets/*/verify/attest           POST
-/targets/*/verify/dns              POST
-/targets/*/verify/echo             POST
-/targets/*/verify/file             POST
-/test-jobs                         GET,POST
-/test-jobs/*                       GET
-/test-jobs/*/abort                 POST
-/test-jobs/*/down                  GET
-/test-jobs/*/insights              GET
-/test-jobs/*/live                  GET
-/test-jobs/*/observer              POST
-/test-jobs/*/reconcile             POST
-/test-jobs/*/recovery              POST
-/test-jobs/*/start                 POST
-/test-jobs/*/telemetry             GET
-/test-plans                        GET,POST
-/test-plans/*/approve              POST
-/webhooks                          GET,POST
-/webhooks/*                        DELETE
-/webhooks/*/test                   POST
-/webhooks/deliveries               GET
-/workers                           GET,POST
-/workers/*/ack                     POST
-/workers/*/claim                   POST
-/workers/*/heartbeat               POST
 ```

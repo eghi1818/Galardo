@@ -45,5 +45,6 @@
 | 40 | diagnosa 2 tes merah knee_probe + fix cache tes E | lihat HASIL-40 |
 | 41 | fix tes E3 (path probe_contract) + hijaukan verify_knee_probe | lihat HASIL-41 |
 | 42 | peta celah UI vs API (dokumen kerja P2) | lihat HASIL-42 |
+| 43 | peta celah UI vs API v2 (ekstraksi dispatch asli) | lihat HASIL-43 |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

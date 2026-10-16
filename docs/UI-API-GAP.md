@@ -1,47 +1,76 @@
-# Peta Celah UI vs API (dibuat oleh STEP-42)
+# Peta Celah UI vs API — v2 (STEP-43)
 
-Sumber: `dashboard/index.html` vs `backend/api.py`.
-Normalisasi: `${...}`, `<...>`, `{...}`, dan angka diganti `*`.
+Sumber: `dashboard/index.html` vs tabel dispatch `backend/api.py` (base `/api/v1`).
+Normalisasi: `${...}` `<...>` `{...}` dan angka -> `*`.
 
 ## Ringkasan
 
-- Endpoint dipanggil UI: **2**
-- Route terlihat di backend: **4**
-- Dipanggil UI tapi TIDAK ada di backend: **1**
-- Ada di backend tapi belum dipakai UI: **3**
+- Literal path di UI: **26**
+- Route di dispatch backend: **10**
+- UI <-> backend cocok: **7**
+- UI memanggil, TIDAK ada di backend (non-static): **19**
+- Route backend belum dipakai UI: **3**
 
-## A. Dipanggil UI, belum ada padanannya di backend (PRIORITAS)
+## A. UI memanggil, tidak ada padanan backend (PRIORITAS)
 
-| Endpoint |
+| Path |
 |---|
+| `/admin/secret` |
 | `/api/v*/health` |
+| `/engagements/*/approve` |
+| `/evidence` |
+| `/evidence/*/build` |
+| `/evidence/*/verify` |
+| `/scenarios` |
+| `/scenarios/validate` |
+| `/scenarios/visual-to-yaml` |
+| `/targets/*/verify` |
+| `/test-jobs` |
+| `/test-jobs/*/abort` |
+| `/test-jobs/*/insights` |
+| `/test-jobs/*/live` |
+| `/test-jobs/*/recovery` |
+| `/test-jobs/*/start` |
+| `/test-plans` |
+| `/test-plans/*/approve` |
+| `/workers` |
 
-## B. Ada di backend, belum dipakai UI
+## B. Route backend belum dipakai UI
 
-| Endpoint |
+| Path |
 |---|
-| `/api/error` |
-| `/api/heavy` |
-| `/api/slow` |
+| `/api` |
+| `/health` |
+| `/seed` |
 
-## C. Daftar mentah (untuk verifikasi manual)
+## C. Cocok (UI <-> backend)
 
-### UI
+| Path |
+|---|
+| `/` |
+| `/api/v*` |
+| `/engagements` |
+| `/healthz` |
+| `/overview` |
+| `/policies` |
+| `/targets` |
+
+## D. Static/aset (bukan API)
+
 ```
+```
+
+## E. Daftar mentah backend
+
+```
+/
+/api
 /api/v*
-/api/v*/health
+/engagements
+/health
+/healthz
+/overview
+/policies
+/seed
+/targets
 ```
-
-### Backend
-```
-/api/error
-/api/heavy
-/api/slow
-/api/v*
-```
-
-## D. Catatan STEP-42
-
-- Peta ini otomatis; nama endpoint bisa perlu dinormalisasi manual kalau backend memakai pola regex/cabang `if`.
-- Belum diverifikasi: apakah buster `__gb` ditempel aman saat path target sudah punya query sendiri.
-- V6 (4 `check()` mati di tests_integration.py) masih terbuka.

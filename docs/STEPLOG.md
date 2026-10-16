@@ -38,5 +38,6 @@
 | 33 | ok_rps: plafon dari throughput berhasil |
 | 34 | kalibrasi delta plateau untuk ramp thread sublinear |
 | 35 | TTL cache knee + biaya probe lebih murah |
+| 36 | pagar anggaran waktu knee + peringatan preflight lambat | lihat HASIL-36 |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

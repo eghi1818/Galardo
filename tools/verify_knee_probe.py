@@ -104,6 +104,24 @@ if ok_import:
     check("D GALARDO_KNEE=0 mematikan", orch._knee_enabled() is False, orch._knee_enabled())
     os.environ.pop("GALARDO_KNEE")
 
+    print("== E. pagar anggaran waktu ==")
+    os.environ["GALARDO_KNEE_STEPS"] = "2,4,8,16"
+    os.environ["GALARDO_KNEE_STEP_SEC"] = "5"
+    os.environ["GALARDO_KNEE_MAX_SEC"] = "4"
+    t0 = time.time()
+    est4, rec4, raw4 = orch._knee_stage("job-uji", {"canonical_origin": ORIGIN})
+    el = time.time() - t0
+    check("E probe dipangkas di bawah anggaran", el < 6.5, round(el, 2))
+    check("E tetap mengembalikan estimate", est4 is not None, est4)
+    os.environ["GALARDO_KNEE_MAX_SEC"] = "100"
+    t0 = time.time()
+    orch._knee_stage("job-uji", {"canonical_origin": ORIGIN})
+    check("E anggaran longgar -> probe penuh", (time.time() - t0) > 6.0,
+          round(time.time() - t0, 2))
+    os.environ.pop("GALARDO_KNEE_MAX_SEC")
+    os.environ.pop("GALARDO_KNEE_STEPS")
+    os.environ.pop("GALARDO_KNEE_STEP_SEC")
+
 srv.shutdown()
 
 print()

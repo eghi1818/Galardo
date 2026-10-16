@@ -45,6 +45,12 @@ README.md, docs/SESSION-HISTORY-COMPLETE.md, docs/WEBHOOK-API.md
 ## E. Tier
 T1 SEBAGIAN (Ed25519 selesai; RBAC+MFA, backup, Docker pending) | T2-T4 PENDING
 
+## E2. Risiko terbuka
+| Risiko | Status | Catatan |
+|---|---|---|
+| Preflight sinkron ber-I/O -> /start menunggu | DIMITIGASI | anggaran GALARDO_KNEE_MAX_SEC; pertimbangkan async |
+| make test melambat karena knee per job | DIMITIGASI | TTL cache di target |
+
 ## F. Aturan anti-overlap
 - SEBELUM mengerjakan item apa pun, cek file ini dulu.
 - Item berstatus SELESAI tidak dikerjakan ulang kecuali ada bukti regresi.

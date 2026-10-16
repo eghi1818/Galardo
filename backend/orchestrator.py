@@ -148,13 +148,20 @@ def _knee_stage(job_id, tgt):
             "reason": "pakai knee tersimpan", "cached": True,
             "age": round(time.time() - measured_at, 1)}
 
-    # default murah: 3 langkah x 1.5s = ~4.5s, bukan ~10s
+    # default murah: 3 langkah x 1.0s = ~3s. Preflight bersifat SINKRON, jadi
+    # biaya ini langsung terasa oleh pemanggil /start -- jangan dibuat mahal.
     raw_steps = os.environ.get("GALARDO_KNEE_STEPS") or "2,4,8"
     steps = [int(x) for x in raw_steps.split(",") if x.strip().isdigit()]
-    secs = float(os.environ.get("GALARDO_KNEE_STEP_SEC") or "1.5")
+    steps = steps or list(knee_probe_mod.DEFAULT_STEPS)
+    secs = float(os.environ.get("GALARDO_KNEE_STEP_SEC") or "1.0")
     tmo = float(os.environ.get("GALARDO_KNEE_TIMEOUT") or "2.0")
-    raw = knee_probe_mod.measure(origin, path="/",
-                                 steps=steps or list(knee_probe_mod.DEFAULT_STEPS),
+
+    # PAGAR: total probe tidak boleh melebihi GALARDO_KNEE_MAX_SEC
+    max_sec = float(os.environ.get("GALARDO_KNEE_MAX_SEC") or "8")
+    if steps and secs * len(steps) > max_sec:
+        secs = max(0.3, max_sec / float(len(steps)))
+
+    raw = knee_probe_mod.measure(origin, path="/", steps=steps,
                                  step_seconds=secs, timeout=tmo)
     samples = raw.get("samples") or []
     if not samples:
@@ -213,10 +220,16 @@ def run_preflight(job_id):
     # tapi WAJIB ditandai supaya spike tidak menembak buta.
     if _knee_enabled() and tgt and tgt.get("canonical_origin"):
         try:
+            _t0 = time.time()
             est, rec, _raw = _knee_stage(job_id, tgt)
+            _el = round(time.time() - _t0, 2)
+            if _el > 12:
+                add("preflight tidak lambat", False,
+                    "knee probe %.1fs (>12s) - pemanggil /start bisa timeout" % _el,
+                    "orchestrator", mandatory=False)
             if est and est.get("knee"):
                 add("knee (plafon) terukur", True,
-                    knee_mod.summarize(est) + " | saran: " + rec["reason"],
+                    knee_mod.summarize(est) + " | %.1fs | saran: %s" % (_el, rec["reason"]),
                     "knee_probe", mandatory=False)
                 db.update("test_jobs", job_id,
                           lambda j: j.update({"knee": {"estimate": est, "recommend": rec}}),

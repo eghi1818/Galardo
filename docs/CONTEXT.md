@@ -89,3 +89,10 @@ git reset --hard checkpoint/galardo-v1.1-mulai
 - Hasil knee di-cache di target (GALARDO_KNEE_TTL, default 1800s)
 - Env: GALARDO_KNEE=0 matikan; GALARDO_KNEE_STEPS; GALARDO_KNEE_STEP_SEC; GALARDO_KNEE_TIMEOUT
 - Plafon disimpulkan dari ok_rps, BUKAN rps (target mati bisa punya rps tinggi)
+
+## RISIKO: preflight kini melakukan I/O jaringan
+- run_preflight memanggil knee probe (SINKRON) -> /start ikut menunggu
+- Klien WAJIB punya timeout >= 15s. Klien tes pernah jebol di 15s.
+- Anggaran: GALARDO_KNEE_MAX_SEC (default 8s) memangkas otomatis
+- Kalau probe >12s, muncul check peringatan "preflight tidak lambat"
+- Jangka panjang: pertimbangkan knee dijalankan di background (P2/UI)

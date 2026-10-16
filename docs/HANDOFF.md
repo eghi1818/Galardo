@@ -59,16 +59,16 @@ ekor backup chat, dokumen REA lanjutan, isi 14 poin list kendala per-item.
 ## 8. PENDING BERIKUTNYA (URUT PRIORITAS - jangan dilompati)
 
 P0 - Goal 2 inti (paling menentukan)
-  1. Migrasi SEMUA modul HTTPS ke backend/netssl.context():
+  1. [SELESAI STEP-26] Migrasi SEMUA modul HTTPS ke backend/netssl.context():
      engine.py, observer.py, routeoverride.py, safety.py, srccap.py,
      step_load.py, transport.py   (external_probe.py sudah)
-  2. Sambungkan auto-knee ke preflight: ukur plafon (tools/galardo_capacity.py)
+  2. [SELESAI STEP-32..39] Sambungkan auto-knee ke preflight: ukur plafon (tools/galardo_capacity.py)
      SEBELUM spike, jangan tembak buta.
 
 P1 - Universalitas
-  3. Jalur probe residential (field proxy_pool masih ditolak sebagai field asing)
-  4. Verifikasi rung 1 kepemilikan end-to-end di koler.space (zone sudah ACTIVE)
-  5. T3 end-to-end di koler.space: Worker + route, buktikan 404/blank
+  3. [SELESAI STEP-54] Jalur probe residential (field proxy_pool masih ditolak sebagai field asing)
+  4. [SELESAI STEP-55] Verifikasi rung dns_txt (rank 4) kepemilikan end-to-end di koler.space
+  5. [SELESAI STEP-48] T3 end-to-end di koler.space: Worker + route, buktikan 404/blank
 
 P2 - Produk (yang dipakai manusia)
   6. AUDIT DASHBOARD: folder dashboard/ BELUM PERNAH diperiksa - petakan isinya
@@ -84,6 +84,7 @@ P3 - Kesiapan produksi
   menghalangi item P0.
 - Satu item P0 selesai -> baru naik ke P1.
 - Jangan buka lebih dari satu item sekaligus.
+- P0.1b (temuan STEP-55): backend/ownership_ladder.default_fetcher() masih urllib polos, bukan netssl.context(). DICATAT, belum dikerjakan.
 
 ## 8c. INVENTARIS LENGKAP
 Status per item (V/D/goals/dokumen/tier) ada di docs/INVENTARIS.md.

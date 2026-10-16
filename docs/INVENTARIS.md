@@ -1,6 +1,6 @@
 # INVENTARIS PENDING — status terverifikasi
 
-Diperbarui: STEP-27. Sumber: daftar INVENTARIS lama + cross-check terhadap repo.
+Diperbarui: STEP-55. Sumber: daftar INVENTARIS lama + cross-check terhadap repo.
 Legenda: SELESAI | SEBAGIAN | PENDING | PERLU-VERIFIKASI
 
 ## A. Verifikasi
@@ -27,7 +27,7 @@ Legenda: SELESAI | SEBAGIAN | PENDING | PERLU-VERIFIKASI
 | Item | Status |
 |---|---|
 | Item 1 cache-buster | SELESAI (cachebuster.py + engine + step_load, penanda __gb) |
-| Item 5 T3 edge rule | SEBAGIAN (koler.space active; bukti end-to-end belum) |
+| Item 5 T3 edge rule | SELESAI | bukti live .out/HASIL-48.md + docs/T3-RUN.md (404 + blank via edge, revert bersih) |
 | Item 2/3 lane proxy | PENDING (proxy.py tidak ada; transport sudah punya proxy) |
 | Item 4 transport multi-lane | PENDING |
 | Item 9 botnet IoT global | PENDING |
@@ -36,6 +36,7 @@ Legenda: SELESAI | SEBAGIAN | PENDING | PERLU-VERIFIKASI
 | Item 14 worm/lease | PENDING |
 | Item 6/8/11/12 | SELESAI + teruji |
 | GOAL 2 observer tersambung | PENDING |
+| P1.4 kepemilikan dns_txt (rank 4) end-to-end | SELESAI | docs/HASIL-55.md + tools/verify_ownership_rung1.py |
 | GOAL 3 T1/T2 | SELESAI + teruji |
 
 ## D. Dokumen kontradiktif (belum tersentuh)
@@ -56,3 +57,8 @@ T1 SEBAGIAN (Ed25519 selesai; RBAC+MFA, backup, Docker pending) | T2-T4 PENDING
 - Item berstatus SELESAI tidak dikerjakan ulang kecuali ada bukti regresi.
 - Kalau status di sini bertentangan dengan dokumen lain, file ini yang menang
   untuk soal STATUS; docs/CONTEXT.md menang untuk soal ATURAN.
+## G. Temuan tercatat (belum dikerjakan)
+| ID | Temuan | Status |
+|---|---|---|
+| P0.1b | backend/ownership_ladder.default_fetcher() masih urllib.request.urlopen polos, bukan netssl.context() (temuan STEP-55) | BELUM |
+| F-1 | tests_integration.py:275 flaky: job degrade memakai Idempotency-Key tetap (test-job-degrade-1); bila data/state.json masih menyimpan job lama, POST /start balas 409. Lolos 61/61 pada 2 ulang berturut. Bukan regresi STEP-55. | TERBUKA |

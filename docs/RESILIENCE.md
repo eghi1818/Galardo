@@ -13,7 +13,7 @@ Retry biasanya gagal lagi. Obatnya struktural, bukan mengulang.
 Kalau dokumen bertentangan dengan kode, KODE yang benar. Laporkan, jangan ikuti dokumen buta.
 
 ## 3. Protokol sesi baru (wajib, urut)
-1. Baca lampiran saja: .out/ONBOARDING_PROMPT.txt + docs/SESSION_STATE.md. Jangan baca riwayat chat lama.
+1. Baca lampiran saja: docs/ONBOARDING_PROMPT.txt + docs/SESSION_STATE.md. Jangan baca riwayat chat lama.
 2. Baca output bash tools/resume.sh yang di-paste user.
 3. Cross-check SESSION_STATE vs kode dan git; tandai status dokumen yang basi.
 4. Lapor ringkas: HEAD, branch, ahead/behind, dirty, hasil tes, item aktif, item berikutnya.
@@ -40,5 +40,5 @@ Kalau dokumen bertentangan dengan kode, KODE yang benar. Laporkan, jangan ikuti 
 - Commit kecil per STEP, jangan menumpuk.
 
 ## 8. Yang dilampirkan saat sesi baru
-Hanya: .out/ONBOARDING_PROMPT.txt + docs/SESSION_STATE.md + output tools/resume.sh.
+Hanya: docs/ONBOARDING_PROMPT.txt + docs/SESSION_STATE.md + output tools/resume.sh.
 HASIL-xx.md hanya dilampirkan kalau STEP terakhir GAGAL.

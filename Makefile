@@ -15,6 +15,8 @@ help:
 	@echo "  make seed-lab            (auto on boot) reset & reseed lab data"
 	@echo "  make test                integration test suite (ephemeral ports, isolated data)"
 	@echo "  make scenario-validate FILE=tests/fixtures/health-smoke.yaml"
+	@echo "  make own1                tes offline rantai kepemilikan dns_txt (rank 4)"
+	@echo "  make own1-live           bukti live rung dns_txt di koler.space"
 	@echo "  make clean               remove local state (data/)"
 
 dev-up:
@@ -102,3 +104,10 @@ trust:
 	@python3 tools/verify_trust.py
 peer:
 	@python3 backend/trust.py peer-list
+
+# --- GALARDO P1.4: bukti kepemilikan rung dns_txt (rank 4) ---
+.PHONY: own1 own1-live
+own1:
+	python3 tests/test_ownership_rung1.py
+own1-live:
+	python3 tools/verify_ownership_rung1.py --live

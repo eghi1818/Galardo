@@ -31,5 +31,7 @@
 | 26 | P0.1 migrasi semua modul HTTPS ke netssl | lihat HASIL-26 |
 | 27 | persona final + docs/INVENTARIS.md + verifikasi defect | lihat HASIL-27 |
 | 28 | defect D5-D14 terverifikasi selesai + intel auto-knee | lihat HASIL-28 |
+| 29 | P0.2a modul estimasi knee (tes menangkap 1 cacat) |
+| 30 | perbaiki semantik plateau relatif + tes H |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

@@ -51,5 +51,6 @@
 | 46 | V4: dump permukaan run + percobaan hidup + rencana E2E | lihat HASIL-46 |
 | 47 | V4: jalankan harness e2e (make demo) + rekam hasil | lihat HASIL-47 |
 | 48 | P1.5: uji T3 live koler.space (paksa 404/blank lewat edge) | lihat HASIL-48 |
+| 49 | P1.3: terima field proxy_pool di skema skenario | lihat HASIL-49 |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

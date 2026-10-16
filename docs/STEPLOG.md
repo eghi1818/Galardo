@@ -42,5 +42,7 @@
 | 37 | audit dashboard/ - ternyata SUDAH ADA (index.html 1205 baris) |
 | 38 | cache knee per origin |
 | 39 | check knee wajib PASS + probe tidak mengganggu baseline |
+| 40 | diagnosa 2 tes merah knee_probe + fix cache tes E | lihat HASIL-40 |
+| 41 | fix tes E3 (path probe_contract) + hijaukan verify_knee_probe | lihat HASIL-41 |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

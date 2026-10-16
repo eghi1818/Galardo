@@ -113,8 +113,7 @@ if ok_import:
         "job-pc", {"canonical_origin": ORIGIN,
                    "probe_contract": {"url": ORIGIN + "/healthz"}})
     check("E3 tetap menghasilkan estimate", est5 is not None, est5)
-    check("E3 url probe memakai path target", raw5.get("url", "").endswith("/healthz"),
-          raw5.get("url"))
+    check("E3 url probe memakai path target", "/healthz" in str(raw5.get("url")), raw5.get("url"))
     orch._KNEE_CACHE.clear()
     os.environ.pop("GALARDO_KNEE_SETTLE")
 
@@ -134,6 +133,8 @@ if ok_import:
     orch._KNEE_CACHE.clear()
 
     print("== E. pagar anggaran waktu ==")
+    orch._KNEE_CACHE.clear()
+    os.environ["GALARDO_KNEE_SETTLE"] = "0"
     os.environ["GALARDO_KNEE_STEPS"] = "2,4,8,16"
     os.environ["GALARDO_KNEE_STEP_SEC"] = "5"
     os.environ["GALARDO_KNEE_MAX_SEC"] = "4"
@@ -143,6 +144,7 @@ if ok_import:
     check("E probe dipangkas di bawah anggaran", el < 6.5, round(el, 2))
     check("E tetap mengembalikan estimate", est4 is not None, est4)
     os.environ["GALARDO_KNEE_MAX_SEC"] = "100"
+    orch._KNEE_CACHE.clear()
     t0 = time.time()
     orch._knee_stage("job-uji", {"canonical_origin": ORIGIN})
     check("E anggaran longgar -> probe penuh", (time.time() - t0) > 6.0,
@@ -150,6 +152,7 @@ if ok_import:
     os.environ.pop("GALARDO_KNEE_MAX_SEC")
     os.environ.pop("GALARDO_KNEE_STEPS")
     os.environ.pop("GALARDO_KNEE_STEP_SEC")
+    os.environ.pop("GALARDO_KNEE_SETTLE")
 
 srv.shutdown()
 

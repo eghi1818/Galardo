@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+"""Pastikan modul HTTPS ke luar memakai netssl, bukan context bawaan."""
+import os
+import ssl
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.normpath(os.path.join(HERE, ".."))
+sys.path.insert(0, os.path.join(ROOT, "backend"))
+
+import netssl            # noqa: E402
+import external_probe    # noqa: E402
+
+PASS = 0
+FAIL = 0
+
+
+def check(name, cond, detail=""):
+    global PASS, FAIL
+    if cond:
+        PASS += 1
+        print("  ok   %s" % name)
+    else:
+        FAIL += 1
+        print("  FAIL %s   <-- %r" % (name, detail))
+
+
+ep = open(os.path.join(ROOT, "backend", "external_probe.py"), encoding="utf-8").read()
+
+print("== A. external_probe ==")
+check("A memakai netssl", "netssl as _ns" in ep, "import netssl hilang")
+check("A tidak memakai context bawaan", "create_default_context" not in ep,
+      [l for l in ep.splitlines() if "create_default_context" in l])
+check("A memakai _ns.context", "_ns.context(" in ep, "pemanggilan hilang")
+
+print("== B. netssl sehat ==")
+check("B ca_file ada dan berisi", bool(netssl.ca_file()) and os.path.isfile(netssl.ca_file()),
+      netssl.ca_file())
+ctx = netssl.context()
+check("B context verifikasi aktif", ctx.verify_mode == ssl.CERT_REQUIRED, ctx.verify_mode)
+ctxn = netssl.context(verify=False)
+check("B verify=False -> CERT_NONE", ctxn.verify_mode == ssl.CERT_NONE, ctxn.verify_mode)
+ok, detail = netssl.verify_probe()
+check("B verify_probe berhasil", ok is True, detail)
+
+print("== C. probe hidup ==")
+r = external_probe.probe_http("http://127.0.0.1:1/", timeout=2)
+check("C probe port mati tidak melempar", isinstance(r, dict) and r.get("ok") is False, r)
+check("C hasil probe punya atribusi lapisan", "layer" in r, list(r)[:6])
+
+print("== D. pemindaian: modul lain yang masih pakai context bawaan ==")
+kandidat = []
+for fn in sorted(os.listdir(os.path.join(ROOT, "backend"))):
+    if not fn.endswith(".py"):
+        continue
+    txt = open(os.path.join(ROOT, "backend", fn), encoding="utf-8").read()
+    if "create_default_context" in txt and fn not in ("netssl.py",):
+        kandidat.append(fn)
+print("  kandidat: %s" % (kandidat or "(bersih)"))
+check("D external_probe tidak lagi jadi kandidat", "external_probe.py" not in kandidat, kandidat)
+
+print()
+print("HASIL: %d passed, %d failed" % (PASS, FAIL))
+sys.exit(1 if FAIL else 0)

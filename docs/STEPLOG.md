@@ -26,5 +26,7 @@
 | 21 | verifikasi token CF + status zone + uji tulis DNS | hijau (TLS salah diagnosa) |
 | 22 | TLS doctor awal + netssl + catat STEPLOG 21 | hijau |
 | 23 | TLS doctor benar + netssl wired ke probe | lihat HASIL-23 |
+| 24 | external_probe pakai netssl (regex, gagal lalu diperbaiki) |
+| 25 | fix netssl + _opener + persona + roadmap berjenjang |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

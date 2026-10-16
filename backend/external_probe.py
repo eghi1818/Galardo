@@ -50,7 +50,8 @@ class _NoRedirect(urlrequest.HTTPRedirectHandler):
 
 
 def _opener(tls_verify=True):
-    ctx = ssl.create_default_context() if tls_verify else ssl._create_unverified_context()
+    # pakai netssl: bundle CA sistem bisa tidak valid
+    ctx = _ns.context(verify=tls_verify)
     return urlrequest.build_opener(_NoRedirect(), urlrequest.HTTPSHandler(context=ctx))
 
 
@@ -91,6 +92,11 @@ try:
     from . import layer_attrib as _la
 except ImportError:
     import layer_attrib as _la
+
+try:
+    from . import netssl as _ns
+except ImportError:
+    import netssl as _ns
 
 
 def cache_buster_token():

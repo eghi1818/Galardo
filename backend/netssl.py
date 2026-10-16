@@ -60,10 +60,18 @@ def context(verify=True, cafile=None):
 
 
 def verify_probe(url="https://api.cloudflare.com/client/v4/", timeout=10):
-    """Tes apakah HTTPS ke luar bisa diverifikasi. Kembalikan (ok, detail)."""
+    """Tes apakah HTTPS ke luar bisa diverifikasi. Kembalikan (ok, detail).
+
+    PENTING: urllib melempar HTTPError untuk 4xx/5xx. Itu artinya TLS SUDAH lolos
+    dan server yang menjawab -- BUKAN kegagalan sertifikat.
+    """
+    import urllib.error
     import urllib.request
     try:
         urllib.request.urlopen(url, timeout=timeout, context=context())
         return True, "verifikasi TLS OK (ca=%s)" % (ca_file() or "default")
+    except urllib.error.HTTPError as exc:
+        return True, "verifikasi TLS OK - server jawab HTTP %d (ca=%s)" % (
+            exc.code, ca_file() or "default")
     except Exception as exc:
         return False, "%s" % str(exc)[:180]

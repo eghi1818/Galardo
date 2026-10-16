@@ -56,15 +56,34 @@ Tag sudah di-push. Cek: `git tag -l 'checkpoint/*'`
 UI (dashboard/, templates/), proxy.py (TIDAK ADA - transport.py sudah punya proxy),
 ekor backup chat, dokumen REA lanjutan, isi 14 poin list kendala per-item.
 
-## 8. PENDING BERIKUTNYA (urut, jangan dilompati)
-1. Auto-knee sebelum spike (ukur plafon dulu) -> butuh tools/galardo_capacity.py
-2. Probe multi-jalur: observer.py (check-host.net) SUDAH ADA; sisa = jalur residential
-   + field proxy_pool (masih ditolak sebagai field asing)
-3. Atribusi lapisan verdict: DNS / edge / origin / app
-4. Satukan GALARDO_LOCAL_DEV ke tangga kepemilikan
-5. Tier 1 sisa: RBAC+MFA, backup otomatis, Docker Compose
-6. Tier 2-4: Postgres, NATS, OTel, alerting
-7. Run end-to-end nyata pasca perubahan Tier 1 + Fase A
+## 8. PENDING BERIKUTNYA (URUT PRIORITAS - jangan dilompati)
+
+P0 - Goal 2 inti (paling menentukan)
+  1. Migrasi SEMUA modul HTTPS ke backend/netssl.context():
+     engine.py, observer.py, routeoverride.py, safety.py, srccap.py,
+     step_load.py, transport.py   (external_probe.py sudah)
+  2. Sambungkan auto-knee ke preflight: ukur plafon (tools/galardo_capacity.py)
+     SEBELUM spike, jangan tembak buta.
+
+P1 - Universalitas
+  3. Jalur probe residential (field proxy_pool masih ditolak sebagai field asing)
+  4. Verifikasi rung 1 kepemilikan end-to-end di koler.space (zone sudah ACTIVE)
+  5. T3 end-to-end di koler.space: Worker + route, buktikan 404/blank
+
+P2 - Produk (yang dipakai manusia)
+  6. AUDIT DASHBOARD: folder dashboard/ BELUM PERNAH diperiksa - petakan isinya
+  7. Alur UI: target -> intel REA -> preflight -> playbook -> jalankan -> verdict
+
+P3 - Kesiapan produksi
+  8. Tier 1: RBAC+MFA, backup otomatis, Docker Compose
+  9. Tier 2-4: Postgres, NATS, OTel, alerting
+ 10. Run end-to-end nyata pasca semua perubahan
+
+## 8b. ATURAN PRIORITAS
+- Temuan sampingan DICATAT di sini; jangan langsung dikerjakan kecuali
+  menghalangi item P0.
+- Satu item P0 selesai -> baru naik ke P1.
+- Jangan buka lebih dari satu item sekaligus.
 
 ## 9. DONE RINGKAS (jangan dikerjakan ulang)
 STEP 01-15 selesai. Rincian: docs/STEPLOG.md

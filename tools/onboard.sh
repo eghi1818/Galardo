@@ -15,4 +15,5 @@ echo "Aturan: satu STEP = satu patch = satu verifikasi = satu commit; uji merah 
 echo "        file belum dibaca = jangan disentuh; output STEP ke .out/; push otomatis via hook."
 echo "Tugas berikutnya: lihat bagian 8 docs/HANDOFF.md"
 echo "Perintah pertama yang diminta: bash tools/step_guard.sh && bash tools/git_discipline.sh"
+echo "PROMPT PEMBUKA: salin isi docs/ONBOARDING_PROMPT.md (bagian di antara garis)"
 echo "=========================================================="

@@ -25,8 +25,11 @@ __all__ = ["estimate", "recommend", "summarize", "TRIGGERS",
 TRIGGERS = ("latency_bend", "rps_plateau", "error_onset")
 
 DEFAULT_LATENCY_FACTOR = 2.0
-# toleransi kekurangan relatif rps terhadap kenaikan vus (kecil = sensitif)
-DEFAULT_PLATEAU_DELTA = 0.10
+# Toleransi kekurangan relatif rps terhadap kenaikan vus (kecil = sangat sensitif).
+# 0.75 dipilih karena pada ramp berbasis THREAD, rps sering tumbuh sublinear
+# walau target sehat (GIL + scheduling) -- dengan 0.10 hampir semua ramp
+# langsung salah dianggap jenuh.
+DEFAULT_PLATEAU_DELTA = 0.75
 DEFAULT_ERROR_RATE = 0.01
 
 
@@ -73,7 +76,8 @@ def _plateau_index(ss, delta):
 
     Perbandingan dilakukan RELATIF (rgain vs vgain), bukan ambang absolut,
     supaya benar untuk rentang vus apa pun. delta = toleransi kekurangan
-    relatif; delta kecil berarti lebih sensitif.
+    relatif; delta kecil berarti lebih sensitif. Default longgar (0.75) agar
+    pertumbuhan sublinear yang normal tidak dianggap saturasi.
     """
     for i in range(1, len(ss)):
         prev, cur = ss[i - 1], ss[i]

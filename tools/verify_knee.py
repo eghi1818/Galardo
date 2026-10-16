@@ -87,6 +87,16 @@ check("H rps tertinggal + delta 0 -> plateu terpicu",
       "rps_plateau" in r["triggers"], r["triggers"])
 r = knee.estimate(seri([100, 200, 300, 302], [20, 21, 22, 23]), plateau_delta=0.99)
 check("H delta sangat longgar -> tidak picu", "rps_plateau" not in r["triggers"], r["triggers"])
+# ramp berbasis thread: rps tumbuh sublinear walau target sehat
+r = knee.estimate(seri([100, 145, 200, 250], [20, 21, 22, 23]))
+check("H ramp sublinear (rps +45% saat vus x2) -> TIDAK dianggap jenuh",
+      "rps_plateau" not in r["triggers"], r["triggers"])
+check("H ramp sublinear -> tidak ada knee sama sekali",
+      r["quality"] == "no_knee", r["quality"])
+# saturasi sungguhan: rps nyaris tidak naik padahal vus berlipat
+r = knee.estimate(seri([100, 200, 300, 310], [20, 21, 22, 23]))
+check("H saturasi sungguhan -> plateu terpicu dengan delta default",
+      "rps_plateau" in r["triggers"], r["triggers"])
 r = knee.estimate(seri([100, 200, 300], [20, 21, 22], [0, 5, 5]), error_rate=0.5)
 check("H error_rate tinggi -> tidak picu", "error_onset" not in r["triggers"], r["triggers"])
 r = knee.estimate(seri([100, 200, 300], [20, 200, 300]), baseline_p95=100)

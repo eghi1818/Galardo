@@ -33,5 +33,10 @@
 | 28 | defect D5-D14 terverifikasi selesai + intel auto-knee | lihat HASIL-28 |
 | 29 | P0.2a modul estimasi knee (tes menangkap 1 cacat) |
 | 30 | perbaiki semantik plateau relatif + tes H |
+| 31 | bedah orchestrator.py (langkah baca) |
+| 32 | P0.2b knee_probe + sambung ke preflight |
+| 33 | ok_rps: plafon dari throughput berhasil |
+| 34 | kalibrasi delta plateau untuk ramp thread sublinear |
+| 35 | TTL cache knee + biaya probe lebih murah |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

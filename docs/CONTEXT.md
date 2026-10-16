@@ -82,3 +82,10 @@ git reset --hard checkpoint/galardo-v1.1-mulai
   observer, routeoverride, safety, srccap, step_load, transport
 - Tidak boleh ada ssl.create_default_context() baru di backend/ (kecuali netssl.py)
 - Alat migrasi: tools/migrate_netssl.py (punya --dry-run)
+
+## Knee / plafon (P0.2)
+- backend/knee.py = estimasi dari data; backend/knee_probe.py = ramp konkurensi
+- check di run_preflight bersifat NON-mandatory (tidak boleh memblokir job)
+- Hasil knee di-cache di target (GALARDO_KNEE_TTL, default 1800s)
+- Env: GALARDO_KNEE=0 matikan; GALARDO_KNEE_STEPS; GALARDO_KNEE_STEP_SEC; GALARDO_KNEE_TIMEOUT
+- Plafon disimpulkan dari ok_rps, BUKAN rps (target mati bisa punya rps tinggi)

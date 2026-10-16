@@ -11,6 +11,7 @@ re-enters RECOVERY_WAIT. Abort is idempotent (FR-06). Recovery is judged by the
 INDEPENDENT probe, never by worker completion (FR-08). No automatic traffic
 re-run after ambiguous outcome (Blueprint §6.1).
 """
+import os
 import threading
 import time
 
@@ -33,6 +34,13 @@ try:
     import observer as observer_mod
 except ImportError:
     from . import observer as observer_mod
+
+try:
+    import knee as knee_mod
+    import knee_probe as knee_probe_mod
+except ImportError:
+    from . import knee as knee_mod
+    from . import knee_probe as knee_probe_mod
 
 JOBS = {}          # job_id -> RuntimeCtx
 JOBS_LOCK = threading.Lock()
@@ -119,6 +127,46 @@ def _set_state(job_id, new_state, actor="orchestrator", action=None, reason="", 
 # ---------------------------------------------------------------------------
 # Preflight (Dashboard UX §6 checklist)
 # ---------------------------------------------------------------------------
+def _knee_enabled():
+    return (os.environ.get("GALARDO_KNEE", "1") or "").lower() not in ("0", "false", "no")
+
+
+def _knee_stage(job_id, tgt):
+    """P0.2b: ukur plafon target SEBELUM spike. Tidak pernah memblokir job.
+
+    Kembalikan (estimate, recommend, raw). estimate None = belum terukur.
+    """
+    origin = ((tgt or {}).get("canonical_origin") or "").rstrip("/")
+    if not origin:
+        return None, None, {"reason": "target tanpa canonical_origin"}
+    # TTL cache: knee disimpan di target, tidak diukur ulang tiap job
+    ttl = float(os.environ.get("GALARDO_KNEE_TTL") or "1800")
+    cached = (tgt or {}).get("knee")
+    measured_at = (tgt or {}).get("knee_measured_at") or 0
+    if cached and ttl > 0 and (time.time() - measured_at) < ttl:
+        return cached.get("estimate"), cached.get("recommend"), {
+            "reason": "pakai knee tersimpan", "cached": True,
+            "age": round(time.time() - measured_at, 1)}
+
+    # default murah: 3 langkah x 1.5s = ~4.5s, bukan ~10s
+    raw_steps = os.environ.get("GALARDO_KNEE_STEPS") or "2,4,8"
+    steps = [int(x) for x in raw_steps.split(",") if x.strip().isdigit()]
+    secs = float(os.environ.get("GALARDO_KNEE_STEP_SEC") or "1.5")
+    tmo = float(os.environ.get("GALARDO_KNEE_TIMEOUT") or "2.0")
+    raw = knee_probe_mod.measure(origin, path="/",
+                                 steps=steps or list(knee_probe_mod.DEFAULT_STEPS),
+                                 step_seconds=secs, timeout=tmo)
+    samples = raw.get("samples") or []
+    if not samples:
+        return None, None, {"reason": "knee probe tanpa sampel", "raw": raw}
+    # pakai ok_rps: target mati bisa punya 'rps' tinggi karena gagal seketika
+    if max((s.get("ok_rps", s.get("rps") or 0) or 0) for s in samples) <= 0:
+        return None, None, {"reason": "target tidak merespons (semua request gagal)", "raw": raw}
+    est = knee_mod.estimate(samples)
+    rec = knee_mod.recommend(est.get("knee"))
+    return est, rec, raw
+
+
 def run_preflight(job_id):
     job = db.get("test_jobs", job_id)
     plan = db.get("test_plans", job.get("test_plan_id") or "") if job else None
@@ -160,6 +208,36 @@ def run_preflight(job_id):
         "one active job per target", "db")
     add("abort route available",
         True, "in-process abort channel registered at dispatch", "orchestrator")
+
+    # P0.2b: plafon target (knee). NON-mandatory: tidak boleh memblokir job,
+    # tapi WAJIB ditandai supaya spike tidak menembak buta.
+    if _knee_enabled() and tgt and tgt.get("canonical_origin"):
+        try:
+            est, rec, _raw = _knee_stage(job_id, tgt)
+            if est and est.get("knee"):
+                add("knee (plafon) terukur", True,
+                    knee_mod.summarize(est) + " | saran: " + rec["reason"],
+                    "knee_probe", mandatory=False)
+                db.update("test_jobs", job_id,
+                          lambda j: j.update({"knee": {"estimate": est, "recommend": rec}}),
+                          audit=False)
+                # simpan di TARGET juga supaya job berikutnya tidak mengukur ulang
+                db.update("targets", tgt["id"],
+                          lambda t: t.update({"knee": {"estimate": est, "recommend": rec},
+                                              "knee_measured_at": time.time()}),
+                          audit=False)
+            else:
+                add("knee (plafon) terukur", None,
+                    "belum terukur: " + str((est or {}).get("reason")
+                                            or _raw.get("reason") or "tanpa data"),
+                    "knee_probe", mandatory=False)
+        except Exception as exc:
+            add("knee (plafon) terukur", None, "gagal: %s" % str(exc)[:140],
+                "knee_probe", mandatory=False)
+    else:
+        add("knee (plafon) terukur", None,
+            "dimatikan (GALARDO_KNEE=0) atau target tanpa origin", "knee_probe",
+            mandatory=False)
     return checks
 
 

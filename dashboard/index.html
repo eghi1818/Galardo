@@ -162,7 +162,8 @@ details{margin-top:8px}summary{cursor:pointer;font-size:12px;color:var(--cyan)}
     <a data-p="evidence"><span class="ico">🔒</span> Reports &amp; Evidence</a>
     <a data-p="audit"><span class="ico">☰</span> Audit Log</a>
     <a data-p="policy"><span class="ico">⚖</span> Safety Policy</a>
-  </nav>
+      <a data-p="ownership"><span class="ico">⚖</span>Ownership</a>
+</nav>
 </aside>
 <main>
   <div class="topbar">
@@ -221,7 +222,9 @@ async function discoverApi(){
 
 const $ = s => document.querySelector(s);
 const PAGE_TITLES = {overview:'Overview',engagements:'Engagements',targets:'Targets',scenarios:'Scenarios',
-  plans:'Test Plans',live:'Live Execution',workers:'Workers',evidence:'Reports & Evidence',audit:'Audit Log',policy:'Safety Policy (restricted)'};
+  plans:'Test Plans',live:'Live Execution',workers:'Workers',evidence:'Reports & Evidence',audit:'Audit Log',policy:'Safety Policy (restricted)'
+  ownership: 'Ownership',
+};
 let CURRENT_PAGE = 'overview';
 let LIVE_POLL = null, GEN_POLL = null, SELECTED_JOB = localStorage.getItem('galardo.job') || '';
 let lastOkFetch = null;
@@ -342,6 +345,79 @@ function restoreForms(st){
 }
 
 /* ---- Overview ---- */
+async function ownPost(path, body){
+  const o = {method:'POST'};
+  if (body) o.body = body;
+  return api(path, o);
+}
+
+async function ownAct(id, kind){
+  const out = document.getElementById('ownOut');
+  const base = '/targets/' + encodeURIComponent(id);
+  const path = kind==='challenge' ? base+'/challenge' : base+'/verify/'+kind;
+  const body = kind==='attest' ? {min_level:'operator_attestation'}
+             : kind==='file'   ? {min_level:'well_known_file'}
+             : kind==='echo'   ? {min_level:'http_echo'} : null;
+  if (out) out.textContent = kind + ' ...';
+  try {
+    const r = await ownPost(path, body);
+    if (out) out.textContent = JSON.stringify(r, null, 2);
+    if (typeof toast === 'function') toast(kind + ': ok');
+  } catch(e) {
+    if (out) out.textContent = String((e && e.message) || e);
+    if (typeof toast === 'function') toast(kind + ': gagal', true);
+  }
+  await RENDER.ownership();
+}
+
+RENDER.ownership = async function(){
+  const V = document.getElementById('view') || document.getElementById('main') || document.body;
+  V.innerHTML = '<div class="card">Memuat ownership ...</div>';
+  let raw = [];
+  try { raw = await api('/targets'); } catch(e){ if (typeof toast==='function') toast('targets: gagal', true); }
+  const list = Array.isArray(raw) ? raw : (raw.items || raw.targets || []);
+  const rows = [];
+  for (const t of list){
+    let own = null;
+    try { own = await api('/targets/' + encodeURIComponent(t.id) + '/ownership'); } catch(e){}
+    const lvl  = (own && own.ownership_level != null) ? own.ownership_level : '-';
+    const st   = (own && own.ownership) || t.ownership || '-';
+    const isP  = !!(own && own.proof);
+    const rungs = ((own && own.rungs) || []).map(function(r){
+      return esc(r.method) + ' (r' + r.rank + (r.is_proof ? ', bukti' : '') + ')';
+    }).join(', ') || '-';
+    const b = function(x){ return (typeof badge === 'function') ? badge(x) : esc(String(x)); };
+    rows.push('<tr>'
+      + '<td>' + esc(t.id) + '</td>'
+      + '<td>' + esc(t.canonical_origin || '-') + '</td>'
+      + '<td>' + b(t.status || '-') + '</td>'
+      + '<td>' + b(st) + '</td>'
+      + '<td>' + esc(String(lvl)) + '</td>'
+      + '<td>' + (isP ? 'PROOF' : 'tanpa bukti') + '</td>'
+      + '<td>' + rungs + '</td>'
+      + '<td>'
+      + '<button data-own="challenge" data-id="' + esc(t.id) + '">Challenge DNS</button> '
+      + '<button data-own="dns" data-id="' + esc(t.id) + '">Verify DNS</button> '
+      + '<button data-own="file" data-id="' + esc(t.id) + '">Verify File</button> '
+      + '<button data-own="echo" data-id="' + esc(t.id) + '">Verify Echo</button> '
+      + '<button data-own="attest" data-id="' + esc(t.id) + '">Attest</button>'
+      + '</td></tr>');
+  }
+  V.innerHTML =
+      '<h2>Ownership</h2>'
+    + '<p class="muted">Tangga verifikasi kepemilikan. Rank lebih tinggi = bukti lebih kuat. '
+    + 'Attestasi (rank 1) hanya pernyataan operator, bukan bukti.</p>'
+    + '<div class="card"><table><thead><tr>'
+    + '<th>target</th><th>origin</th><th>status</th><th>ownership</th><th>rank</th>'
+    + '<th>bukti</th><th>rungs</th><th>aksi</th>'
+    + '</tr></thead><tbody>'
+    + (rows.join('') || '<tr><td colspan="8">belum ada target</td></tr>')
+    + '</tbody></table></div><pre id="ownOut" class="card"></pre>';
+  V.querySelectorAll('button[data-own]').forEach(function(btn){
+    btn.onclick = function(){ ownAct(btn.getAttribute('data-id'), btn.getAttribute('data-own')); };
+  });
+};
+
 RENDER.overview = async function(){
   const ov = await api('/overview');
   const jobs = await api('/test-jobs');

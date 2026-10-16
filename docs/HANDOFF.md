@@ -85,7 +85,7 @@ P3 - Kesiapan produksi
 - Satu item P0 selesai -> baru naik ke P1.
 - Jangan buka lebih dari satu item sekaligus.
 - P0.1b (temuan STEP-55): backend/ownership_ladder.default_fetcher() masih urllib polos, bukan netssl.context(). DICATAT, belum dikerjakan.
-- F-2..F-4 (temuan STEP-56): /admin/secret & /healthz tanpa handler; tanpa CSP; CORS * + Bearer. DICATAT, belum dikerjakan.
+- F-2 DITUTUP (STEP-57): /healthz & /admin/secret adalah path sisi-target, bukan route API; API sudah punya GET /health. F-3 (CSP) & F-4 (CORS *) masih terbuka.
 
 ## 8c. INVENTARIS LENGKAP
 Status per item (V/D/goals/dokumen/tier) ada di docs/INVENTARIS.md.

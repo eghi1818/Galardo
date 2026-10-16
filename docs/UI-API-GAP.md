@@ -14,8 +14,8 @@ Sumber: `dashboard/index.html` vs SELURUH `_dispatch` (`api.py` baris 348..1308)
 
 | Path | UI pakai | Status |
 |---|---|---|
-| `/admin/secret` | GET | BELUM DIBERESKAN |
-| `/healthz` | GET | BELUM DIBERESKAN |
+[DITUTUP STEP-57 - lihat KOREKSI di bawah] | `/admin/secret` | GET | BELUM DIBERESKAN |
+[DITUTUP STEP-57 - lihat KOREKSI di bawah] | `/healthz` | GET | BELUM DIBERESKAN |
 
 ## B. Backlog P2 — route backend yang belum tampil di UI
 
@@ -117,3 +117,19 @@ Urutan mengikuti tiga goal, bukan kemudahan.
 /test-plans/*/approve
 /workers
 ```
+
+## KOREKSI (STEP-57)
+
+Klaim lama: UI memanggil `GET /healthz` dan `GET /admin/secret` yang belum ada handler-nya.
+
+Kenyataan setelah verifikasi per-baris `dashboard/index.html`:
+- Keduanya BUKAN panggilan API. Semua panggilan API di UI memakai helper `api()` (baris 232).
+- `/healthz` hanya muncul sebagai: teks placeholder form (441), `path:` di YAML skenario (482, 503),
+  dan `path:` di objek route JS (558, 685).
+- `/admin/secret` hanya `path:` YAML skenario (516) - contoh path yang sengaja di-override jadi 404.
+- API Galardo sudah punya health endpoint sendiri: `GET /health` (`backend/api.py:358`).
+- 26 panggilan `api('...')` yang nyata: /overview, /test-jobs, /engagements, /targets,
+  /scenarios, /scenarios/validate, /scenarios/visual-to-yaml, /policies, /test-plans,
+  /workers, /evidence, /audit.
+
+Kesimpulan: F-2 DITUTUP sebagai reklasifikasi. Tidak ada route API yang hilang.

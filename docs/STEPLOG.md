@@ -60,5 +60,6 @@
 | 54b | kit ketahanan sesi: SESSION_STATE + RESILIENCE + resume.sh | lihat docs/RESILIENCE.md |
 | 55 | P1.4: bukti e2e rung dns_txt (rank 4) di koler.space + verifier + tes | lihat HASIL-55 |
 | 56 | sinkron audit dashboard: item 6 SELESAI + upgrade DASHBOARD-AUDIT.md + temuan F-2..F-4 | lihat docs/HASIL-56.md |
+| 57 | tutup F-2 sebagai reklasifikasi (path target, bukan route API) + koreksi UI-API-GAP | lihat docs/HASIL-57.md |
 
 Acuan tes: make test 61/61. Titik aman: checkpoint/galardo-v1.1-mulai

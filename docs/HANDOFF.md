@@ -24,7 +24,7 @@ Tag sudah di-push. Cek: `git tag -l 'checkpoint/*'`
 - STEP terakhir selesai: STEP-15 (fix import step_load + smoke test), commit 31d95d0
 - SELESAI juga: STEP-14 (handoff darurat + wiring cache buster ke engine/scenario/step_load)
 - Sedang dikerjakan: STEP-16 (first-prompt ke repo + selaraskan dokumen)
-- Tes acuan: make test 59/59, smoke OK, trust 39/39, ownership_ladder 27/27,
+- Tes acuan: make test 61/61, smoke OK, trust 39/39, ownership_ladder 27/27,
   ladder API 18/18, cachebuster 36/36
 - Bukti hidup cache buster: 100/100 request membawa ?__gb=<nonce>; mode OFF = 0
 

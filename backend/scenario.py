@@ -275,6 +275,9 @@ def parse_scenario_yaml(yaml_text, targets_by_name):
         if _ok:
             inorm["pool"] = _isim.pool_meta(inorm["count"], inorm["seed"])
             normalized["identity_sim"] = inorm
+    _pp = doc.get("proxy_pool")
+    if _pp is not None:
+        normalized["proxy_pool"] = _pp if isinstance(_pp, list) else [_pp]
     normalized["scenario_sha256"] = sha256_text(json.dumps(normalized, sort_keys=True))
     return normalized
 

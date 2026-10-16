@@ -53,5 +53,7 @@
 | 48 | P1.5: uji T3 live koler.space (paksa 404/blank lewat edge) | lihat HASIL-48 |
 | 49 | P1.3: terima field proxy_pool di skema skenario | lihat HASIL-49 |
 | 50 | proxy_pool di TOP_LEVEL + validasi + 2 tes (pintu probe residential) | lihat HASIL-50 |
+| 51 | proxy_pool mengalir ke dokumen ternormalisasi + verifier | lihat HASIL-51 |
+| 52 | verifier proxy_pool: targets_by_name + cek ketat | lihat HASIL-52 |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

@@ -57,5 +57,6 @@
 | 52 | verifier proxy_pool: targets_by_name + cek ketat | lihat HASIL-52 |
 | 53 | registry sumber: buka kapabilitas residential | lihat HASIL-53 |
 | 54 | cabut residential dari SUPPORTED_ENCODINGS + resolver proxypool | lihat HASIL-54 |
+| 54b | kit ketahanan sesi: SESSION_STATE + RESILIENCE + resume.sh | lihat docs/RESILIENCE.md |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

@@ -48,5 +48,6 @@
 | 43 | peta celah UI vs API v2 (ekstraksi dispatch asli) | lihat HASIL-43 |
 | 44 | peta celah UI vs API v3 (scan _dispatch penuh + method) | lihat HASIL-44 |
 | 45 | konfirmasi GAP, bersihkan artefak, backlog P2 berprioritas | lihat HASIL-45 |
+| 46 | V4: dump permukaan run + percobaan hidup + rencana E2E | lihat HASIL-46 |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

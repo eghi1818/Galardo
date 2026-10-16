@@ -24,9 +24,11 @@ from util import now_iso
 try:
     from . import assertions as assertions_mod
     from . import transport as transport_mod
+    from . import cachebuster as cachebuster_mod
 except ImportError:
     import assertions as assertions_mod
     import transport as transport_mod
+    import cachebuster as cachebuster_mod
 
 # Larger implied context for SSL certificates (not used for http lab targets)
 ssl_ctx = None
@@ -244,6 +246,8 @@ class LoadEngine:
         self.connect_ip = connect_ip
         self.keep_alive = normalized.get("keep_alive", True)
         self.transport = transport_mod.Transport(verify_tls=verify_tls)
+        self.piercer = cachebuster_mod.Piercer(
+            run_id=run_id, enabled=bool(normalized.get("cache_buster", True)))
         self.assert_fail_hard = 0
         self.assert_fail_soft = 0
         self.norm = normalized
@@ -281,6 +285,11 @@ class LoadEngine:
             headers["Connection"] = "close"
         for k, v in (req.get("headers") or {}).items():
             headers[k] = str(v)
+        # Goal 2: nonce unik agar CDN tidak melayani salinan cache
+        if self.piercer.enabled:
+            url, _gb_nonce = self.piercer.decorate(url)
+            for _hk, _hv in cachebuster_mod.NO_CACHE_HEADERS.items():
+                headers.setdefault(_hk, _hv)
         timeout = req.get("timeout_ms", 1000) / 1000.0
         t0 = time.time()
         resp = self.transport.request(
@@ -288,6 +297,11 @@ class LoadEngine:
             body=req.get("body"), body_encoding=req.get("body_encoding") or "identity",
             connect_ip=self.connect_ip, timeout=timeout)
         dt = time.time() - t0
+        if self.piercer.enabled:
+            try:
+                self.piercer.observe(getattr(resp, "headers", None) or {}, url=url)
+            except Exception:
+                pass
 
         hard = soft = 0
         specs = req.get("assertions") or []
@@ -392,4 +406,5 @@ class LoadEngine:
         return {"started_at": now_iso(), "duration_actual": round(self.ended_at - self.started_at, 2),
                 "abort_reason": self.abort_reason,
                 "assert_hard_fail": self.assert_fail_hard,
-                "assert_soft_fail": self.assert_fail_soft}
+                "assert_soft_fail": self.assert_fail_soft,
+                "cache": self.piercer.stats()}

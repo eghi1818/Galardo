@@ -20,9 +20,10 @@ def main():
         sys.exit(2)
     url, rps, dur = sys.argv[1], float(sys.argv[2]), float(sys.argv[3])
     timeout_ms = int(sys.argv[4]) if len(sys.argv) > 4 else 4000
+    buster = not os.environ.get("GALARDO_NO_BUSTER")
 
     lock = threading.Lock()
-    stats = {"n": 0, "ok": 0, "e4": 0, "e5": 0, "to": 0, "ce": 0,
+    stats = {"n": 0, "ok": 0, "e4": 0, "e5": 0, "to": 0, "ce": 0, "ch": 0,
              "lat": [], "bytes": 0, "codes": {}}
     stop = threading.Event()
 
@@ -51,16 +52,25 @@ def main():
         while not stop.is_set():
             if not bucket.take():
                 break
-            req = urllib.request.Request(url, headers={
-                "User-Agent": "galardo-stepload/1.0 (authorized capacity test)",
-                "Accept": "*/*", "Connection": "close"})
+            u = url
+            hdrs = {"User-Agent": "galardo-stepload/1.0 (authorized capacity test)",
+                    "Accept": "*/*", "Connection": "close"}
+            if buster:
+                u, _n = cb.decorate(url)
+                hdrs.update(cb.NO_CACHE_HEADERS)
+            req = urllib.request.Request(u, headers=hdrs)
             t0 = time.time()
             code = err = None
+            cache_hit = False
             try:
                 with urllib.request.urlopen(req, timeout=timeout_ms / 1000.0, context=ctx) as r:
                     b = r.read(32768)
                     code = r.status
                     rb = len(b)
+                    try:
+                        cache_hit = not cb.pierce_ok(dict(r.headers))
+                    except Exception:
+                        cache_hit = False
             except urllib.error.HTTPError as e:
                 code = e.code
                 rb = 0
@@ -85,6 +95,8 @@ def main():
                     else:
                         stats["e5"] += 1
                 stats["lat"].append(dt)
+                if cache_hit:
+                    stats["ch"] += 1
 
     threads = [threading.Thread(target=worker, daemon=True) for _ in range(min(max(8, int(rps)), 256))]
     t0 = time.time()
@@ -115,6 +127,7 @@ def main():
             "requests": stats["n"], "actual_rps": round(stats["n"] / el, 2),
             "ok": stats["ok"], "err_4xx": stats["e4"], "err_5xx": stats["e5"],
             "timeouts": stats["to"], "conn_errors": stats["ce"],
+            "cache_buster": buster, "cache_hits": stats["ch"],
             "status_codes": stats["codes"],
             "p50_ms": pct(50), "p95_ms": pct(95), "p99_ms": pct(99),
             "bandwidth_kbps": round(stats["bytes"] * 8 / el / 1024, 1),

@@ -19,7 +19,7 @@ MAX_YAML_BYTES = 65536
 MAX_DEPTH = 12
 ALLOWED_METHODS = {"GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"}
 TOP_LEVEL = {"schema_version", "name", "description", "target_ref", "profile",
-             "requests", "think_time_ms", "identity_sim", "keep_alive"}
+             "requests", "think_time_ms", "identity_sim", "keep_alive", "cache_buster"}
 PROFILE_FIELDS = {"duration_seconds", "virtual_users", "max_rps", "max_concurrency", "ramp"}
 REQUEST_FIELDS = {"name", "method", "path", "weight", "timeout_ms", "headers", "query",
                  "body", "body_encoding", "assertions"}
@@ -73,6 +73,11 @@ def parse_scenario_yaml(yaml_text, targets_by_name):
                               "message": f"Nesting exceeds {MAX_DEPTH} levels"}])
 
     _reject_unknown(set(doc.keys()), TOP_LEVEL, "", errors)
+
+    cb_on = doc.get("cache_buster")
+    if cb_on is not None and not isinstance(cb_on, bool):
+        errors.append({"field": "cache_buster", "code": "invalid",
+                       "message": "cache_buster must be a boolean"})
 
     schema_version = doc.get("schema_version")
     if schema_version not in ("1.0", "1.1", "1.2"):
@@ -248,6 +253,8 @@ def parse_scenario_yaml(yaml_text, targets_by_name):
                            "message": "keep_alive must be a boolean"})
         else:
             normalized["keep_alive"] = ka
+    # cache_buster (Goal 2): default ON. false hanya untuk pembanding.
+    normalized["cache_buster"] = True if cb_on is None else bool(cb_on)
     if schema_version in ("1.1", "1.2") and (identity_spec or {}).get("enabled"):
         import identity_sim as _isim
         _ok, _e, inorm = _isim.validate_identity_spec(identity_spec)

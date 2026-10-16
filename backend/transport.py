@@ -34,7 +34,7 @@ __all__ = [
 
 DEFAULT_USER_AGENT = "Galardo/1.0"
 DEFAULT_TIMEOUT = 15.0
-SUPPORTED_ENCODINGS = ("identity", "gzip", "base64", "base64+gzip")
+SUPPORTED_ENCODINGS = ("residential", "identity", "gzip", "base64", "base64+gzip")
 
 class TransportError(Exception):
     """The request could not be completed at the socket level."""

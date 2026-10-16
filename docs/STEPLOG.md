@@ -55,5 +55,6 @@
 | 50 | proxy_pool di TOP_LEVEL + validasi + 2 tes (pintu probe residential) | lihat HASIL-50 |
 | 51 | proxy_pool mengalir ke dokumen ternormalisasi + verifier | lihat HASIL-51 |
 | 52 | verifier proxy_pool: targets_by_name + cek ketat | lihat HASIL-52 |
+| 53 | registry sumber: buka kapabilitas residential | lihat HASIL-53 |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

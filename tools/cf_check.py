@@ -16,13 +16,23 @@ API = "https://api.cloudflare.com/client/v4"
 WRITE = "--write" in sys.argv
 OK = True
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "backend"))
+try:
+    import netssl
+except Exception:
+    netssl = None
+
+
+def _ctx():
+    return netssl.context() if netssl else None
+
 
 def call(method, path, token, body=None):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(API + path, data=data, method=method, headers={
         "Authorization": "Bearer %s" % token, "Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=25) as r:
+        with urllib.request.urlopen(req, timeout=25, context=_ctx()) as r:
             return r.status, json.loads(r.read() or b"{}")
     except urllib.error.HTTPError as e:
         try:
@@ -39,7 +49,7 @@ def doh_txt(name):
     req = urllib.request.Request("https://cloudflare-dns.com/dns-query?" + q,
                                  headers={"Accept": "application/dns-json"})
     try:
-        with urllib.request.urlopen(req, timeout=10) as r:
+        with urllib.request.urlopen(req, timeout=10, context=_ctx()) as r:
             ans = json.loads(r.read() or b"{}").get("Answer") or []
             return [a.get("data", "").strip('"') for a in ans if a.get("type") == 16]
     except Exception:

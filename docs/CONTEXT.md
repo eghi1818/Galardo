@@ -63,3 +63,9 @@ git reset --hard checkpoint/galardo-v1.1-mulai
 - T3 baru berfungsi kalau zone berstatus `active`; `pending` = API jalan, edge belum
 - Target pihak ketiga (zone bukan milik kita) -> hanya T1/T2 yang berlaku
 - Alat periksa: tools/cf_check.py  (tambah --write untuk uji tulis DNS)
+
+## TLS / CA (macOS)
+- Python CLT bisa gagal verifikasi HTTPS -> jalur probe out-of-band mati diam-diam
+- Perbaikan: SSL_CERT_FILE di .env + backend/netssl.py (pemilih CA + konteks)
+- Diagnosis cepat: python3 -c "import sys;sys.path.insert(0,'backend');import netssl;print(netssl.verify_probe())"
+- Semua modul yang pakai HTTPS ke luar WAJIB pakai netssl.context()

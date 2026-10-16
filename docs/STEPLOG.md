@@ -1,0 +1,21 @@
+# STEPLOG — riwayat langkah
+
+| STEP | Isi | Hasil |
+|---|---|---|
+| 01 | fix 2 FAIL verifikasi trust | 39/0 hijau |
+| 02 | commit + intel Makefile | hijau |
+| 03 | push + tarik dokumen rencana | hijau |
+| 04 | lacak W4 + siapkan ownership | hijau |
+| 05 | inventaris + lacak REA | hijau |
+| 06 | amankan + kirim file | hijau |
+| 07 | Fase A patch 1: ownership_ladder.py | 27/0 hijau |
+| 08 | alat bundel + docs/HANDOFF.md | hijau |
+| 09 | audit lokasi + fix bundle (zsh) | hijau |
+| 10 | adopsi .git ke path kanonik | hijau (10B lanjutan) |
+| 10B | selesaikan adopsi + arsip folder lama | hijau |
+| 11 | Fase A patch 2: endpoint tangga di api.py | 18/0 hijau |
+| 12 | disiplin git 4 lapis + hook auto-push | hijau |
+| 13 | cache buster + deteksi cache HIT | 36/0 hijau |
+| 14 | handoff darurat + wiring cache buster | lihat HASIL-14 |
+
+Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

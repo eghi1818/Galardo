@@ -1,0 +1,18 @@
+#!/bin/bash
+# Cetak blok onboarding untuk chat baru. Copy seluruh output ke chat.
+REPO="/Users/eghi/Documents/REPO/Galardo/Galardo-main"
+cd "$REPO" || exit 1
+echo "=========== BLOK ONBOARD (tempel ke chat baru) ==========="
+echo "Proyek: Galardo - dashboard load-testing aktif, Python 3.9 stdlib."
+echo "Repo kanonik: $REPO"
+echo "Remote: $(git config --get remote.origin.url)"
+echo "HEAD: $(git log --oneline -1)"
+echo "Branch: $(git rev-parse --abbrev-ref HEAD) | ahead: $(git rev-list --count origin/main..HEAD 2>/dev/null)"
+echo "Titik aman: checkpoint/galardo-v1.1-mulai"
+echo "Tes acuan: make test 59/59 | trust 39/39 | ownership_ladder 27/27 | ladder API 18/18 | cachebuster 36/36"
+echo "Baca dulu: docs/HANDOFF.md, docs/EMERGENCY.md, docs/CONTEXT.md, docs/STEPLOG.md, docs/ROADMAP.md"
+echo "Aturan: satu STEP = satu patch = satu verifikasi = satu commit; uji merah = jangan commit;"
+echo "        file belum dibaca = jangan disentuh; output STEP ke .out/; push otomatis via hook."
+echo "Tugas berikutnya: lihat bagian 8 docs/HANDOFF.md"
+echo "Perintah pertama yang diminta: bash tools/step_guard.sh && bash tools/git_discipline.sh"
+echo "=========================================================="

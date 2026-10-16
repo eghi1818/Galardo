@@ -5,6 +5,7 @@ Usage: step_load.py <url> <rps> <duration_sec> [timeout_ms]
 Designed for authorized capacity testing of owner-controlled targets.
 Exact RPS via token bucket; progress + interim metrics every 5s.
 """
+import os
 import json
 import socket
 import ssl
@@ -13,6 +14,9 @@ import threading
 import time
 import urllib.error
 import urllib.request
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import cachebuster as cb  # noqa: E402
 
 def main():
     if len(sys.argv) < 4:

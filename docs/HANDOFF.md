@@ -71,7 +71,7 @@ P1 - Universalitas
   5. [SELESAI STEP-48] T3 end-to-end di koler.space: Worker + route, buktikan 404/blank
 
 P2 - Produk (yang dipakai manusia)
-  6. AUDIT DASHBOARD: folder dashboard/ BELUM PERNAH diperiksa - petakan isinya
+  6. [SELESAI STEP-56] AUDIT DASHBOARD: peta di docs/UI-API-GAP.md + docs/DASHBOARD-AUDIT.md
   7. Alur UI: target -> intel REA -> preflight -> playbook -> jalankan -> verdict
 
 P3 - Kesiapan produksi
@@ -85,6 +85,7 @@ P3 - Kesiapan produksi
 - Satu item P0 selesai -> baru naik ke P1.
 - Jangan buka lebih dari satu item sekaligus.
 - P0.1b (temuan STEP-55): backend/ownership_ladder.default_fetcher() masih urllib polos, bukan netssl.context(). DICATAT, belum dikerjakan.
+- F-2..F-4 (temuan STEP-56): /admin/secret & /healthz tanpa handler; tanpa CSP; CORS * + Bearer. DICATAT, belum dikerjakan.
 
 ## 8c. INVENTARIS LENGKAP
 Status per item (V/D/goals/dokumen/tier) ada di docs/INVENTARIS.md.

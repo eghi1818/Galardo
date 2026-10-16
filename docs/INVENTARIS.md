@@ -37,6 +37,7 @@ Legenda: SELESAI | SEBAGIAN | PENDING | PERLU-VERIFIKASI
 | Item 6/8/11/12 | SELESAI + teruji |
 | GOAL 2 observer tersambung | PENDING |
 | P1.4 kepemilikan dns_txt (rank 4) end-to-end | SELESAI | docs/HASIL-55.md + tools/verify_ownership_rung1.py |
+| Item 6 audit dashboard | SELESAI | docs/UI-API-GAP.md (v4) + docs/DASHBOARD-AUDIT.md |
 | GOAL 3 T1/T2 | SELESAI + teruji |
 
 ## D. Dokumen kontradiktif (belum tersentuh)
@@ -62,3 +63,6 @@ T1 SEBAGIAN (Ed25519 selesai; RBAC+MFA, backup, Docker pending) | T2-T4 PENDING
 |---|---|---|
 | P0.1b | backend/ownership_ladder.default_fetcher() masih urllib.request.urlopen polos, bukan netssl.context() (temuan STEP-55) | BELUM |
 | F-1 | tests_integration.py:275 flaky: job degrade memakai Idempotency-Key tetap (test-job-degrade-1); bila data/state.json masih menyimpan job lama, POST /start balas 409. Lolos 61/61 pada 2 ulang berturut. Bukan regresi STEP-55. | TERBUKA |
+| F-2 | UI memanggil GET /admin/secret & GET /healthz, handler belum ada (STEP-56) | TERBUKA |
+| F-3 | Tidak ada Content-Security-Policy pada respons API/dashboard (STEP-56) | TERBUKA |
+| F-4 | CORS "*" digabung Bearer token (STEP-56) | TERBUKA |

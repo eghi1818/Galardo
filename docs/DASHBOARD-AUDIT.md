@@ -1,24 +1,23 @@
-# AUDIT DASHBOARD — catatan awal
+# AUDIT DASHBOARD
 
-Dibuat otomatis STEP-37. Isi: struktur, jumlah file, entry point.
+Status: SELESAI (STEP-56). Peta lengkap: `docs/UI-API-GAP.md` (v4, STEP-45).
 
-## Struktur
-```
-dashboard/index.html
-```
+## Fakta dasar
+- Satu file: `dashboard/index.html` (1205 baris, ~78KB, HTML+CSS+JS inline, tanpa build step).
+- Disajikan `backend/api.py` lewat `_static` (`DASH_DIR` baris 30; handler 301-352; traversal diblokir).
+- Hanya 1 commit menyentuh folder ini. Tanpa aset eksternal/CDN.
 
-## Jumlah per ekstensi
-```
-   1 html
-```
+## Permukaan API
+- `docs/UI-API-GAP.md` v4: 25 path dipanggil UI, 57 route backend, 23 cocok.
+- UI memanggil 2 path tanpa handler backend: `GET /admin/secret`, `GET /healthz`.
 
-## Disajikan oleh
-```
-1:"""GALARDO - REST API + dashboard static server (stdlib only, ThreadingHTTPServer).
-30:DASH_DIR = os.path.normpath(os.path.join(BASE, "..", "dashboard"))
-301:    def _static(self, path):
-305:        root = os.path.normpath(DASH_DIR)
-309:        if not fp.startswith(DASH_DIR) or not os.path.isfile(fp):
-352:                return self._static(path)
-1298:    print(f"[galardo-api] listening on http://{host}:{port}  (dashboard: http://{host}:{port}/)")
-```
+## Model keamanan
+- Auth: Bearer `DEV_TOKEN` (default `dev-token`, env `GALARDO_DEV_TOKEN`) - `backend/api.py:31`, cek 183-191.
+- CORS `*`, mengizinkan header `Authorization` + `Idempotency-Key` (baris 165-167).
+- Belum ada `Content-Security-Policy`.
+- Banyak `innerHTML`; ada helper `esc()` - kelengkapannya belum diaudit.
+
+## Temuan (belum dikerjakan)
+- F-2: UI memanggil `/admin/secret` + `/healthz` yang belum ada handler-nya.
+- F-3: tidak ada CSP.
+- F-4: CORS `*` digabung Bearer token.

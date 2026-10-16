@@ -30,5 +30,6 @@
 | 25 | fix netssl + _opener + persona + roadmap berjenjang |
 | 26 | P0.1 migrasi semua modul HTTPS ke netssl | lihat HASIL-26 |
 | 27 | persona final + docs/INVENTARIS.md + verifikasi defect | lihat HASIL-27 |
+| 28 | defect D5-D14 terverifikasi selesai + intel auto-knee | lihat HASIL-28 |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

@@ -42,3 +42,10 @@ Kalau dokumen bertentangan dengan kode, KODE yang benar. Laporkan, jangan ikuti 
 ## 8. Yang dilampirkan saat sesi baru
 Hanya: docs/ONBOARDING_PROMPT.txt + docs/SESSION_STATE.md + output tools/resume.sh.
 HASIL-xx.md hanya dilampirkan kalau STEP terakhir GAGAL.
+
+## 9. Konvensi bukti (HASIL-xx)
+- SATU tempat saja: docs/HASIL-xx.md. Tidak ada mirror ke .out/.
+- Alasan: .out/ di-ignore git - file di sana tidak ikut ter-commit dan bisa hilang.
+- docs/ sudah jadi rumah dokumen sejenis (T3-RUN.md, E2E-RUN.md, CF-EDGE-SETUP.md).
+- .out/ dipakai untuk: log mentah terminal, backup, file sementara.
+- Nama file: docs/HASIL-<nomor STEP>.md

@@ -54,3 +54,12 @@ git reset --hard checkpoint/galardo-v1.1-mulai
 - STEP tidak dihitung SELESAI sebelum audit lolos
 - Push gagal -> STOP, lapor, jangan lanjut
 - Repo hasil clone ulang: jalankan `git config core.hooksPath .githooks`
+
+## Cloudflare (T3) — status
+- Token `galardo-edge`: All zones (Zone:Read, Workers Routes:Edit, DNS:Edit) +
+  Account (Workers Scripts:Edit). Value tidak berubah saat permission diubah.
+- Token disimpan di .env sebagai GALARDO_CF_TOKEN (.env ter-ignore git)
+- Zone yang ada: koler.space saja (domain kosong, dipakai sebagai zona latihan T3)
+- T3 baru berfungsi kalau zone berstatus `active`; `pending` = API jalan, edge belum
+- Target pihak ketiga (zone bukan milik kita) -> hanya T1/T2 yang berlaku
+- Alat periksa: tools/cf_check.py  (tambah --write untuk uji tulis DNS)

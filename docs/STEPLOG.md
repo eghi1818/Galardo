@@ -39,5 +39,8 @@
 | 34 | kalibrasi delta plateau untuk ramp thread sublinear |
 | 35 | TTL cache knee + biaya probe lebih murah |
 | 36 | pagar anggaran waktu knee + peringatan preflight lambat | lihat HASIL-36 |
+| 37 | audit dashboard/ - ternyata SUDAH ADA (index.html 1205 baris) |
+| 38 | cache knee per origin |
+| 39 | check knee wajib PASS + probe tidak mengganggu baseline |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

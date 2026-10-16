@@ -104,6 +104,35 @@ if ok_import:
     check("D GALARDO_KNEE=0 mematikan", orch._knee_enabled() is False, orch._knee_enabled())
     os.environ.pop("GALARDO_KNEE")
 
+    print("== E3. pakai path probe_contract target ==")
+    os.environ["GALARDO_KNEE_STEPS"] = "2,4"
+    os.environ["GALARDO_KNEE_STEP_SEC"] = "0.5"
+    os.environ["GALARDO_KNEE_SETTLE"] = "0"
+    orch._KNEE_CACHE.clear()
+    est5, _r5, raw5 = orch._knee_stage(
+        "job-pc", {"canonical_origin": ORIGIN,
+                   "probe_contract": {"url": ORIGIN + "/healthz"}})
+    check("E3 tetap menghasilkan estimate", est5 is not None, est5)
+    check("E3 url probe memakai path target", raw5.get("url", "").endswith("/healthz"),
+          raw5.get("url"))
+    orch._KNEE_CACHE.clear()
+    os.environ.pop("GALARDO_KNEE_SETTLE")
+
+    print("== E2. cache per origin ==")
+    os.environ["GALARDO_KNEE_STEPS"] = "2,4,8"
+    os.environ["GALARDO_KNEE_STEP_SEC"] = "1.0"
+    orch._KNEE_CACHE.clear()
+    t0 = time.time()
+    orch._knee_stage("job-a", {"canonical_origin": ORIGIN})
+    t_first = time.time() - t0
+    t0 = time.time()
+    _e, _r, raw_c = orch._knee_stage("job-b", {"canonical_origin": ORIGIN})
+    t_second = time.time() - t0
+    check("E2 panggilan pertama mengukur", t_first > 2.0, round(t_first, 2))
+    check("E2 panggilan kedua pakai cache", raw_c.get("cached") is True, raw_c)
+    check("E2 panggilan kedua jauh lebih cepat", t_second < 0.5, round(t_second, 2))
+    orch._KNEE_CACHE.clear()
+
     print("== E. pagar anggaran waktu ==")
     os.environ["GALARDO_KNEE_STEPS"] = "2,4,8,16"
     os.environ["GALARDO_KNEE_STEP_SEC"] = "5"

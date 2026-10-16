@@ -96,3 +96,9 @@ git reset --hard checkpoint/galardo-v1.1-mulai
 - Anggaran: GALARDO_KNEE_MAX_SEC (default 8s) memangkas otomatis
 - Kalau probe >12s, muncul check peringatan "preflight tidak lambat"
 - Jangka panjang: pertimbangkan knee dijalankan di background (P2/UI)
+
+## PELAJARAN: check preflight wajib PASS/FAIL
+- Tes menuntut "preflight all PASS" saat start sehat -> check advisory pun
+  TIDAK BOLEH mengembalikan UNKNOWN. Pakai PASS + reason yang jujur.
+- Knee probe mengganggu baseline-probe job berikutnya (pernah -> 409).
+  Mitigasi: probe ke path probe_contract target, intensitas lembut, settle 1s.

@@ -18,6 +18,11 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import cachebuster as cb  # noqa: E402
 
+try:
+    from . import netssl as _ns
+except ImportError:
+    import netssl as _ns
+
 def main():
     if len(sys.argv) < 4:
         print("usage: step_load.py <url> <rps> <duration_sec> [timeout_ms]")
@@ -52,7 +57,7 @@ def main():
     bucket = TokenBucket(rps)
 
     def worker():
-        ctx = ssl.create_default_context()
+        ctx = _ns.context()
         while not stop.is_set():
             if not bucket.take():
                 break

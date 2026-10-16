@@ -22,6 +22,11 @@ import urllib.request
 from util import now_iso
 
 try:
+    from . import netssl as _ns
+except ImportError:
+    import netssl as _ns
+
+try:
     from . import assertions as assertions_mod
     from . import transport as transport_mod
     from . import cachebuster as cachebuster_mod
@@ -34,7 +39,7 @@ except ImportError:
 ssl_ctx = None
 try:
     import ssl
-    ssl_ctx = ssl.create_default_context()
+    ssl_ctx = _ns.context()
     ssl_ctx.check_hostname = False
     ssl_ctx.verify_mode = ssl.CERT_NONE
 except Exception:

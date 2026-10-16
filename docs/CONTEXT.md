@@ -76,3 +76,9 @@ git reset --hard checkpoint/galardo-v1.1-mulai
 - SEMUA modul HTTPS ke luar WAJIB pakai backend/netssl.context().
 - Diagnosis: python3 tools/tls_doctor.py   (jangan menilai dari HTTPError)
 - SSL_CERT_FILE di .env + tools/ca_env.sh sebagai jalur cepat
+
+## netssl — cakupan (P0.1 SELESAI)
+- SEMUA modul HTTPS memakai backend/netssl.context(): external_probe, engine,
+  observer, routeoverride, safety, srccap, step_load, transport
+- Tidak boleh ada ssl.create_default_context() baru di backend/ (kecuali netssl.py)
+- Alat migrasi: tools/migrate_netssl.py (punya --dry-run)

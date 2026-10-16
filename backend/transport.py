@@ -21,6 +21,11 @@ import threading
 import time
 from urllib.parse import urljoin, urlsplit
 
+try:
+    from . import netssl as _ns
+except ImportError:
+    import netssl as _ns
+
 __all__ = [
     "TransportError", "Response", "ConnectionPool", "Transport",
     "ConnectToIPHTTPConnection", "ConnectToIPHTTPSConnection",
@@ -277,7 +282,7 @@ class Transport(object):
         self.proxy = proxy
         self.max_body_bytes = max_body_bytes
         self.verify_tls = verify_tls
-        self._context = ssl.create_default_context()
+        self._context = _ns.context()
         if not verify_tls:
             self._context.check_hostname = False
             self._context.verify_mode = ssl.CERT_NONE

@@ -30,6 +30,11 @@ from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, quote
 
+try:
+    from . import netssl as _ns
+except ImportError:
+    import netssl as _ns
+
 OVERRIDE_HEADER = "X-Galardo-Override"
 
 try:
@@ -494,7 +499,7 @@ def _resolve_a(name, server="1.1.1.1", timeout=3.0):
 def _edge_probe_via(host, ip, path, timeout=10.0):
     """HTTPS langsung ke IP dengan SNI/Host = hostname asli."""
     t0 = time.time()
-    ctx = ssl.create_default_context()
+    ctx = _ns.context()
     try:
         raw = socket.create_connection((ip, 443), timeout=timeout)
         ss = ctx.wrap_socket(raw, server_hostname=host)

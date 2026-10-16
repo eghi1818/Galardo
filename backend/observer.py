@@ -22,6 +22,11 @@ from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 
+try:
+    from . import netssl as _ns
+except ImportError:
+    import netssl as _ns
+
 BASE = "https://check-host.net"
 START_PATH = "/check-http"
 RESULT_PATH = "/check-result/"
@@ -127,9 +132,9 @@ class ObserverClient:
     # ------------------------------------------------------------------
     def _get(self, url, timeout):
         last = None
-        attempts = [("verified", ssl.create_default_context())]
+        attempts = [("verified", _ns.context())]
         if True:
-            attempts.append(("unverified", ssl._create_unverified_context()))
+            attempts.append(("unverified", _ns.context(verify=False)))
         for mode, ctx in attempts:
             try:
                 opener = urlrequest.build_opener(urlrequest.HTTPSHandler(context=ctx))

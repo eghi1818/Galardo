@@ -25,6 +25,11 @@ from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 
+try:
+    from . import netssl as _ns
+except ImportError:
+    import netssl as _ns
+
 # Kapabilitas yang HANYA boleh diubah oleh probe_egress. Yang lain
 # (udp, spoof_src, redirects, ...) dibuktikan prober terpisah dan tidak
 # boleh terhapus saat probe HTTP dijalankan ulang.
@@ -113,7 +118,7 @@ def _probe_tls(host, port, version_name, timeout=8.0):
     ver = getattr(ssl.TLSVersion, version_name, None)
     if ver is None:
         return {"ok": None, "reason": "enum_tidak_ada", "lib": lib}
-    ctx = ssl.create_default_context()
+    ctx = _ns.context()
     try:
         ctx.minimum_version = ver
         ctx.maximum_version = ver

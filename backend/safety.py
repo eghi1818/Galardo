@@ -17,10 +17,15 @@ import urllib.request
 import db
 from util import now_iso, now_ts
 
+try:
+    from . import netssl as _ns
+except ImportError:
+    import netssl as _ns
+
 ssl_ctx = None
 try:
     import ssl
-    ssl_ctx = ssl.create_default_context()
+    ssl_ctx = _ns.context()
     ssl_ctx.check_hostname = False
     ssl_ctx.verify_mode = ssl.CERT_NONE
 except Exception:

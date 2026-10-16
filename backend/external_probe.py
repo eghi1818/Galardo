@@ -87,6 +87,11 @@ try:
 except ImportError:
     import cachebuster as _cb
 
+try:
+    from . import layer_attrib as _la
+except ImportError:
+    import layer_attrib as _la
+
 
 def cache_buster_token():
     with _BC_LOCK:
@@ -105,8 +110,8 @@ def cache_buster_path(url, token=None):
     return decorated
 
 
-def probe_http(url, timeout=1.5, expected_status=(200,), tls_verify=True,
-               method="GET", headers=None):
+def probe_http_raw(url, timeout=1.5, expected_status=(200,), tls_verify=True,
+                   method="GET", headers=None):
     """Single out-of-band HTTP sample. Returns a result dict, never raises."""
     exp = _as_status_set(expected_status)
     t0 = time.time()
@@ -151,6 +156,53 @@ def probe_http(url, timeout=1.5, expected_status=(200,), tls_verify=True,
         return _res(False, FAILURE_CRASH, None, (time.time() - t0) * 1000.0, str(e)[:200], url)
 
 
+def attribute(result, cdn=None, control_ok=True):
+    """Lampirkan atribusi lapisan (dns/edge/origin/app/ours) pada hasil probe.
+
+    Vonis "DOWN" tanpa lapisan itu menyesatkan: DNS mati, edge mati, origin mati,
+    dan aplikasi error butuh tindakan berbeda.
+    """
+    r = dict(result or {})
+    if r.get("ok"):
+        r["layer"] = "healthy"
+        return r
+    reason = r.get("reason")
+    obs = {}
+    if reason == FAILURE_DNS:
+        obs["dns"] = {"ok": False, "rcode": "GAIERROR"}
+    elif reason == FAILURE_TIMEOUT:
+        obs["http"] = {"ok": False, "error": r.get("error") or "timed out"}
+    elif reason == FAILURE_CONN:
+        obs["tcp"] = {"ok": False, "error": r.get("error") or "connection failed"}
+    elif reason == FAILURE_TLS:
+        obs["tls"] = {"ok": False, "error": r.get("error") or "tls failed"}
+    elif reason == FAILURE_HTTP:
+        obs["http"] = {"ok": False, "status": r.get("status")}
+    else:
+        obs["http"] = {"ok": False, "error": r.get("error") or str(reason)}
+    if cdn:
+        obs["cdn"] = cdn
+    try:
+        res = _la.classify(obs, control_ok=control_ok)
+    except Exception as e:
+        res = {"layer": "unknown", "reason": "atribusi gagal: %s" % e,
+               "confidence": "low", "tier_hint": "", "evidence": {}}
+    r["layer"] = res.get("layer")
+    r["layer_reason"] = res.get("reason")
+    r["layer_confidence"] = res.get("confidence")
+    r["layer_hint"] = res.get("tier_hint")
+    return r
+
+
+def probe_http(url, timeout=1.5, expected_status=(200,), tls_verify=True,
+               method="GET", headers=None):
+    """probe_http_raw + atribusi lapisan pada hasilnya."""
+    return attribute(probe_http_raw(url, timeout=timeout,
+                                    expected_status=expected_status,
+                                    tls_verify=tls_verify, method=method,
+                                    headers=headers))
+
+
 def probe_tcp(host, port, timeout=1.5):
     """L4 reachability sample (does not prove the app answered)."""
     t0 = time.time()
@@ -193,6 +245,7 @@ class DownStateMachine:
         self.transitions = []
         self.last_reason = ""
         self.last_failure_reason = None
+        self.last_layer = None
 
     def _to(self, new, reason):
         old = self.state
@@ -221,9 +274,11 @@ class DownStateMachine:
                 pass
         return ev
 
-    def on_sample(self, ok, reason=""):
+    def on_sample(self, ok, reason="", layer=None):
         now = self.clock()
         self.last_reason = reason or ""
+        if layer:
+            self.last_layer = layer
         if not ok:
             self.ok_streak = 0
             self.fail_streak += 1
@@ -269,6 +324,7 @@ class DownStateMachine:
             "recover_seconds": self.recover_seconds,
             "last_reason": self.last_reason,
             "last_failure_reason": self.last_failure_reason,
+            "last_layer": self.last_layer,
         }
 
     def verdict(self):
@@ -347,6 +403,7 @@ class ExternalProbe(threading.Thread):
                 "failures": errs,
                 "error_ratio_pct": round(100.0 * errs / total, 2) if total else 0.0,
                 "last_reason": last.get("reason"),
+                "last_layer": last.get("layer"),
                 "last_error": self.last_error,
                 "last_latency_ms": last.get("latency_ms"),
                 "p50_ms": _pct(lats, 50),
@@ -380,7 +437,7 @@ class DownWatcher:
             expected_status=expected_status, tls_verify=tls_verify,
             max_samples=max_samples, cache_buster=cache_buster,
             on_sample=lambda r: self.sm.on_sample(
-                r["ok"], r.get("error") or r.get("reason") or ""))
+                r["ok"], r.get("error") or r.get("reason") or "", r.get("layer")))
 
     def start(self):
         self.probe.start()

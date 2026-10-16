@@ -38,6 +38,18 @@ try:
 except Exception:
     pass
 
+try:
+    from . import cachebuster as _cb
+except ImportError:
+    import cachebuster as _cb
+
+
+def _busted_path(path):
+    """path + nonce kanonik (__gb) supaya edge/CDN tidak menyajikan salinan cache."""
+    u, _ = _cb.decorate("https://galardo.invalid" + path)
+    parts = urlsplit(u)
+    return parts.path + (("?" + parts.query) if parts.query else "")
+
 MODES = {
     "404":   {"status": 404, "body": b"", "reason": "Not Found"},
     "410":   {"status": 410, "body": b"", "reason": "Gone"},
@@ -841,7 +853,7 @@ class CloudflareEdgeOverride:
         retries = retries or self.verify_retries
         last = None
         for i in range(retries):
-            url = "https://%s%s?_gcb=%d" % (host, path, int(time.time() * 1000))
+            url = "https://%s%s" % (host, _busted_path(path))
             last = _edge_probe(url)
             if last.get("status") == expect_status and last.get("header") == mode:
                 last["attempts"] = i + 1
@@ -849,7 +861,7 @@ class CloudflareEdgeOverride:
             if last.get("error_kind") == "dns":
                 ips = _resolve_a(host)
                 for ip in ips[:2]:
-                    alt = _edge_probe_via(host, ip, path + "?_gcb=%d" % int(time.time() * 1000))
+                    alt = _edge_probe_via(host, ip, _busted_path(path))
                     if alt.get("status") == expect_status and alt.get("header") == mode:
                         alt["attempts"] = i + 1
                         alt["note"] = "resolver lokal basi; probe lewat 1.1.1.1 -> %s" % ip

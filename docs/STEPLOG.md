@@ -21,6 +21,7 @@
 | 16 | first-prompt ke repo + selaraskan dokumen | hijau |
 | 17 | ONBOARDING_PROMPT.md sumber tunggal | hijau |
 | 18 | atribusi lapisan verdict | 32/0 hijau |
-| 19 | satukan penanda cache buster ke __gb | lihat HASIL-19 |
+| 19 | satukan penanda cache buster ke __gb | 18/0 hijau |
+| 20 | bersihkan _gcb sisa + atribusi lapisan di probe | lihat HASIL-20 |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

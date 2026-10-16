@@ -85,5 +85,9 @@ P3 - Kesiapan produksi
 - Satu item P0 selesai -> baru naik ke P1.
 - Jangan buka lebih dari satu item sekaligus.
 
+## 8c. INVENTARIS LENGKAP
+Status per item (V/D/goals/dokumen/tier) ada di docs/INVENTARIS.md.
+CEK DULU sebelum mengerjakan apa pun, supaya tidak overlap.
+
 ## 9. DONE RINGKAS (jangan dikerjakan ulang)
 STEP 01-15 selesai. Rincian: docs/STEPLOG.md

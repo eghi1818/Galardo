@@ -21,9 +21,12 @@ Tag sudah di-push. Cek: `git tag -l 'checkpoint/*'`
 7. Push gagal = STOP, lapor.
 
 ## 3. STATUS (lihat juga docs/STEPLOG.md)
-- STEP terakhir selesai: STEP-13 (cache buster, 36/36 hijau), commit d73878a
-- Sedang dikerjakan: STEP-14 (handoff + wiring cache buster ke engine/step_load)
-- Tes acuan: make test 59/59, trust 39/39, ownership_ladder 27/27, ladder API 18/18, cachebuster 36/36
+- STEP terakhir selesai: STEP-15 (fix import step_load + smoke test), commit 31d95d0
+- SELESAI juga: STEP-14 (handoff darurat + wiring cache buster ke engine/scenario/step_load)
+- Sedang dikerjakan: STEP-16 (first-prompt ke repo + selaraskan dokumen)
+- Tes acuan: make test 59/59, smoke OK, trust 39/39, ownership_ladder 27/27,
+  ladder API 18/18, cachebuster 36/36
+- Bukti hidup cache buster: 100/100 request membawa ?__gb=<nonce>; mode OFF = 0
 
 ## 4. PETA MODUL (backend/)
 - Inti: engine.py, step_load.py, transport.py, netdns.py, assertions.py, safety.py, scenario.py
@@ -53,11 +56,14 @@ Tag sudah di-push. Cek: `git tag -l 'checkpoint/*'`
 UI (dashboard/, templates/), proxy.py (TIDAK ADA - transport.py sudah punya proxy),
 ekor backup chat, dokumen REA lanjutan, isi 14 poin list kendala per-item.
 
-## 8. PENDING BERIKUTNYA
-1. STEP-15: auto-knee sebelum spike (ukur plafon dulu)
+## 8. PENDING BERIKUTNYA (urut, jangan dilompati)
+1. Auto-knee sebelum spike (ukur plafon dulu) -> butuh tools/galardo_capacity.py
 2. Probe multi-jalur + kesiapan residential (field proxy_pool)
 3. Atribusi lapisan verdict: DNS / edge / origin / app
 4. Satukan GALARDO_LOCAL_DEV ke tangga kepemilikan
 5. Tier 1 sisa: RBAC+MFA, backup otomatis, Docker Compose
 6. Tier 2-4: Postgres, NATS, OTel, alerting
 7. Run end-to-end nyata pasca perubahan Tier 1 + Fase A
+
+## 9. DONE RINGKAS (jangan dikerjakan ulang)
+STEP 01-15 selesai. Rincian: docs/STEPLOG.md

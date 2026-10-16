@@ -16,6 +16,8 @@
 | 11 | Fase A patch 2: endpoint tangga di api.py | 18/0 hijau |
 | 12 | disiplin git 4 lapis + hook auto-push | hijau |
 | 13 | cache buster + deteksi cache HIT | 36/0 hijau |
-| 14 | handoff darurat + wiring cache buster | lihat HASIL-14 |
+| 14 | handoff darurat + wiring cache buster | hijau (engine/scenario/step_load) |
+| 15 | fix import os step_load + smoke.sh | 59/0 + smoke OK |
+| 16 | first-prompt ke repo + selaraskan dokumen | lihat HASIL-16 |
 
 Acuan tes: make test 59/59. Titik aman: checkpoint/galardo-v1.1-mulai

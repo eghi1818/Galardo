@@ -67,3 +67,4 @@ T1 SEBAGIAN (Ed25519 selesai; RBAC+MFA, backup, Docker pending) | T2-T4 PENDING
 | F-3 | Tidak ada Content-Security-Policy pada respons API/dashboard (STEP-56) | TERBUKA |
 | F-4 | CORS "*" digabung Bearer token (STEP-56) | TERBUKA |
 | F-5 | UI tidak mengirim Authorization ke API - by design D14 (header absen = boleh) | BUKAN TEMUAN |
+| F-6 | Gate STEP-58 tidak memuat verifier & node --check, sehingga commit lolos membawa JS rusak (sudah diperbaiki STEP-58b) | TUTUP |

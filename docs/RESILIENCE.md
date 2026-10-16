@@ -49,3 +49,8 @@ HASIL-xx.md hanya dilampirkan kalau STEP terakhir GAGAL.
 - docs/ sudah jadi rumah dokumen sejenis (T3-RUN.md, E2E-RUN.md, CF-EDGE-SETUP.md).
 - .out/ dipakai untuk: log mentah terminal, backup, file sementara.
 - Nama file: docs/HASIL-<nomor STEP>.md
+
+## 10. Gate wajib sebelum commit
+- Setiap commit harus lulus: make test (0 failed), smoke, verifier terkait, dan node --check bila ada JS.
+- Exit code != 0 pada salah satu -> JANGAN commit.
+- Verifikasi dilakukan SEBELUM commit, bukan sesudah.

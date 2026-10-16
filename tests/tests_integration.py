@@ -126,6 +126,14 @@ def main():
     check("unknown field rejected (additionalProperties=false)", st == 422 and any(
         e["code"] == "unknown_field" for e in r["errors"]), str(r)[:200])
 
+    st, r = req("POST", "/scenarios/validate", {"yaml": FIX_WITH_PROXY})
+    check("proxy_pool diterima (jalur probe residential)",
+          st == 200 and r.get("valid") is True, str(r)[:200])
+
+    st, r = req("POST", "/scenarios/validate", {"yaml": FIX_BAD_PROXY})
+    check("proxy_pool bentuk salah ditolak", st == 422 and any(
+        e["code"] == "invalid_proxy_pool" for e in r["errors"]), str(r)[:200])
+
     st, r = req("POST", "/scenarios/validate", {"yaml": FIX_BAD_METHOD})
     st_b, r_b = req("POST", "/scenarios/validate", {"yaml": FIX_WITH_BODY})
     st_t, r_t = req("POST", "/scenarios/validate", {"yaml": FIX_UNKNOWN_METHOD})
@@ -477,7 +485,9 @@ FIX_OVER_LIMIT = FIX_VALID.replace("max_rps: 10", "max_rps: 99999").replace(
     "virtual_users: 4", "virtual_users: 5000").replace("duration_seconds: 8", "duration_seconds: 999999")
 FIX_BAD_PATH = FIX_VALID.replace('path: "/healthz"', 'path: "/admin/secret"')
 FIX_ABS_URL = FIX_VALID.replace('path: "/healthz"', 'path: "http://evil.example.com/x"')
-FIX_UNKNOWN_FIELD = FIX_VALID + "proxy_pool: 'residential'\n"
+FIX_UNKNOWN_FIELD = FIX_VALID + "field_ngawur_xyz: 1\n"
+FIX_WITH_PROXY = FIX_VALID + "proxy_pool: 'residential'\n"
+FIX_BAD_PROXY = FIX_VALID + "proxy_pool: 12345\n"
 FIX_BAD_METHOD = FIX_VALID.replace('method: "GET"', 'method: "POST"', 1)
 FIX_UNKNOWN_METHOD = FIX_VALID.replace('method: "GET"', 'method: "TRACE"', 1)
 FIX_WITH_BODY = """schema_version: "1.2"

@@ -18,7 +18,7 @@ from util import sha256_text, parse_origin
 MAX_YAML_BYTES = 65536
 MAX_DEPTH = 12
 ALLOWED_METHODS = {"GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"}
-TOP_LEVEL = {"schema_version", "name", "description", "target_ref", "profile",
+TOP_LEVEL = {"proxy_pool", "schema_version", "name", "description", "target_ref", "profile",
              "requests", "think_time_ms", "identity_sim", "keep_alive", "cache_buster"}
 PROFILE_FIELDS = {"duration_seconds", "virtual_users", "max_rps", "max_concurrency", "ramp"}
 REQUEST_FIELDS = {"name", "method", "path", "weight", "timeout_ms", "headers", "query",
@@ -73,6 +73,20 @@ def parse_scenario_yaml(yaml_text, targets_by_name):
                               "message": f"Nesting exceeds {MAX_DEPTH} levels"}])
 
     _reject_unknown(set(doc.keys()), TOP_LEVEL, "", errors)
+
+    pp = doc.get("proxy_pool")
+    if pp is not None:
+        if isinstance(pp, str):
+            if not pp.strip():
+                errors.append({"field": "proxy_pool", "code": "invalid_proxy_pool",
+                               "message": "proxy_pool must be a non-empty string"})
+        elif isinstance(pp, list):
+            if not pp or not all(isinstance(x, str) and x.strip() for x in pp):
+                errors.append({"field": "proxy_pool", "code": "invalid_proxy_pool",
+                               "message": "proxy_pool list must contain non-empty strings"})
+        else:
+            errors.append({"field": "proxy_pool", "code": "invalid_proxy_pool",
+                           "message": "proxy_pool must be a string or a list of strings"})
 
     cb_on = doc.get("cache_buster")
     if cb_on is not None and not isinstance(cb_on, bool):

@@ -45,7 +45,7 @@ def check(name, ok, detail=""):
     print(f"  [{'PASS' if ok else 'FAIL'}] {name}" + (f" — {detail}" if detail and not ok else ""))
 
 
-def req(method, path, body=None, headers=None, expect_json=True):
+def req(method, path, body=None, headers=None, expect_json=True, timeout=15):
     h = dict(headers or {})
     data = None
     if body is not None:
@@ -53,7 +53,7 @@ def req(method, path, body=None, headers=None, expect_json=True):
         h["Content-Type"] = "application/json"
     r = urllib.request.Request(API + path, data=data, method=method, headers=h)
     try:
-        with urllib.request.urlopen(r, timeout=15) as resp:
+        with urllib.request.urlopen(r, timeout=timeout) as resp:
             raw = resp.read()
             if expect_json:
                 return resp.status, (json.loads(raw) if raw else None)
@@ -69,6 +69,17 @@ def req(method, path, body=None, headers=None, expect_json=True):
 def target_req(path):
     with urllib.request.urlopen(TGT + path, timeout=5) as r:
         return r.status, json.loads(r.read())
+
+
+def start_job(job_id, tries=12, delay=0.4):
+    """POST /start dengan toleransi 409 (preflight async belum siap). F-1."""
+    st, r = None, None
+    for _ in range(tries):
+        st, r = req("POST", f"/test-jobs/{job_id}/start")
+        if st != 409:
+            return st, r
+        time.sleep(delay)
+    return st, r
 
 
 def wait_terminal(job_id, timeout=90):
@@ -164,7 +175,7 @@ def main():
     check("job from unapproved plan rejected", st == 422, f"{st} {r}")
 
     # ---- 5. bounded run end-to-end (COMPLETED path) ----
-    st, r = req("POST", f"/test-jobs/{job_a}/start")
+    st, r = start_job(job_a)
     check("start: preflight all PASS", st == 200 and r["started"] is True and all(
         c["result"] == "PASS" for c in r["preflight"]), str(r)[:400])
     snap = wait_terminal(job_a, 60)
@@ -415,7 +426,7 @@ def main():
     check("second source registered for udp test", st == 201 and sid2 == "src-it-udp",
           str(src2)[:160])
     st, up = req("POST", f"/sources/{sid2}/udp",
-                 {"qname": "isc.org", "timeout": 2.0, "ports_n": 2, "spoof": False})
+                 {"qname": "isc.org", "timeout": 2.0, "ports_n": 2, "spoof": False}, timeout=45)
     check("udp probe returns amplification shape",
           st == 200 and "best_amplification" in up and "reflection_capable" in up,
           str(up)[:200])

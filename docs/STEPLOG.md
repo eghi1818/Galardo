@@ -64,5 +64,6 @@
 | 58 | panel Ownership di dashboard (irisan 1/6 item 7) + verifier halaman + F-6 | lihat docs/HASIL-58.md |
 | 59 | panel Sources di dashboard (irisan 2/6 item 7) | lihat docs/HASIL-59.md |
 | 60 | kartu Bukti & observer di halaman live (irisan 3/6 item 7) + tutup F-1 | lihat docs/HASIL-60.md |
+| 60c | tutup F-1 dengan sebab akurat (toleransi 409 preflight) + F-7 timeout udp | lihat docs/HASIL-60c.md |
 
 Acuan tes: make test 61/61. Titik aman: checkpoint/galardo-v1.1-mulai

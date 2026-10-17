@@ -75,4 +75,4 @@
 | 68 | bus NATS opt-in (fail-open) + service nats di compose + verify_bus | lihat docs/HASIL-68.md |
 | 69 | alerting + F-9..F-12 (bus, _match list, bootstrap peran, _g1 rekursi) | lihat docs/HASIL-69.md |
 
-Acuan tes: make test 71/71. Titik aman: checkpoint/galardo-v1.1-mulai
+Acuan tes: make test 79/79. Titik aman: checkpoint/galardo-v1.1-mulai

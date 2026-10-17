@@ -11,6 +11,8 @@ import threading
 
 from util import now_iso, gen_id, sha256_text
 
+import db_pg  # adapter PostgreSQL (STEP-72); fail-open bila tidak dipakai
+
 LOCK = threading.RLock()
 BASE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get("GALARDO_DATA_DIR", os.path.join(BASE, "..", "data"))
@@ -26,12 +28,19 @@ _state_mtime = 0.0
 def _load():
     global _state, _state_mtime
     with LOCK:
+        if _state is None and _pg_mode():
+            st = db_pg.hydrate()
+            if st is not None:
+                _state = st
+                _state_mtime = float("inf")  # file JSON = cermin, bukan sumber
+                return _state
         # multi-process coherence: reload when another process wrote the file
         try:
             mtime = os.path.getmtime(DB_PATH) if os.path.exists(DB_PATH) else 0.0
         except OSError:
             mtime = 0.0
-        if _state is not None and mtime and mtime != _state_mtime and mtime > _state_mtime:
+        if (_state is not None and mtime and mtime != _state_mtime
+                and mtime > _state_mtime and _state_mtime != float("inf")):
             try:
                 with open(DB_PATH, "r", encoding="utf-8") as f:
                     _state = json.load(f)
@@ -57,7 +66,7 @@ def _save():
         json.dump(_state, f, indent=1, default=str)
     os.replace(tmp, DB_PATH)
     try:
-        _state_mtime = os.path.getmtime(DB_PATH)
+        _state_mtime = float("inf") if _pg_mode() else os.path.getmtime(DB_PATH)
     except OSError:
         pass
 
@@ -77,6 +86,8 @@ def insert(name, doc, actor="system", action=None, resource_type=None, reason=""
             audit_event(actor, action, resource_type or name, doc["id"], reason, correlation_id,
                         after_hash=sha256_text(json.dumps(doc, sort_keys=True, default=str)))
         _save()
+        if _pg_mode():
+            db_pg.put(name, doc["id"], doc)
         return doc
 
 
@@ -100,6 +111,8 @@ def update(name, doc_id, mutate, actor="system", action=None, resource_type=None
             audit_event(actor, action, resource_type or name, doc_id, reason, correlation_id,
                         before_hash=sha256_text(before), after_hash=sha256_text(after))
         _save()
+        if _pg_mode():
+            db_pg.put(name, doc["id"], doc)
         return doc
 
 
@@ -111,6 +124,8 @@ def delete(name, doc_id, actor="system", action=None, reason=""):
             if action:
                 audit_event(actor, action, name, doc_id, reason)
             _save()
+            if _pg_mode():
+                db_pg.drop(name, doc_id)
             return True
         return False
 
@@ -147,6 +162,8 @@ def audit_event(actor, action, resource_type, resource_id, reason="", correlatio
         c = col("audit_logs")
         c[ev["event_id"]] = ev
         _save()
+    if _pg_mode():
+        db_pg.audit(ev)
     return ev
 
 
@@ -166,4 +183,23 @@ def observation(job_id, source, severity, description, metric_snapshot=None, cor
         c = col("observations")
         c[obs["id"]] = obs
         _save()
+        if _pg_mode():
+            db_pg.put("observations", obs["id"], obs)
     return obs
+
+
+def _pg_mode():
+    """True bila adapter PG ada dan koneksinya hidup."""
+    return db_pg.active()
+
+
+def all(name, filt=None):
+    """Alias list() - dipakai backend/rbac.py:45."""
+    return list(name, filt)
+
+
+def backend():
+    """Status backend penyimpanan (untuk /health atau diagnosis)."""
+    st = db_pg.status()
+    st["mode"] = "postgres" if st.get("active") else "json"
+    return st

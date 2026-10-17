@@ -50,3 +50,9 @@ F-17 (P1) db_pg.status() melaporkan _ready/_reason apa adanya tanpa memicu konek
 Saat PG aktif, PostgreSQL = sumber kebenaran; file JSON = cermin. mtime file
 di-netralkan (float("inf")) supaya file tidak menimpa state PG. Multi-proses
 murni lewat file belum dijamin di mode PG (aplikasi ini satu proses server).
+
+## Catatan sinkronisasi (jujur)
+Commit 4c4c34a memuat kode + HASIL-72 + F-15/F-16/F-17, TETAPI skrip sinkron
+STEPLOG/SESSION_STATE/ROADMAP mati di tengah (NameError: re tidak diimpor), sehingga
+pesan commit sempat mengklaim 'sinkron' padahal belum. Disinkronkan di commit
+lanjutan (docs-only) pada step yang sama.

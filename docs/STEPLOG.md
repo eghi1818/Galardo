@@ -76,5 +76,6 @@
 | 69 | alerting + F-9..F-12 (bus, _match list, bootstrap peran, _g1 rekursi) | lihat docs/HASIL-69.md |
 | 70 | ekspor OTLP/HTTP JSON (metrics+span) + service otel-collector | lihat docs/HASIL-70.md |
 | 71 | klien PostgreSQL minimal (wire v3, scram/md5) + service pg + uji live + F-13/F-14 (terminator startup, SCRAM, vektor RFC 7677, F-1b anggaran retry) | lihat docs/HASIL-71.md |
+| 72 | adapter db -> PostgreSQL dengan fallback JSON (db_pg.py, cermin JSON, fail-open) + F-15/F-16/F-17 | lihat docs/HASIL-72.md |
 
-Acuan tes: make test 79/79. Titik aman: checkpoint/galardo-v1.1-mulai
+Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35. Titik aman: checkpoint/galardo-v1.2-item9-tuntas

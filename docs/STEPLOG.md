@@ -74,4 +74,4 @@
 | 67 | Docker Compose + Dockerfile + verify_compose + dukungan GALARDO_BIND - ITEM 8 TUTUP | lihat docs/HASIL-67.md |
 | 68 | bus NATS opt-in (fail-open) + service nats di compose + verify_bus | lihat docs/HASIL-68.md |
 
-Acuan tes: make test 61/61. Titik aman: checkpoint/galardo-v1.1-mulai
+Acuan tes: make test 71/71. Titik aman: checkpoint/galardo-v1.1-mulai

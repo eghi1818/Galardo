@@ -54,3 +54,10 @@ HASIL-xx.md hanya dilampirkan kalau STEP terakhir GAGAL.
 - Setiap commit harus lulus: make test (0 failed), smoke, verifier terkait, dan node --check bila ada JS.
 - Exit code != 0 pada salah satu -> JANGAN commit.
 - Verifikasi dilakukan SEBELUM commit, bukan sesudah.
+
+## 11. Checklist pra-commit (wajib)
+- make test hijau, 0 failed, dan jumlahnya TIDAK TURUN
+- verifier terkait + smoke hijau
+- SESSION_STATE.md diperbarui: Tes (angka nyata), STEP terakhir, Item berikutnya, Eksekusi
+- STEPLOG.md bertambah satu baris + acuan tes disamakan
+- tidak ada temuan yang sudah ditutup masih dicantumkan sebagai terbuka

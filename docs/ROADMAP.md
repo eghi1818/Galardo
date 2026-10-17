@@ -94,7 +94,7 @@ dianggap "intrusi" diukur dari bukti, bukan dari daftar.
 | Item | Status |
 |---|---|
 | PostgreSQL backend | belum |
-| NATS aktif | belum |
+| NATS aktif | aktif opt-in (STEP-68) |
 | Distributed sharding | belum |
 | Per-worker telemetry merge | belum |
 

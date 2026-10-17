@@ -66,5 +66,6 @@
 | 60 | kartu Bukti & observer di halaman live (irisan 3/6 item 7) + tutup F-1 | lihat docs/HASIL-60.md |
 | 60c | tutup F-1 dengan sebab akurat (toleransi 409 preflight) + F-7 timeout udp | lihat docs/HASIL-60c.md |
 | 61 | halaman Overrides di dashboard (irisan 4/6 item 7) | lihat docs/HASIL-61.md |
+| 62 | editor probe-contract di tabel Targets (irisan 5/6 item 7) | lihat docs/HASIL-62.md |
 
 Acuan tes: make test 61/61. Titik aman: checkpoint/galardo-v1.1-mulai

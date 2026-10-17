@@ -507,7 +507,7 @@ RENDER.targets = async function(){
         <td class="mono note">${esc(t.probe_contract?.url||'—')}<br>exp ${esc(t.probe_contract?.expected_status)} · int ${esc(t.probe_contract?.interval_sec)}s</td>
         <td class="mono note">${esc(fmtTime(t.valid_from))} →<br>${esc(fmtTime(t.valid_until))}</td>
         <td>${badge(t.status)}</td>
-        <td>${t.status==='UNVERIFIED'?`<button class="btn small" onclick="verifyTarget('${t.id}')">Verify</button>`:''}</td></tr>`).join('')}
+        <td>${t.status==='UNVERIFIED'?`<button class="btn small" onclick="verifyTarget('${t.id}')">Verify</button>`:''} <button class="btn small" onclick="editContract('${t.id}')">Kontrak</button></td></tr>`).join('')}
       </tbody></table>`:'<div class="empty">Belum ada target</div>'}
     </div>
     <div class="card"><h3>Register Target</h3>
@@ -1530,6 +1530,58 @@ RENDER.overrides = async function(){
     + '</div>'
     + '<pre id="ovrOut" class="card">hasil aksi akan muncul di sini</pre>';
 };
+
+async function editContract(id){
+  let box = document.getElementById('contractBox');
+  if (!box){
+    $('#view').insertAdjacentHTML('beforeend', '<div id="contractBox" class="card"></div>');
+    box = document.getElementById('contractBox');
+  }
+  box.innerHTML = '<h3>Probe contract</h3><div class="note">memuat ...</div>';
+  let t = null;
+  try { t = await api('/targets/' + encodeURIComponent(id)); } catch(e){}
+  if (!t || !t.probe_contract){
+    try { const l = await api('/targets'); t = (l || []).find(function(x){return x.id === id;}) || t; } catch(e){}
+  }
+  const pc = (t && t.probe_contract) || {};
+  const v = function(x){ return (x === undefined || x === null) ? '' : String(x); };
+  box.innerHTML =
+      '<h3>Probe contract - ' + esc(id) + '</h3>'
+    + '<div class="grid g2">'
+    +   '<label>url<input id="pcUrl" value="' + esc(v(pc.url)) + '"></label>'
+    +   '<label>expected_status<input id="pcStatus" value="' + esc(v(pc.expected_status)) + '"></label>'
+    +   '<label>interval_sec<input id="pcInt" value="' + esc(v(pc.interval_sec)) + '"></label>'
+    +   '<label>timeout_sec<input id="pcTo" value="' + esc(v(pc.timeout_sec)) + '"></label>'
+    +   '<label>failure_threshold<input id="pcFt" value="' + esc(v(pc.failure_threshold)) + '"></label>'
+    + '</div>'
+    + '<div style="margin-top:8px"><button class="btn primary" onclick="saveContract(\'' + esc(id) + '\')">Simpan</button></div>'
+    + '<pre id="pcOut" class="card">-</pre>';
+}
+
+async function saveContract(id){
+  const g = function(x){ return ((document.getElementById(x) || {}).value || '').trim(); };
+  const out = document.getElementById('pcOut');
+  const body = {};
+  if (g('pcUrl')) body.url = g('pcUrl');
+  [['pcStatus','expected_status'],['pcInt','interval_sec'],['pcTo','timeout_sec'],['pcFt','failure_threshold']]
+    .forEach(function(p){
+      const raw = g(p[0]);
+      if (raw !== ''){ const n = Number(raw); if (!isNaN(n)) body[p[1]] = n; }
+    });
+  if (!Object.keys(body).length){
+    if (typeof toast==='function') toast('tidak ada field terisi', true);
+    return;
+  }
+  if (out) out.textContent = 'menyimpan ...';
+  try {
+    const r = await api('/targets/' + encodeURIComponent(id) + '/probe-contract', {method:'POST', body: body});
+    if (out) out.textContent = JSON.stringify(r.probe_contract || r, null, 2);
+    if (typeof toast==='function') toast('probe contract tersimpan');
+  } catch(e){
+    if (out) out.textContent = String((e && e.message) || e);
+    if (typeof toast==='function') toast('gagal menyimpan', true);
+  }
+}
 
 </script>
 </body>

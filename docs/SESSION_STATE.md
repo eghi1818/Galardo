@@ -1,13 +1,13 @@
 # GALARDO - Status Sesi (kanonik, ~20 baris)
 
-- Diperbarui    : STEP-61
+- Diperbarui    : STEP-62
 - HEAD          : lihat output tools/resume.sh (jangan simpan hash di sini)
 - Branch        : main (tracking origin/main, sinkron)
 - Tes           : make test 61 passed / 0 failed
 - Smoke         : OK
 - Guard         : step_guard OK, git_discipline OK, tree bersih
-- STEP terakhir : STEP-61 - halaman Overrides di dashboard (docs/HASIL-61.md)
-- Item berikutnya: item 7 irisan 5/6 = STEP-62 (editor probe-contract)
+- STEP terakhir : STEP-62 - editor probe-contract di tabel Targets (docs/HASIL-62.md)
+- Item berikutnya: item 7 irisan 6/6 = STEP-63 (fleet + notifikasi)
 - Blocker       : tidak ada
 - Eksekusi      : STEP-56 selesai; siap STEP-57
 - Temuan terbuka: P0.1b, F-1 (flaky 409), F-3 (tanpa CSP), F-4 (CORS * + Bearer)

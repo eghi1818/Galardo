@@ -102,7 +102,7 @@ dianggap "intrusi" diukur dari bukti, bukan dari daftar.
 | Item | Status |
 |---|---|
 | Webhook `job.recovery` + `safety.abort` | **SELESAI** (D8) |
-| VictoriaMetrics/OTel/OTLP aktif opt-in (STEP-70) | belum |
+| OTel/OTLP | aktif opt-in (STEP-70) |
 | Evidence signing | belum |
 | Export laporan otomatis | belum |
 

@@ -81,3 +81,4 @@ T1 SEBAGIAN (Ed25519 selesai; RBAC+MFA, backup, Docker pending) | T2-T4 PENDING
 | F-10 | Kode sisipan memakai _m.group(1) padahal _match() mengembalikan LIST, bukan match object (AttributeError -> 500). DITUTUP STEP-69: helper _g1() tahan dua bentuk. | TUTUP |
 | F-11 | /users/*/role menuntut ADMIN padahal aktor default TEST_OPERATOR -> ayam-telur, tak ada yang bisa ubah peran. DITUTUP STEP-69: syarat diturunkan ke TEST_OPERATOR. | TUTUP |
 | F-12 | _g1() memanggil dirinya sendiri (regex ikut mengganti m.group(1) di dalam _g1); lolos karena _match selalu mengembalikan list. DITUTUP STEP-69. | TUTUP |
+| F-13 | startup packet PG kurang byte terminator (\0) -> server menolak; verifier offline belum memeriksanya. DITUTUP STEP-71b: terminator ditambahkan + cek verifier. | TUTUP |

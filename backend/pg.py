@@ -51,6 +51,7 @@ def startup(user, database, params=None):
     body = struct.pack(">I", PROTO)
     for k, v in kv.items():
         body += k.encode() + b"\x00" + str(v).encode() + b"\x00"
+    body += b"\x00"  # terminator daftar parameter (wajib oleh protokol)
     return struct.pack(">I", len(body) + 4) + body
 
 

@@ -67,7 +67,7 @@ P0 - Goal 2 inti (paling menentukan)
 
 P1 - Universalitas
   3. [SELESAI STEP-54] Jalur probe residential (field proxy_pool masih ditolak sebagai field asing)
-  4. [SELESAI STEP-55] Verifikasi rung dns_txt (rank 4) kepemilikan end-to-end di koler.space
+  4. [SELESAI STEP-55] Verifikasi rung dns_txt (rank 4) kepemilikan end-to-end di koler.space  [SELESAI STEP-73 - docs/HASIL-73.md]
   5. [SELESAI STEP-48] T3 end-to-end di koler.space: Worker + route, buktikan 404/blank
 
 P2 - Produk (yang dipakai manusia)

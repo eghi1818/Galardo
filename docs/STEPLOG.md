@@ -73,5 +73,6 @@
 | 66 | backup otomatis: tools/backup.py + verify_backup + target make, retensi, restore | lihat docs/HASIL-66.md |
 | 67 | Docker Compose + Dockerfile + verify_compose + dukungan GALARDO_BIND - ITEM 8 TUTUP | lihat docs/HASIL-67.md |
 | 68 | bus NATS opt-in (fail-open) + service nats di compose + verify_bus | lihat docs/HASIL-68.md |
+| 69 | alerting + F-9..F-12 (bus, _match list, bootstrap peran, _g1 rekursi) | lihat docs/HASIL-69.md |
 
 Acuan tes: make test 71/71. Titik aman: checkpoint/galardo-v1.1-mulai

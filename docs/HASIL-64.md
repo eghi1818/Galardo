@@ -8,3 +8,6 @@
            POST /users/*/role (min ADMIN), 5 cek integrasi di tests_integration.py
 - Prinsip: semantik D14 dipertahankan (header absen = usr-operator) agar 61 tes tetap hijau
 - Verifikasi: verify_rbac 18/18, make test hijau, smoke OK
+
+## Tambahan (64-D lanjutan)
+- 5 cek integrasi RBAC awalnya gagal tersisip (anchor tidak cocok); ditambal di commit lanjutan.

@@ -67,7 +67,7 @@ P0 - Goal 2 inti (paling menentukan)
 
 P1 - Universalitas
   3. [SELESAI STEP-54] Jalur probe residential (field proxy_pool masih ditolak sebagai field asing)
-  4. [SELESAI STEP-55] Verifikasi rung dns_txt (rank 4) kepemilikan end-to-end di koler.space  [SELESAI STEP-73 - docs/HASIL-73.md]
+  4. [SELESAI STEP-55] Verifikasi rung dns_txt (rank 4) kepemilikan end-to-end di koler.space
   5. [SELESAI STEP-48] T3 end-to-end di koler.space: Worker + route, buktikan 404/blank
 
 P2 - Produk (yang dipakai manusia)
@@ -78,7 +78,7 @@ P2 - Produk (yang dipakai manusia)
 P3 - Kesiapan produksi
   8. [SELESAI STEP-64..67] Tier 1: RBAC(64) + MFA(65) + backup(66) + Docker Compose(67)
   9. Tier 2-4: Postgres, NATS, OTel, alerting
- 10. Run end-to-end nyata pasca semua perubahan
+ 10. Run end-to-end nyata pasca semua perubahan  [SELESAI STEP-73 - docs/HASIL-73.md]
 
 ## 8b. ATURAN PRIORITAS
 - Temuan sampingan DICATAT di sini; jangan langsung dikerjakan kecuali

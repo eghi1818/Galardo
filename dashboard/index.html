@@ -163,6 +163,7 @@ details{margin-top:8px}summary{cursor:pointer;font-size:12px;color:var(--cyan)}
     <a data-p="audit"><span class="ico">☰</span> Audit Log</a>
     <a data-p="policy"><span class="ico">⚖</span> Safety Policy</a>
       <a data-p="ownership"><span class="ico">⚖</span> Ownership</a>
+      <a data-p="sources"><span class="ico">⚖</span> Sources</a>
 </nav>
 </aside>
 <main>
@@ -223,7 +224,7 @@ async function discoverApi(){
 const $ = s => document.querySelector(s);
 const PAGE_TITLES = {overview:'Overview',engagements:'Engagements',targets:'Targets',scenarios:'Scenarios',
   plans:'Test Plans',live:'Live Execution',workers:'Workers',evidence:'Reports & Evidence',audit:'Audit Log',policy:'Safety Policy (restricted)',
-  ownership: 'Ownership',
+  ownership: 'Ownership', sources: 'Sources',
 };
 let CURRENT_PAGE = 'overview';
 let LIVE_POLL = null, GEN_POLL = null, SELECTED_JOB = localStorage.getItem('galardo.job') || '';
@@ -1275,6 +1276,107 @@ setInterval(clock,1000); clock();
   API = base;
   go('overview');
 })();
+async function srcPost(path, body){
+  const o = {method:'POST'};
+  if (body) o.body = body;
+  return api(path, o);
+}
+
+async function srcAct(id, kind){
+  const out = document.getElementById('srcOut');
+  const base = '/sources/' + encodeURIComponent(id);
+  const path = kind==='remove' ? base+'/remove' : (kind==='udp' ? base+'/udp' : base+'/probe');
+  if (out) out.textContent = kind + ' ...';
+  try {
+    const r = await srcPost(path, {});
+    if (out) out.textContent = JSON.stringify(r, null, 2);
+    if (typeof toast==='function') toast(kind + ': ok');
+  } catch(e){
+    if (out) out.textContent = String((e && e.message) || e);
+    if (typeof toast==='function') toast(kind + ': gagal', true);
+  }
+  await RENDER.sources();
+}
+
+async function srcRegister(){
+  const g = id => (document.getElementById(id) || {}).value || '';
+  const out = document.getElementById('srcOut');
+  const body = {label:g('srcLabel').trim(), kind:g('srcKind').trim()||'local',
+                ip:g('srcIp').trim()||null, region:g('srcRegion').trim()||null,
+                declared:g('srcDeclared').trim()||null, note:g('srcNote').trim()||''};
+  if (!body.label){ if (typeof toast==='function') toast('label wajib', true); return; }
+  try {
+    const r = await srcPost('/sources', body);
+    if (out) out.textContent = JSON.stringify(r, null, 2);
+    if (typeof toast==='function') toast('source terdaftar');
+  } catch(e){
+    if (out) out.textContent = String((e && e.message) || e);
+    if (typeof toast==='function') toast('registrasi gagal', true);
+  }
+  await RENDER.sources();
+}
+
+async function srcPick(){
+  const g = id => (document.getElementById(id) || {}).value || '';
+  const out = document.getElementById('srcOut');
+  const req = g('pickReq').split(',').map(function(x){return x.trim();}).filter(Boolean);
+  try {
+    const r = await srcPost('/sources/pick', {required:req, kind:g('pickKind').trim()||null});
+    if (out) out.textContent = JSON.stringify(r, null, 2);
+  } catch(e){
+    if (out) out.textContent = String((e && e.message) || e);
+  }
+}
+
+RENDER.sources = async function(){
+  let data = {sources:[]}, mat = null, pool = null;
+  try { data = await api('/sources'); } catch(e){ if (typeof toast==='function') toast('sources: gagal', true); }
+  try { mat = await api('/sources/matrix'); } catch(e){}
+  try { pool = await api('/identity-pool?count=64&seed=ui'); } catch(e){}
+  const items = data.sources || [];
+  const cols = [];
+  items.forEach(function(s){ Object.keys(s).forEach(function(k){ if (cols.indexOf(k) < 0) cols.push(k); }); });
+  const head = cols.map(function(c){ return '<th>' + esc(c) + '</th>'; }).join('');
+  const rows = items.map(function(s){
+    const id = esc(s.id || s.label || '');
+    return '<tr>' + cols.map(function(c){ return '<td class="mono">' + esc(String(s[c])) + '</td>'; }).join('')
+      + '<td><button class="btn" onclick="srcAct(\'' + id + '\',\'probe\')">Probe</button> '
+      + '<button class="btn" onclick="srcAct(\'' + id + '\',\'udp\')">UDP</button> '
+      + '<button class="btn" onclick="srcAct(\'' + id + '\',\'remove\')">Hapus</button></td></tr>';
+  }).join('');
+  const mrows = mat ? Object.keys(mat).map(function(k){
+    return '<tr><td class="mono">' + esc(k) + '</td><td class="mono">' + esc(JSON.stringify(mat[k])) + '</td></tr>';
+  }).join('') : '';
+  $('#view').innerHTML =
+      '<p class="muted">Sumber identitas (Intel REA) + pra-penerbangan. Kapabilitas dan ssl_lib diambil dari API, bukan dari UI.</p>'
+    + '<div class="grid g2">'
+    +   '<div class="card"><h3>Registrasi sumber</h3><div class="grid g2">'
+    +     '<label>label<input id="srcLabel" placeholder="residential-jkt"></label>'
+    +     '<label>kind<input id="srcKind" placeholder="local"></label>'
+    +     '<label>ip<input id="srcIp" placeholder="203.0.113.9"></label>'
+    +     '<label>region<input id="srcRegion" placeholder="ID-JK"></label>'
+    +     '<label>declared<input id="srcDeclared" placeholder="residential"></label>'
+    +     '<label>note<input id="srcNote" placeholder="opsional"></label>'
+    +   '</div><div style="margin-top:8px"><button class="btn primary" onclick="srcRegister()">Daftarkan</button></div>'
+    +   '<div class="note">capabilities: ' + esc((data.capabilities || []).join(', ')) + ' | ssl: ' + esc(data.ssl_lib || '-') + '</div></div>'
+    +   '<div class="card"><h3>Pilih sumber (pick)</h3>'
+    +     '<label>required (pisah koma)<input id="pickReq" placeholder="tls13,http2"></label>'
+    +     '<label>kind<input id="pickKind" placeholder="opsional"></label>'
+    +     '<div style="margin-top:8px"><button class="btn" onclick="srcPick()">Pick</button></div>'
+    +     '<h3 style="margin-top:12px">Identity pool (sample)</h3>'
+    +     '<div class="note">count=' + esc(String((pool && pool.count) || '-'))
+    +       ' sha=' + esc(String((pool && pool.pool_sha256) || '-').slice(0,16))
+    +       ' entropy=' + esc(String((pool && pool.entropy) || '-')) + '</div></div>'
+    + '</div>'
+    + '<div class="card" style="margin-top:12px"><h3>Sources (' + items.length + ')</h3>'
+    +   (items.length ? '<table><thead><tr>' + head + '<th>aksi</th></tr></thead><tbody>' + rows + '</tbody></table>'
+                    : '<div class="empty">Belum ada sumber</div>')
+    + '</div>'
+    + '<div class="card" style="margin-top:12px"><h3>Matrix</h3>'
+    +   (mrows ? '<table><tbody>' + mrows + '</tbody></table>' : '<div class="empty">-</div>') + '</div>'
+    + '<pre id="srcOut" class="card">hasil aksi akan muncul di sini</pre>';
+};
+
 </script>
 </body>
 </html>

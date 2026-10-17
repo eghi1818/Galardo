@@ -392,8 +392,8 @@ RENDER.ownership = async function(){
       + '<td>' + esc(t.canonical_origin || '-') + '</td>'
       + '<td>' + b(t.status || '-') + '</td>'
       + '<td>' + b(st) + '</td>'
-      + '<td>' + esc(String(lvl)) + '</td>'
-      + '<td>' + (isP ? 'PROOF' : 'tanpa bukti') + '</td>'
+      + '<td><span style="white-space:nowrap">' + esc(String(lvl)) + '</span></td>'
+      + '<td><span style="white-space:nowrap">' + (isP ? 'PROOF' : 'tanpa bukti') + '</span></td>'
       + '<td>' + rungs + '</td>'
       + '<td>'
       + '<button data-own="challenge" data-id="' + esc(t.id) + '">Challenge DNS</button> '
@@ -404,15 +404,14 @@ RENDER.ownership = async function(){
       + '</td></tr>');
   }
   V.innerHTML =
-      '<h2>Ownership</h2>'
-    + '<p class="muted">Tangga verifikasi kepemilikan. Rank lebih tinggi = bukti lebih kuat. '
+    '<p class="muted">Tangga verifikasi kepemilikan. Rank lebih tinggi = bukti lebih kuat. '
     + 'Attestasi (rank 1) hanya pernyataan operator, bukan bukti.</p>'
     + '<div class="card"><table><thead><tr>'
     + '<th>target</th><th>origin</th><th>status</th><th>ownership</th><th>rank</th>'
     + '<th>bukti</th><th>rungs</th><th>aksi</th>'
     + '</tr></thead><tbody>'
     + (rows.join('') || '<tr><td colspan="8">belum ada target</td></tr>')
-    + '</tbody></table></div><pre id="ownOut" class="card"></pre>';
+    + '</tbody></table></div><pre id="ownOut" class="card">hasil aksi akan muncul di sini</pre>';
   V.querySelectorAll('button[data-own]').forEach(function(btn){
     btn.onclick = function(){ ownAct(btn.getAttribute('data-id'), btn.getAttribute('data-own')); };
   });

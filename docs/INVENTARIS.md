@@ -62,7 +62,7 @@ T1 SEBAGIAN (Ed25519 selesai; RBAC+MFA, backup, Docker pending) | T2-T4 PENDING
 | ID | Temuan | Status |
 |---|---|---|
 | P0.1b | backend/ownership_ladder.default_fetcher() masih urllib.request.urlopen polos, bukan netssl.context() (temuan STEP-55) | BELUM |
-| F-1 | tests_integration.py:275 flaky: job degrade memakai Idempotency-Key tetap (test-job-degrade-1); bila data/state.json masih menyimpan job lama, POST /start balas 409. Lolos 61/61 pada 2 ulang berturut. Bukan regresi STEP-55. | TERBUKA |
+| F-1 | flaky 409 pada job degrade: kunci idempotency tetap menabrak state.json run sebelumnya. DITUTUP STEP-60b: kunci kini unik per-run (DEGRADE_KEY). | TUTUP |
 | F-2 | UI memanggil GET /admin/secret & GET /healthz - TUTUP: keduanya path sisi-target, bukan route API (STEP-57) | TUTUP |
 | F-3 | Tidak ada Content-Security-Policy pada respons API/dashboard (STEP-56) | TERBUKA |
 | F-4 | CORS "*" digabung Bearer token (STEP-56) | TERBUKA |

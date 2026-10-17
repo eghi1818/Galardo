@@ -15,6 +15,10 @@ import tarfile
 import tempfile
 import threading
 import time
+
+_RUN = str(int(time.time() * 1000))
+DEGRADE_KEY = 'test-job-degrade-1-' + _RUN
+DEGRADE_KEY_B = 'test-job-degrade-1b-' + _RUN
 import urllib.error
 import urllib.request
 
@@ -267,7 +271,7 @@ def main():
                                             "policy_version_id": "pol-global-v1", "name": "degrade"})
     req("POST", f"/test-plans/{plan3['id']}/approve", {})
     st, job3 = req("POST", "/test-jobs", {"test_plan_id": plan3["id"]},
-                   {"Idempotency-Key": "test-job-degrade-1"})
+                   {"Idempotency-Key": DEGRADE_KEY})
     # degrade target BEFORE start -> probe baseline fails asynchronously -> FAILED, no traffic
     with urllib.request.urlopen(TGT + "/control/degrade", timeout=5) as r:
         pass
@@ -280,7 +284,7 @@ def main():
         req("POST", f"/test-jobs/{job3['id']}/abort", {"reason": "flake retry"})
         wait_terminal(job3["id"], 30)
         st, job3 = req("POST", "/test-jobs", {"test_plan_id": plan3["id"]},
-                       {"Idempotency-Key": "test-job-degrade-1b"})
+                       {"Idempotency-Key": DEGRADE_KEY_B})
         req("POST", f"/test-jobs/{job3['id']}/start")
         snap3 = wait_terminal(job3["id"], 45)
     stt3 = snap3["job"]["status"] if snap3 else "timeout"

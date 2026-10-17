@@ -1105,7 +1105,9 @@ RENDER.live = async function(){
       ],{height:120,legend:true});
     }).catch(()=>{});
   }
-  // AI insights (advisory panel)
+    $('#view').insertAdjacentHTML('beforeend', '<div id="proofBox" class="card"></div>');
+  if (SELECTED_JOB) proofLoad(SELECTED_JOB);
+// AI insights (advisory panel)
   if(SELECTED_JOB){
     api(`/test-jobs/${SELECTED_JOB}/insights`).then(r=>{
       const box=$('#aiInsights'); if(!box) return;
@@ -1376,6 +1378,63 @@ RENDER.sources = async function(){
     +   (mrows ? '<table><tbody>' + mrows + '</tbody></table>' : '<div class="empty">-</div>') + '</div>'
     + '<pre id="srcOut" class="card">hasil aksi akan muncul di sini</pre>';
 };
+
+async function proofLoad(jobId){
+  const box = document.getElementById('proofBox');
+  if (!box) return;
+  box.innerHTML = '<h3>Bukti &amp; observer</h3><div class="note">memuat ...</div>';
+  let d = null, t = null;
+  try { d = await api('/test-jobs/' + encodeURIComponent(jobId) + '/down'); } catch(e){}
+  try { t = await api('/test-jobs/' + encodeURIComponent(jobId) + '/telemetry'); } catch(e){}
+  const rows = [];
+  if (d){
+    Object.keys(d).forEach(function(k){
+      rows.push('<tr><td class="mono">' + esc(k) + '</td><td class="mono">'
+        + esc(JSON.stringify(d[k])) + '</td></tr>');
+    });
+  }
+  box.innerHTML =
+      '<h3>Bukti &amp; observer</h3>'
+    + '<div class="note">Observer = pembuktian DOWN dari titik independen, bukan dari sudut target. '
+    + 'Reconcile = pemulihan job macet (menolak 409 bila konteks runtime masih hidup).</div>'
+    + '<div style="margin:8px 0">'
+    +   '<button class="btn" onclick="proofObserver(\'' + esc(jobId) + '\')">Jalankan observer</button> '
+    +   '<button class="btn" onclick="proofReconcile(\'' + esc(jobId) + '\')">Reconcile</button> '
+    +   '<button class="btn" onclick="proofLoad(\'' + esc(jobId) + '\')">Muat ulang</button>'
+    + '</div>'
+    + (rows.length ? '<table><tbody>' + rows.join('') + '</tbody></table>'
+                   : '<div class="empty">snapshot kosong</div>')
+    + (t ? '<div class="note">telemetry: ' + esc(JSON.stringify(t).slice(0, 500)) + '</div>' : '')
+    + '<pre id="proofOut" class="card">hasil aksi akan muncul di sini</pre>';
+}
+
+async function proofObserver(jobId){
+  const out = document.getElementById('proofOut');
+  if (out) out.textContent = 'observer ...';
+  try {
+    const r = await api('/test-jobs/' + encodeURIComponent(jobId) + '/observer', {method:'POST', body:{}});
+    if (out) out.textContent = JSON.stringify(r, null, 2);
+    if (typeof toast === 'function') toast('observer: ok');
+  } catch(e){
+    if (out) out.textContent = String((e && e.message) || e);
+    if (typeof toast === 'function') toast('observer: gagal', true);
+  }
+  await proofLoad(jobId);
+}
+
+async function proofReconcile(jobId){
+  const out = document.getElementById('proofOut');
+  if (out) out.textContent = 'reconcile ...';
+  try {
+    const r = await api('/test-jobs/' + encodeURIComponent(jobId) + '/reconcile', {method:'POST', body:{}});
+    if (out) out.textContent = JSON.stringify(r, null, 2);
+    if (typeof toast === 'function') toast('reconcile: ok');
+  } catch(e){
+    if (out) out.textContent = String((e && e.message) || e);
+    if (typeof toast === 'function') toast('reconcile: gagal', true);
+  }
+  await proofLoad(jobId);
+}
 
 </script>
 </body>

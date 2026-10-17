@@ -144,3 +144,4 @@ Lihat `docs/CAPACITY-BASELINE.md`: plafon generator laptop ~5.900 rps (rute ring
 | D19 | registry sumber hanya di memori (hilang antar-proses) | **fixed** — persist ke `.galardo/sources.json` |
 | D20 | `import os` hilang di `srccap.py` (NameError) | **fixed** |
 | D21 | hitungan `expected_agents` worm salah (6 vs 14) | **fixed** |
+| End-to-end nyata | selesai (STEP-73): demo DOWN->RECOVERED, 404/blank, container sehat + port publish 200 |

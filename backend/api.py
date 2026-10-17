@@ -1451,7 +1451,12 @@ def _count_by_status(jobs):
     return out
 
 
-def serve(host="127.0.0.1", port=None):
+def _bind_host():
+    """Host bind: GALARDO_BIND (dipakai container) atau 127.0.0.1."""
+    return os.environ.get("GALARDO_BIND", "127.0.0.1")
+
+
+def serve(host=_bind_host(), port=None):
     port = int(port or os.environ.get("GALARDO_API_PORT", "8090"))  # D12
     seed_lab()
     import fleet

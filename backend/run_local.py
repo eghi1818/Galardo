@@ -80,7 +80,7 @@ def main():
 
     # target origin must be known before seeding
     if target_port:
-        os.environ["GALARDO_TARGET_ORIGIN"] = f"http://127.0.0.1:{target_port}"
+        os.environ["GALARDO_TARGET_ORIGIN"] = f"http://{os.environ.get('GALARDO_BIND', '127.0.0.1')}:{target_port}"
 
     import lab_target
     import api
@@ -88,12 +88,12 @@ def main():
     if target_port:
         threading.Thread(target=lab_target.serve, kwargs={"port": target_port},
                          daemon=True).start()
-        if wait_http(f"http://127.0.0.1:{target_port}/healthz"):
-            print(f"[run_local] lab target ready  -> http://127.0.0.1:{target_port}")
+        if wait_http(f"http://{os.environ.get('GALARDO_BIND', '127.0.0.1')}:{target_port}/healthz"):
+            print(f"[run_local] lab target ready  -> http://{os.environ.get('GALARDO_BIND', '127.0.0.1')}:{target_port}")
 
     print("=" * 62)
-    print(f"  GALARDO dashboard : http://127.0.0.1:{api_port}/")
-    print(f"  API base         : http://127.0.0.1:{api_port}/api/v1")
+    print(f"  GALARDO dashboard : http://{os.environ.get('GALARDO_BIND', '127.0.0.1')}:{api_port}/")
+    print(f"  API base         : http://{os.environ.get('GALARDO_BIND', '127.0.0.1')}:{api_port}/api/v1")
     print("=" * 62)
     api.serve(port=api_port)  # blocks; seeds lab on boot
 

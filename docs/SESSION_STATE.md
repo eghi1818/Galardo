@@ -15,5 +15,5 @@
 - Konvensi bukti: docs/HASIL-<step>.md (satu tempat, bukan .out/)
 - Istilah      : "rung 1 kepemilikan" = dns_txt (rank 4). Jangan tulis "rank 1" (itu operator_attestation)
 
-- Langkah terakhir : STEP-72 (adapter db -> PostgreSQL + fallback JSON) — F-15/F-16/F-17 TUTUP
-- Langkah berikut  : item 10 (run end-to-end nyata) — baca kriteria di HANDOFF dulu
+- Langkah terakhir : STEP-73 (e2e nyata lokal + Docker) — item 10 TUNTAS, F-18/F-19/F-20/F-21 TUTUP
+- Langkah berikut  : tutup temuan terbuka: P0.1b (urllib default_fetcher), F-7 (probe UDP lambat), F-4 (CORS *), F-3 (tanpa CSP)

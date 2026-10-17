@@ -9,3 +9,11 @@
 - Perintah: make docker-verify | docker-build | docker-up | docker-down
 - Verifikasi: verify_compose 20/20, docker compose config VALID, build + up + health 200 + down
 - Catatan: port 8090 bentrok dengan make dev-up; hentikan dev-up dulu sebelum docker-up
+
+## Koreksi (ditemukan di STEP-73)
+Bukti "build/up/health 200" di file ini TIDAK membuktikan container sehat:
+- F-19: image tidak memasang dependensi (tak ada requirements.txt, tak ada pip install)
+  -> container crash-loop `ModuleNotFoundError: No module named 'yaml'`.
+- F-20: api.serve()/lab_target.serve() bind 127.0.0.1 -> port publish mati dari host (000).
+- Akibat: angka 200 pada probe waktu itu berasal dari server HOST di port 8090, bukan container.
+Terbukti ulang setelah host dimatikan + pakai docker inspect: docs/HASIL-73.md bagian 4-7.

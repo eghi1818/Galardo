@@ -21,6 +21,7 @@ v2 adds the missing ingredient: a CEILING.
 Backwards compatible: /healthz, /api/slow, /api/error, /api/heavy,
 /control/mode, /control/degrade, /control/recover all keep working.
 """
+import os
 import argparse
 import json
 import random
@@ -289,7 +290,12 @@ class TargetHandler(BaseHTTPRequestHandler):
         return self._json(404, {"error": "unknown control path", "got": path})
 
 
-def serve(host="127.0.0.1", port=8088, workers=0, backlog=0):
+def _bind_host():
+    """Host bind: GALARDO_BIND (dipakai container) atau 127.0.0.1."""
+    return os.environ.get("GALARDO_BIND", "127.0.0.1")
+
+
+def serve(host=_bind_host(), port=8088, workers=0, backlog=0):
     GATE.configure(workers=workers, backlog=backlog)
     httpd = ThreadingHTTPServer((host, port), TargetHandler)
     httpd.daemon_threads = True

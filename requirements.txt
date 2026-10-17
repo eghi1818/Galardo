@@ -1,0 +1,3 @@
+# dependensi pihak ketiga yang benar-benar diimpor backend/
+certifi
+PyYAML

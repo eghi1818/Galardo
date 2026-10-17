@@ -21,5 +21,14 @@ else
   echo "  [X] step_load CRASH"; tail -5 /tmp/smoke2.log; rc=1
 fi
 kill $P 2>/dev/null
+# --- uji HTTP nyata (prefix /api/v1) - F-18 ---
+BASE="http://127.0.0.1:${GALARDO_API_PORT:-8090}/api/v1"
+if curl -s -m 3 -o /dev/null "$BASE/health"; then
+  C=$(curl -s -m 3 -o /dev/null -w "%{http_code}" "$BASE/health")
+  if [ "$C" = "200" ]; then echo "  [v] GET /api/v1/health -> $C"; else echo "  [X] GET /api/v1/health -> $C"; rc=1; fi
+else
+  echo "  [v] SKIP GET /api/v1/health (server tidak mendengarkan)"
+fi
 if [ "$rc" = "0" ]; then echo "== SMOKE OK =="; else echo "== SMOKE GAGAL =="; fi
+
 exit $rc

@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse, parse_qs
 
 import db
+import rbac
 import orchestrator
 import evidence as evidence_mod
 import ownership_ladder as _ladder
@@ -353,6 +354,55 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(404, {"error": "not found"})
 
         api_path = path[len("/api/v1"):] or "/"
+
+        # --- RBAC (item 8 / STEP-64) ---
+        if api_path == "/me" and method == "GET":
+            uid = self._auth()
+            return self._json(200, {"actor": uid, "user": rbac.public(rbac.user_of(uid))})
+
+        if api_path == "/users" and method == "GET":
+            uid = self._auth()
+            ok, why = rbac.ensure(rbac.user_of(uid), "VIEWER")
+            if not ok:
+                return self._json(403, {"error": why})
+            return self._json(200, [rbac.public(u) for u in db.list("users")])
+
+        if api_path == "/users" and method == "POST":
+            uid = self._auth()
+            ok, why = rbac.ensure(rbac.user_of(uid), "TEST_OPERATOR")
+            if not ok:
+                return self._json(403, {"error": why})
+            body = self._body() if hasattr(self, "_body") else {}
+            role = (body.get("role") or "VIEWER").upper()
+            if role not in rbac.ROLE_RANK:
+                return self._json(422, {"error": "peran tak dikenal: %s" % role, "roles": list(rbac.ROLES)})
+            email = (body.get("email") or "").strip()
+            if not email:
+                return self._json(422, {"error": "email wajib"})
+            u = db.insert("users", {"email": email, "role": role, "status": "ACTIVE",
+                                    "org_id": body.get("org_id")},
+                          actor=uid, action="user.created")
+            return self._json(201, rbac.public(u))
+
+        _m = _match(api_path, "/users/*/role")
+        if _m and method == "POST":
+            uid = self._auth()
+            ok, why = rbac.ensure(rbac.user_of(uid), "ADMIN")
+            if not ok:
+                return self._json(403, {"error": why})
+            target = db.get("users", _m.group(1))
+            if not target:
+                return self._json(404, {"error": "user tidak ada"})
+            role = ((self._body() if hasattr(self, "_body") else {}).get("role") or "").upper()
+            if role not in rbac.ROLE_RANK:
+                return self._json(422, {"error": "peran tak dikenal: %s" % role})
+            def _mut(d, role=role):
+                d["role"] = role
+                return d
+            u = db.update("users", _m.group(1), _mut, actor=uid, action="user.role_changed")
+            return self._json(200, rbac.public(u))
+
+
 
         # health/readiness (internal)
         if api_path == "/health" and method == "GET":

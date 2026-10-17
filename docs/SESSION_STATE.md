@@ -1,13 +1,13 @@
 # GALARDO - Status Sesi (kanonik, ~20 baris)
 
-- Diperbarui    : STEP-57
+- Diperbarui    : STEP-58
 - HEAD          : lihat output tools/resume.sh (jangan simpan hash di sini)
 - Branch        : main (tracking origin/main, sinkron)
 - Tes           : make test 61 passed / 0 failed
 - Smoke         : OK
 - Guard         : step_guard OK, git_discipline OK, tree bersih
-- STEP terakhir : STEP-57 - tutup F-2 sebagai reklasifikasi (docs/HASIL-57.md)
-- Item berikutnya: HANDOFF bagian 8 item 7 (alur UI)
+- STEP terakhir : STEP-58 - panel Ownership di dashboard (docs/HASIL-58.md)
+- Item berikutnya: item 7 irisan 2/6 = STEP-59 (Intel REA + preflight)
 - Blocker       : tidak ada
 - Eksekusi      : STEP-56 selesai; siap STEP-57
 - Temuan terbuka: P0.1b, F-1 (flaky 409), F-3 (tanpa CSP), F-4 (CORS * + Bearer)

@@ -69,4 +69,5 @@ def public(user_doc):
         return None
     return {"id": user_doc.get("id"), "email": user_doc.get("email"),
             "role": user_doc.get("role"), "status": user_doc.get("status"),
-            "org_id": user_doc.get("org_id")}
+            "org_id": user_doc.get("org_id"),
+            "mfa_enabled": bool(user_doc.get("mfa_enabled"))}

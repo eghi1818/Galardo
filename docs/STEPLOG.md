@@ -69,5 +69,6 @@
 | 62 | editor probe-contract di tabel Targets (irisan 5/6 item 7) | lihat docs/HASIL-62.md |
 | 63 | halaman Webhooks + remote-dispatch (irisan 6/6 item 7) - ITEM 7 TUTUP | lihat docs/HASIL-63.md |
 | 64 | RBAC inti: backend/rbac.py + tools/verify_rbac.py + endpoint /me,/users,/users/*/role + 5 cek integrasi | lihat docs/HASIL-64.md |
+| 65 | MFA TOTP: backend/mfa.py + tools/verify_mfa.py (vektor RFC 6238) + /me/mfa/{enroll,verify,disable} + 5 cek integrasi | lihat docs/HASIL-65.md |
 
 Acuan tes: make test 61/61. Titik aman: checkpoint/galardo-v1.1-mulai

@@ -463,6 +463,23 @@ def main():
     st, bad = req("POST", "/users", {"email": "x@y.z", "role": "SUPERMAN"})
     check("rbac: peran tak dikenal 422", st == 422, st)
 
+    print("== MFA (STEP-65) ==")
+    try:
+        import mfa as _mfa
+    except ImportError:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "backend"))
+        import mfa as _mfa
+    st, en = req("POST", "/me/mfa/enroll")
+    secret = (en or {}).get("secret")
+    check("mfa: enroll 200 + secret", st == 200 and bool(secret), st)
+    check("mfa: enroll beri otpauth uri", "otpauth://" in ((en or {}).get("otpauth") or ""), en)
+    st, vf = req("POST", "/me/mfa/verify", {"code": _mfa.totp(secret) if secret else "000000"})
+    check("mfa: verify kode benar -> enabled", st == 200 and (vf or {}).get("mfa_enabled") is True, vf)
+    st, vf2 = req("POST", "/me/mfa/verify", {"code": _mfa.totp(secret) if secret else "000000"})
+    check("mfa: replay step sama ditolak", st == 422, st)
+    st, off = req("POST", "/me/mfa/disable", {})
+    check("mfa: disable -> nonaktif", st == 200 and (off or {}).get("mfa_enabled") is False, off)
+
     print(f"\n{'='*60}\nRESULTS: {len(PASS)} passed, {len(FAIL)} failed")
     if FAIL:
         for name, detail in FAIL:

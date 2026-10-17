@@ -1,13 +1,13 @@
 # GALARDO - Status Sesi (kanonik, ~20 baris)
 
-- Diperbarui    : STEP-64
+- Diperbarui    : STEP-65
 - HEAD          : lihat output tools/resume.sh (jangan simpan hash di sini)
 - Branch        : main (tracking origin/main, sinkron)
 - Tes           : make test 61 passed / 0 failed
 - Smoke         : OK
 - Guard         : step_guard OK, git_discipline OK, tree bersih
-- STEP terakhir : STEP-64 - RBAC inti (docs/HASIL-64.md)
-- Item berikutnya: item 8 lanjutan = MFA TOTP (STEP-65)
+- STEP terakhir : STEP-65 - MFA TOTP enroll/verify/disable (docs/HASIL-65.md)
+- Item berikutnya: item 8 lanjutan = backup otomatis (STEP-66)
 - Blocker       : tidak ada
 - Eksekusi      : STEP-56 selesai; siap STEP-57
 - Temuan terbuka: P0.1b, F-1 (flaky 409), F-3 (tanpa CSP), F-4 (CORS * + Bearer)

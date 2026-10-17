@@ -14,6 +14,7 @@ from urllib.parse import urlparse, parse_qs
 
 import db
 import rbac
+import mfa
 import orchestrator
 import evidence as evidence_mod
 import ownership_ladder as _ladder
@@ -360,6 +361,61 @@ class Handler(BaseHTTPRequestHandler):
         if api_path == "/me" and method == "GET":
             uid = self._auth()
             return self._json(200, {"actor": uid, "user": rbac.public(rbac.user_of(uid))})
+
+        if api_path == "/me/mfa/enroll" and method == "POST":
+            uid = self._auth()
+            try:
+                secret = mfa.gen_secret()
+                def _en(d, secret=secret, uid=uid):
+                    d["id"] = d.get("id") or uid
+                    d["mfa_secret"] = secret
+                    d["mfa_enabled"] = False
+                    d["mfa_last_step"] = None
+                    return d
+                if db.get("users", uid):
+                    u = db.update("users", uid, _en, actor=uid, action="mfa.enrolled")
+                else:
+                    u = db.insert("users", _en({"id": uid}), actor=uid, action="mfa.enrolled")
+                return self._json(200, {"secret": secret,
+                                        "otpauth": mfa.provisioning_uri(secret, (u or {}).get("email") or uid),
+                                        "mfa_enabled": False})
+            except Exception as exc:
+                return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
+
+        if api_path == "/me/mfa/verify" and method == "POST":
+            uid = self._auth()
+            try:
+                u = db.get("users", uid)
+                if not u or not u.get("mfa_secret"):
+                    return self._json(422, {"error": "belum enroll"})
+                body = self._body() if hasattr(self, "_body") else {}
+                last = u.get("mfa_last_step") if u.get("mfa_enabled") else None
+                ok, step, drift = mfa.verify(u.get("mfa_secret"), body.get("code"), last_step=last)
+                if not ok:
+                    return self._json(422, {"error": "kode salah", "step": step, "drift": drift})
+                def _vf(d, step=step):
+                    d["mfa_enabled"] = True
+                    d["mfa_last_step"] = step
+                    return d
+                db.update("users", uid, _vf, actor=uid, action="mfa.verified")
+                return self._json(200, {"mfa_enabled": True, "step": step, "drift": drift})
+            except Exception as exc:
+                return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
+
+        if api_path == "/me/mfa/disable" and method == "POST":
+            uid = self._auth()
+            try:
+                if not db.get("users", uid):
+                    return self._json(404, {"error": "user tidak ada"})
+                def _of(d):
+                    d["mfa_enabled"] = False
+                    d["mfa_last_step"] = None
+                    d.pop("mfa_secret", None)
+                    return d
+                db.update("users", uid, _of, actor=uid, action="mfa.disabled")
+                return self._json(200, {"mfa_enabled": False})
+            except Exception as exc:
+                return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
 
         if api_path == "/users" and method == "GET":
             uid = self._auth()

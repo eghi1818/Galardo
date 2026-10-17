@@ -74,5 +74,6 @@
 | 67 | Docker Compose + Dockerfile + verify_compose + dukungan GALARDO_BIND - ITEM 8 TUTUP | lihat docs/HASIL-67.md |
 | 68 | bus NATS opt-in (fail-open) + service nats di compose + verify_bus | lihat docs/HASIL-68.md |
 | 69 | alerting + F-9..F-12 (bus, _match list, bootstrap peran, _g1 rekursi) | lihat docs/HASIL-69.md |
+| 70 | ekspor OTLP/HTTP JSON (metrics+span) + service otel-collector | lihat docs/HASIL-70.md |
 
 Acuan tes: make test 79/79. Titik aman: checkpoint/galardo-v1.1-mulai

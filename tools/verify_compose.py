@@ -67,6 +67,17 @@ check("E modul bus ada", bool(read("backend/bus.py")))
 check("E bus fail-open (tanpa env -> skipped)",
       "nats nonaktif" in read("backend/bus.py"))
 
+
+print("== F. OTLP ==")
+check("F service otel ada", "galardo-otel" in dc or "otel:" in dc)
+check("F image collector", "opentelemetry-collector" in dc)
+check("F GALARDO_OTLP_URL di env", "GALARDO_OTLP_URL" in dc)
+check("F depends_on otel", "- otel" in dc)
+check("F modul otlp ada", bool(read("backend/otlp.py")))
+check("F otlp fail-open", "otlp nonaktif" in read("backend/otlp.py"))
+check("F konfig collector ada", bool(read("ops/otel-collector.yaml")))
+check("F konfig punya receiver otlp", "otlp:" in read("ops/otel-collector.yaml"))
+
 print()
 print("RESULTS: %d passed, %d failed" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

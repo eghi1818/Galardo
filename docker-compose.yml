@@ -11,6 +11,7 @@ services:
       GALARDO_BIND: "0.0.0.0"
       GALARDO_DEV_TOKEN: "${GALARDO_DEV_TOKEN:-dev-token}"
       GALARDO_NATS_URL: "nats://nats:4222"
+      GALARDO_OTLP_URL: "http://otel:4318"
     volumes:
       - ./data:/app/data
     env_file:
@@ -18,6 +19,7 @@ services:
         required: false
     depends_on:
       - nats
+      - otel
     restart: unless-stopped
 
   nats:
@@ -27,4 +29,14 @@ services:
     ports:
       - "4222:4222"
       - "8222:8222"
+    restart: unless-stopped
+
+  otel:
+    image: otel/opentelemetry-collector-contrib:0.104.0
+    container_name: galardo-otel
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./ops/otel-collector.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "4318:4318"
     restart: unless-stopped

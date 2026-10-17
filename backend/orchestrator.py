@@ -706,6 +706,13 @@ def _execute(job_id):
         ctx.timeline = [{"at": d["at"], "severity": d["severity"], "message": d["message"]}
                         for d in ctx.safety.decisions[-100:]]
         db.update("test_jobs", job_id, lambda j: j.update({"final_metrics": final}), audit=False)
+        try:
+            import otlp
+            otlp.export_job(job_id, final["aggregate"],
+                            extra={"target_id": job.get("target_id")})
+        except Exception:
+            pass
+
         db.update("test_runs", run_id, lambda r: r.update({
             "ended_at": now_iso(), "exit_code": 2 if aborted else 0,
             "result_json": {"aggregate": final["aggregate"], "abort_reason": result["abort_reason"]},

@@ -72,8 +72,8 @@ P1 - Universalitas
 
 P2 - Produk (yang dipakai manusia)
   6. [SELESAI STEP-56] AUDIT DASHBOARD: peta di docs/UI-API-GAP.md + docs/DASHBOARD-AUDIT.md
-  7. Alur UI:
-     - irisan 1/6 SELESAI (STEP-58): panel Ownership + tools/verify_dashboard_pages.py. Sisa irisan: 59-63. target -> intel REA -> preflight -> playbook -> jalankan -> verdict
+  7. [SELESAI STEP-58..63] Alur UI:
+     - 6 irisan selesai: Ownership(58), Sources(59), Bukti&observer(60), Overrides(61), probe-contract(62), Webhooks+remote-dispatch(63). target -> intel REA -> preflight -> playbook -> jalankan -> verdict
 
 P3 - Kesiapan produksi
   8. Tier 1: RBAC+MFA, backup otomatis, Docker Compose

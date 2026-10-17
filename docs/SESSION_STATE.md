@@ -1,13 +1,13 @@
 # GALARDO - Status Sesi (kanonik, ~20 baris)
 
-- Diperbarui    : STEP-66
+- Diperbarui    : STEP-67
 - HEAD          : lihat output tools/resume.sh (jangan simpan hash di sini)
 - Branch        : main (tracking origin/main, sinkron)
 - Tes           : make test 61 passed / 0 failed
 - Smoke         : OK
 - Guard         : step_guard OK, git_discipline OK, tree bersih
-- STEP terakhir : STEP-66 - backup otomatis (docs/HASIL-66.md)
-- Item berikutnya: item 8 lanjutan = Docker Compose (STEP-67)
+- STEP terakhir : STEP-67 - Docker Compose; ITEM 8 TUTUP (docs/HASIL-67.md)
+- Item berikutnya: HANDOFF bagian 8 item 9
 - Blocker       : tidak ada
 - Eksekusi      : STEP-56 selesai; siap STEP-57
 - Temuan terbuka: P0.1b, F-1 (flaky 409), F-3 (tanpa CSP), F-4 (CORS * + Bearer)

@@ -118,3 +118,14 @@ backup:
 	python3 tools/backup.py
 backup-verify:
 	python3 tools/verify_backup.py
+
+# --- GALARDO item 8d: Docker Compose ---
+.PHONY: docker-verify docker-build docker-up docker-down
+docker-verify:
+	python3 tools/verify_compose.py
+docker-build:
+	docker compose build
+docker-up:
+	docker compose up -d
+docker-down:
+	docker compose down

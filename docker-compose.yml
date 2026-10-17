@@ -1,0 +1,18 @@
+services:
+  galardo:
+    build: .
+    image: galardo:local
+    container_name: galardo-local
+    ports:
+      - "8090:8090"   # dashboard + API
+      - "8095:8095"   # target lab
+      - "8899:8899"   # shim override
+    environment:
+      GALARDO_BIND: "0.0.0.0"
+      GALARDO_DEV_TOKEN: "${GALARDO_DEV_TOKEN:-dev-token}"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped

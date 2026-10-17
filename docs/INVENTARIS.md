@@ -72,3 +72,5 @@ T1 SEBAGIAN (Ed25519 selesai; RBAC+MFA, backup, Docker pending) | T2-T4 PENDING
 | F-8 | /start balas 409 untuk preflight belum siap (fail-fast) - keputusan desain, bukan bug. | BUKAN TEMUAN |
 | Item 8a RBAC | SELESAI | docs/HASIL-64.md |
 | Item 8b MFA TOTP | SELESAI | docs/HASIL-65.md |
+| Item 8c backup | SELESAI | docs/HASIL-66.md |
+| Item 8d Docker Compose | SELESAI | docs/HASIL-67.md |

@@ -76,7 +76,7 @@ P2 - Produk (yang dipakai manusia)
      - 6 irisan selesai: Ownership(58), Sources(59), Bukti&observer(60), Overrides(61), probe-contract(62), Webhooks+remote-dispatch(63). target -> intel REA -> preflight -> playbook -> jalankan -> verdict
 
 P3 - Kesiapan produksi
-  8. Tier 1: RBAC+MFA, backup otomatis, Docker Compose
+  8. [SELESAI STEP-64..67] Tier 1: RBAC(64) + MFA(65) + backup(66) + Docker Compose(67)
   9. Tier 2-4: Postgres, NATS, OTel, alerting
  10. Run end-to-end nyata pasca semua perubahan
 

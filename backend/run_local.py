@@ -29,7 +29,7 @@ def port_free(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
-            s.bind(("127.0.0.1", port))
+            s.bind((os.environ.get("GALARDO_BIND", "127.0.0.1"), port))
             return True
         except OSError:
             return False

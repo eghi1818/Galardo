@@ -62,7 +62,7 @@ T1 SEBAGIAN (Ed25519 selesai; RBAC+MFA, backup, Docker pending) | T2-T4 PENDING
 | ID | Temuan | Status |
 |---|---|---|
 | P0.1b | backend/ownership_ladder.default_fetcher() masih urllib.request.urlopen polos, bukan netssl.context() (temuan STEP-55) | BELUM |
-| F-1 | flaky 409 pada dispatch job. SEBAB SEBENARNYA: /start fail-fast balas 409 bila preflight async belum PASS (api.py:845). DITUTUP STEP-60c: helper start_job toleran 409 (12x0.4s). | TUTUP |
+| F-1 | flaky 409 pada dispatch job. SEBAB SEBENARNYA: /start fail-fast balas 409 bila preflight async belum PASS (api.py:845). DITUTUP STEP-60c/64-K: helper start_job toleran 409 (30x0.4s), berlaku untuk semua bentuk pemanggilan /start. | TUTUP |
 | F-2 | UI memanggil GET /admin/secret & GET /healthz - TUTUP: keduanya path sisi-target, bukan route API (STEP-57) | TUTUP |
 | F-3 | Tidak ada Content-Security-Policy pada respons API/dashboard (STEP-56) | TERBUKA |
 | F-4 | CORS "*" digabung Bearer token (STEP-56) | TERBUKA |

@@ -6,6 +6,7 @@ Base path /api/v1 per Technical Design §12. HTTP semantics: 400 malformed,
 """
 import json
 import os
+import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from datetime import datetime, timedelta, timezone
@@ -369,20 +370,27 @@ class Handler(BaseHTTPRequestHandler):
 
         if api_path == "/users" and method == "POST":
             uid = self._auth()
-            ok, why = rbac.ensure(rbac.user_of(uid), "TEST_OPERATOR")
-            if not ok:
-                return self._json(403, {"error": why})
-            body = self._body() if hasattr(self, "_body") else {}
-            role = (body.get("role") or "VIEWER").upper()
-            if role not in rbac.ROLE_RANK:
-                return self._json(422, {"error": "peran tak dikenal: %s" % role, "roles": list(rbac.ROLES)})
-            email = (body.get("email") or "").strip()
-            if not email:
-                return self._json(422, {"error": "email wajib"})
-            u = db.insert("users", {"email": email, "role": role, "status": "ACTIVE",
-                                    "org_id": body.get("org_id")},
-                          actor=uid, action="user.created")
-            return self._json(201, rbac.public(u))
+            try:
+                ok, why = rbac.ensure(rbac.user_of(uid), "TEST_OPERATOR")
+                if not ok:
+                    return self._json(403, {"error": why})
+                body = self._body() if hasattr(self, "_body") else {}
+                role = (body.get("role") or "VIEWER").upper()
+                if role not in rbac.ROLE_RANK:
+                    return self._json(422, {"error": "peran tak dikenal", "roles": list(rbac.ROLES)})
+                email = (body.get("email") or "").strip()
+                if not email:
+                    return self._json(422, {"error": "email wajib"})
+                slug = re.sub(r"[^a-z0-9]+", "-", email.split("@")[0].lower()).strip("-")[:24] or "user"
+                _id = "usr-" + slug
+                if db.get("users", _id):
+                    _id = _id + "-" + str(len(db.list("users")))
+                _doc = {"id": _id, "email": email, "role": role, "status": "ACTIVE",
+                        "org_id": body.get("org_id")}
+                u = db.insert("users", _doc, actor=uid, action="user.created")
+                return self._json(201, rbac.public(u if isinstance(u, dict) else (db.get("users", _id) or _doc)))
+            except Exception as exc:
+                return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
 
         _m = _match(api_path, "/users/*/role")
         if _m and method == "POST":
@@ -390,21 +398,18 @@ class Handler(BaseHTTPRequestHandler):
             ok, why = rbac.ensure(rbac.user_of(uid), "ADMIN")
             if not ok:
                 return self._json(403, {"error": why})
-            target = db.get("users", _m.group(1))
-            if not target:
+            if not db.get("users", _m.group(1)):
                 return self._json(404, {"error": "user tidak ada"})
             role = ((self._body() if hasattr(self, "_body") else {}).get("role") or "").upper()
             if role not in rbac.ROLE_RANK:
-                return self._json(422, {"error": "peran tak dikenal: %s" % role})
-            def _mut(d, role=role):
-                d["role"] = role
-                return d
-            u = db.update("users", _m.group(1), _mut, actor=uid, action="user.role_changed")
-            return self._json(200, rbac.public(u))
+                return self._json(422, {"error": "peran tak dikenal", "roles": list(rbac.ROLES)})
+            try:
+                u = db.update("users", _m.group(1), lambda d: d.update({"role": role}),
+                              actor=uid, action="user.role_changed")
+            except Exception as exc:
+                return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
+            return self._json(200, rbac.public(u if isinstance(u, dict) else db.get("users", _m.group(1))))
 
-
-
-        # health/readiness (internal)
         if api_path == "/health" and method == "GET":
             return self._json(200, {"status": "ok", "service": "galardo-api", "version": "1.0",
                                     "time": now_iso(),

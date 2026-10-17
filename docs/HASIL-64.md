@@ -11,3 +11,7 @@
 
 ## Tambahan (64-D lanjutan)
 - 5 cek integrasi RBAC awalnya gagal tersisip (anchor tidak cocok); ditambal di commit lanjutan.
+- 64-J: akar RemoteDisconnected = NameError: name 're' is not defined di handler POST /users
+  (baris 206 log). Ditutup dengan import re + try/except penuh -> 500 berpesan.
+- 64-K: F-1 kambuh karena regex penambal melewatkan bentuk f-string bersubscript
+  ({job3['id']}); semua pemanggilan /start kini lewat start_job, jendela retry 30x0.4s.

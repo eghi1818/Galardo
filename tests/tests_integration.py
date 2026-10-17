@@ -71,7 +71,7 @@ def target_req(path):
         return r.status, json.loads(r.read())
 
 
-def start_job(job_id, tries=12, delay=0.4):
+def start_job(job_id, tries=30, delay=0.4):
     """POST /start dengan toleransi 409 (preflight async belum siap). F-1."""
     st, r = None, None
     for _ in range(tries):
@@ -260,7 +260,7 @@ def main():
     req("POST", f"/test-plans/{plan2['id']}/approve", {})
     st, job2 = req("POST", "/test-jobs", {"test_plan_id": plan2["id"]},
                    {"Idempotency-Key": "test-job-long-1"})
-    st, r = req("POST", f"/test-jobs/{job2['id']}/start")
+    st, r = start_job(job2['id'])
     check("long job started", st == 200 and r["started"], str(r)[:300])
     time.sleep(2.5)
     st, ab = req("POST", f"/test-jobs/{job2['id']}/abort", {"reason": "integration test abort"})
@@ -286,7 +286,7 @@ def main():
     # degrade target BEFORE start -> probe baseline fails asynchronously -> FAILED, no traffic
     with urllib.request.urlopen(TGT + "/control/degrade", timeout=5) as r:
         pass
-    st, r = req("POST", f"/test-jobs/{job3['id']}/start")
+    st, r = start_job(job3['id'])
     check("degraded-target job dispatched (async preflight DB checks PASS)", st == 200 and r["started"], f"st={st}")
     snap3 = wait_terminal(job3["id"], 45)
     if snap3 is None:
@@ -296,7 +296,7 @@ def main():
         wait_terminal(job3["id"], 30)
         st, job3 = req("POST", "/test-jobs", {"test_plan_id": plan3["id"]},
                        {"Idempotency-Key": DEGRADE_KEY_B})
-        req("POST", f"/test-jobs/{job3['id']}/start")
+        start_job(job3['id'])
         snap3 = wait_terminal(job3["id"], 45)
     stt3 = snap3["job"]["status"] if snap3 else "timeout"
     check("degraded baseline -> FAILED (fail-closed, no traffic)", stt3 == "FAILED", stt3)
@@ -310,7 +310,7 @@ def main():
     time.sleep(1.0)
     st, job4 = req("POST", "/test-jobs", {"test_plan_id": plan3["id"]},
                    {"Idempotency-Key": "test-job-degrade-2"})
-    st, r = req("POST", f"/test-jobs/{job4['id']}/start")
+    st, r = start_job(job4['id'])
     started4 = st == 200 and r["started"]
     if started4:
         time.sleep(4)  # let some traffic flow
@@ -452,6 +452,17 @@ def main():
     wt.cleanup()
 
     # ---- summary ----
+    print("== RBAC (STEP-64) ==")
+    st, me = req("GET", "/me")
+    check("rbac: /me balas 200", st == 200, st)
+    check("rbac: /me memuat role aktor", isinstance(me, dict) and (me.get("user") or {}).get("role") == "TEST_OPERATOR", me)
+    st, us = req("GET", "/users")
+    check("rbac: /users balas list", st == 200 and isinstance(us, list), st)
+    st, nu = req("POST", "/users", {"email": "uji-rbac@contoh.test", "role": "VIEWER"})
+    check("rbac: POST /users 201 VIEWER", st == 201 and (nu or {}).get("role") == "VIEWER", nu)
+    st, bad = req("POST", "/users", {"email": "x@y.z", "role": "SUPERMAN"})
+    check("rbac: peran tak dikenal 422", st == 422, st)
+
     print(f"\n{'='*60}\nRESULTS: {len(PASS)} passed, {len(FAIL)} failed")
     if FAIL:
         for name, detail in FAIL:

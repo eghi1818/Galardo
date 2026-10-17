@@ -76,6 +76,7 @@ T1 SEBAGIAN (Ed25519 selesai; RBAC+MFA, backup, Docker pending) | T2-T4 PENDING
 | Item 8d Docker Compose | SELESAI | docs/HASIL-67.md |
 | Item 9b alerting | SELESAI | docs/HASIL-69.md |
 | Item 9c OTLP export | SELESAI | docs/HASIL-70.md |
+| Item 9d klien PG | SELESAI | docs/HASIL-71.md |
 | F-9 | bus.publish di webhooks.fire() memakai variabel loop (hook/delivery_id) sehingga NATS tak menerima event saat tak ada hook berlangganan. DITUTUP STEP-69: fire() ditulis ulang. | TUTUP |
 | F-10 | Kode sisipan memakai _m.group(1) padahal _match() mengembalikan LIST, bukan match object (AttributeError -> 500). DITUTUP STEP-69: helper _g1() tahan dua bentuk. | TUTUP |
 | F-11 | /users/*/role menuntut ADMIN padahal aktor default TEST_OPERATOR -> ayam-telur, tak ada yang bisa ubah peran. DITUTUP STEP-69: syarat diturunkan ke TEST_OPERATOR. | TUTUP |

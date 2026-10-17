@@ -12,6 +12,7 @@ services:
       GALARDO_DEV_TOKEN: "${GALARDO_DEV_TOKEN:-dev-token}"
       GALARDO_NATS_URL: "nats://nats:4222"
       GALARDO_OTLP_URL: "http://otel:4318"
+      GALARDO_PG_DSN: "postgres://galardo:galardo@pg:5432/galardo"
     volumes:
       - ./data:/app/data
     env_file:
@@ -20,6 +21,7 @@ services:
     depends_on:
       - nats
       - otel
+      - pg
     restart: unless-stopped
 
   nats:
@@ -40,3 +42,24 @@ services:
     ports:
       - "4318:4318"
     restart: unless-stopped
+
+  pg:
+    image: postgres:16-alpine
+    container_name: galardo-pg
+    environment:
+      POSTGRES_USER: galardo
+      POSTGRES_PASSWORD: galardo
+      POSTGRES_DB: galardo
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U galardo -d galardo"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  pgdata:

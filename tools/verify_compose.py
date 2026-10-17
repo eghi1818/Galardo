@@ -78,6 +78,16 @@ check("F otlp fail-open", "otlp nonaktif" in read("backend/otlp.py"))
 check("F konfig collector ada", bool(read("ops/otel-collector.yaml")))
 check("F konfig punya receiver otlp", "otlp:" in read("ops/otel-collector.yaml"))
 
+
+print("== G. Postgres ==")
+check("G service pg ada", "galardo-pg" in dc)
+check("G image postgres", "postgres:16-alpine" in dc)
+check("G GALARDO_PG_DSN di env", "GALARDO_PG_DSN" in dc)
+check("G depends_on pg", "- pg" in dc)
+check("G volume pgdata", "pgdata" in dc)
+check("G modul pg ada", bool(read("backend/pg.py")))
+check("G pg fail-open", "GALARDO_PG_DSN" in read("backend/pg.py"))
+
 print()
 print("RESULTS: %d passed, %d failed" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

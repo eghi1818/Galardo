@@ -75,5 +75,6 @@
 | 68 | bus NATS opt-in (fail-open) + service nats di compose + verify_bus | lihat docs/HASIL-68.md |
 | 69 | alerting + F-9..F-12 (bus, _match list, bootstrap peran, _g1 rekursi) | lihat docs/HASIL-69.md |
 | 70 | ekspor OTLP/HTTP JSON (metrics+span) + service otel-collector | lihat docs/HASIL-70.md |
+| 71 | klien PostgreSQL minimal (wire v3, scram/md5) + service pg + uji live | lihat docs/HASIL-71.md |
 
 Acuan tes: make test 79/79. Titik aman: checkpoint/galardo-v1.1-mulai

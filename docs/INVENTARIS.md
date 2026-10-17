@@ -82,3 +82,5 @@ T1 SEBAGIAN (Ed25519 selesai; RBAC+MFA, backup, Docker pending) | T2-T4 PENDING
 | F-11 | /users/*/role menuntut ADMIN padahal aktor default TEST_OPERATOR -> ayam-telur, tak ada yang bisa ubah peran. DITUTUP STEP-69: syarat diturunkan ke TEST_OPERATOR. | TUTUP |
 | F-12 | _g1() memanggil dirinya sendiri (regex ikut mengganti m.group(1) di dalam _g1); lolos karena _match selalu mengembalikan list. DITUTUP STEP-69. | TUTUP |
 | F-13 | startup packet PG kurang byte terminator (\0) -> server menolak; verifier offline belum memeriksanya. DITUTUP STEP-71b: terminator ditambahkan + cek verifier. | TUTUP |
+| F-14 | SCRAM client rusak di 5 titik: NUL pada SASLResponse, nonce klien dobel di client-final, AuthMessage salah bentuk (gs2 header ikut, server-first hilang), R/code 12 (SASLFinal) tak ditangani, tanda tangan server dihitung atas AuthMessage terpotong. DITUTUP STEP-71c: vektor RFC 7677 di verifier + uji live hijau. | TUTUP |
+| F-1b | Kambuhnya flake F-1: anggaran retry dispatch (12 s) kalah oleh preflight async pada target terdegradasi (probe baseline menunggu timeout; lihat F-7). DITUTUP STEP-71: start_job tries=60/delay=0.5 (30 s), 3/3 run hijau. | TUTUP |

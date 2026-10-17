@@ -56,7 +56,7 @@ check("C scram first format", f == "n,,n=budi,r=nonce123", f)
 fin = pg.scram_client_final("rahasia", b"saltsalt", 4096, f, "nonce123", "servernonce")
 check("C scram final punya p=", ",p=" in fin, fin)
 check("C scram final punya c=biws", fin.startswith("c=biws"), fin)
-check("C scram final memuat nonce gabungan", "nonce123servernonce" in fin, fin)
+check("C scram final r = snonce (tanpa dobel)", fin.startswith("c=biws,r=servernonce,"), fin)
 proof = fin.split(",p=")[1]
 check("C proof base64 sah", len(base64.b64decode(proof)) == 32, len(base64.b64decode(proof)))
 
@@ -90,5 +90,27 @@ check("E query gagal tidak melempar", rows == [] and isinstance(err2, dict), (ro
 check("E error tercatat", pg.stats()["error"] >= 1, pg.stats())
 
 print()
+# --- V. vektor RFC 7677 (SCRAM-SHA-256) — kunci anti-regresi ---
+import base64 as _b64
+import struct as _st
+_first = "n,,n=user,r=rOprNGfwEbeRWgbNEkqO"
+_sfirst = "r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096"
+_prefix = _first[3:] + "," + _sfirst
+_salt = _b64.b64decode("W22ZaJ0SNY7soEsUEjb6gQ==")
+_cn = "rOprNGfwEbeRWgbNEkqO"
+_sn = "rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0"
+_fin = pg.scram_client_final("pencil", _salt, 4096, _prefix, _cn, _sn)
+check("V RFC7677 client-final persis",
+      _fin == "c=biws,r=" + _sn + ",p=dHzbZapWIk4jUhN+Ute9ytag9zjfMHgsqmmiz7AndVQ=", _fin)
+check("V RFC7677 server signature persis",
+      pg.scram_server_signature("pencil", _salt, 4096, _prefix, _sn) == "6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4=",
+      pg.scram_server_signature("pencil", _salt, 4096, _prefix, _sn))
+check("V nonce klien hanya sekali di final", _fin.count(_cn) == 1, _fin)
+check("V sasl_attr buang NUL akhir", pg.sasl_attr(_st.pack(">I", 12) + b"v=ABC=\x00") == "ABC=",
+      repr(pg.sasl_attr(_st.pack(">I", 12) + b"v=ABC=\x00")))
+check("V server sig sensitif nonce", pg.scram_server_signature("pencil", _salt, 4096, _prefix, _sn)
+      != pg.scram_server_signature("pencil", _salt, 4096, _prefix, _sn + "x"), "")
+
+
 print("RESULTS: %d passed, %d failed" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

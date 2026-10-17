@@ -94,11 +94,30 @@ def scram_client_final(password, salt, iterations, auth_message, nonce, snonce):
     salted = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, iterations)
     client_key = hmac.new(salted, b"Client Key", hashlib.sha256).digest()
     stored = hashlib.sha256(client_key).digest()
-    without_proof = "c=biws,r=%s%s" % (nonce, snonce)
+    without_proof = "c=biws,r=%s" % (snonce)
     auth = (auth_message + "," + without_proof).encode()
     sig = hmac.new(stored, auth, hashlib.sha256).digest()
     proof = bytes(a ^ b for a, b in zip(client_key, sig))
     return "%s,p=%s" % (without_proof, base64.b64encode(proof).decode())
+
+
+def sasl_attr(payload, key="v"):
+    """Ambil 1 atribut dari payload SASL (PG mengirim string NUL-terminated)."""
+    s = payload[4:].decode("utf-8", "replace").rstrip("\x00")
+    return dict(p.split("=", 1) for p in s.split(",") if "=" in p).get(key)
+
+
+def scram_server_signature(password, salt, iterations, auth_message, snonce):
+    """ServerSignature = HMAC(ServerKey, AuthMessage) -> base64 (verifikasi R/code 12).
+
+    auth_message = client-first-bare + "," + server-first (2 bagian pertama).
+    Bagian ketiga (client-final tanpa proof) ditambahkan di sini supaya simetris
+    dengan scram_client_final().
+    """
+    salted = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, iterations)
+    server_key = hmac.new(salted, b"Server Key", hashlib.sha256).digest()
+    auth = (auth_message + "," + "c=biws,r=" + snonce).encode()
+    return base64.b64encode(hmac.new(server_key, auth, hashlib.sha256).digest()).decode()
 
 
 # ---------------- parsing ----------------
@@ -202,11 +221,20 @@ def connect(dsn=None, timeout=6.0):
                 body = b"SCRAM-SHA-256\x00" + struct.pack(">I", len(first)) + first.encode()
                 sock.sendall(pack(b"p", body))
             elif code == 11:
-                cont = payload[4:].decode("utf-8", "replace")
+                cont = payload[4:].decode("utf-8", "replace").rstrip("\x00")
                 parts = dict(p.split("=", 1) for p in cont.split(",") if "=" in p)
-                final = scram_client_final(d["password"], base64.b64decode(parts["s"]),
-                                           int(parts["i"]), first, nonce, parts["r"])
-                sock.sendall(password_message(final))
+                if not parts["r"].startswith(nonce):
+                    raise RuntimeError("nonce server tidak berawalan nonce klien")
+                salt = base64.b64decode(parts["s"])
+                iters = int(parts["i"])
+                auth_msg = first[3:] + "," + cont
+                final = scram_client_final(d["password"], salt, iters, auth_msg,
+                                           nonce, parts["r"])
+                expect_sig = scram_server_signature(d["password"], salt, iters, auth_msg, parts["r"])
+                sock.sendall(pack(b"p", final.encode()))
+            elif code == 12:
+                if sasl_attr(payload) != expect_sig:
+                    raise RuntimeError("tanda tangan server SCRAM tidak cocok")
             else:
                 raise RuntimeError("metode auth tak didukung: %d" % code)
         elif kind == b"E":

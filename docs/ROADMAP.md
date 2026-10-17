@@ -93,7 +93,7 @@ dianggap "intrusi" diukur dari bukti, bukan dari daftar.
 ### Tier 2 — Scale
 | Item | Status |
 |---|---|
-| PostgreSQL backend | belum |
+| PostgreSQL backend | klien minimal + uji live hijau (STEP-71); adapter db belum |
 | NATS aktif | aktif opt-in (STEP-68) |
 | Distributed sharding | belum |
 | Per-worker telemetry merge | belum |

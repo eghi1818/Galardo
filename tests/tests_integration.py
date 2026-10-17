@@ -71,7 +71,7 @@ def target_req(path):
         return r.status, json.loads(r.read())
 
 
-def start_job(job_id, tries=30, delay=0.4):
+def start_job(job_id, tries=60, delay=0.5):
     """POST /start dengan toleransi 409 (preflight async belum siap). F-1."""
     st, r = None, None
     for _ in range(tries):

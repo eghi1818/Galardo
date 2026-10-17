@@ -10,6 +10,8 @@ Usage:
   python3 run_local.py --no-target  # API+dashboard only
   python3 run_local.py --reset      # wipe state and reseed
 """
+
+import netssl as _ns
 import argparse
 import os
 import shutil
@@ -55,10 +57,11 @@ def reset_state():
 
 def wait_http(url, timeout=10):
     import urllib.request
+
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
-            with urllib.request.urlopen(url, timeout=1) as r:
+            with urllib.request.urlopen(url, timeout=1, context=_ns.context()) as r:
                 if r.status == 200:
                     return True
         except Exception:

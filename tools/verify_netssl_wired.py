@@ -58,6 +58,33 @@ for fn in sorted(os.listdir(os.path.join(ROOT, "backend"))):
         kandidat.append(fn)
 print("  kandidat: %s" % (kandidat or "(bersih)"))
 check("D external_probe tidak lagi jadi kandidat", "external_probe.py" not in kandidat, kandidat)
+print("== E. urlopen tanpa context di backend ==")
+pelanggar = []
+for fn in sorted(os.listdir(os.path.join(ROOT, "backend"))):
+    if not fn.endswith(".py") or fn == "netssl.py":
+        continue
+    for i, l in enumerate(open(os.path.join(ROOT, "backend", fn), encoding="utf-8").read().split("\n")):
+        if "urlopen(" in l and "context=" not in l:
+            pelanggar.append("%s:%d" % (fn, i + 1))
+check("E tak ada urlopen tanpa context", not pelanggar, pelanggar)
+for fn in ("ownership_ladder.py", "webhooks.py", "worker_daemon.py", "run_local.py"):
+    t = open(os.path.join(ROOT, "backend", fn), encoding="utf-8").read()
+    check("E %s memakai _ns.context" % fn, "_ns.context()" in t)
+
+print("== F. fetch HTTPS nyata lewat ownership_ladder ==")
+import ownership_ladder as ol   # noqa: E402
+r = ol.default_fetcher("https://example.com/", 8)
+check("F default_fetcher HTTPS berstatus 200",
+      isinstance(r, dict) and r.get("status") == 200 and not r.get("error"),
+      {k: r.get(k) for k in ("status", "error")} if isinstance(r, dict) else r)
+print("== E2. AST: netssl diimpor di level modul ==")
+import ast as _ast
+for _fn in ("ownership_ladder.py", "webhooks.py", "worker_daemon.py", "run_local.py"):
+    _t = _ast.parse(open(os.path.join(ROOT, "backend", _fn), encoding="utf-8").read())
+    _al = [(a.asname or a.name) for n in _t.body if isinstance(n, _ast.Import) for a in n.names]
+    check("E2 AST netssl level modul: %s" % _fn, "_ns" in _al or "netssl" in _al, _al)
+
+
 
 print()
 print("HASIL: %d passed, %d failed" % (PASS, FAIL))

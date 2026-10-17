@@ -21,6 +21,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import netssl as _ns
+
 from util import now_iso, gen_id
 
 MAX_BODY = 65536
@@ -91,7 +93,7 @@ def _deliver(hook, event_type, payload, delivery_id):
                          "X-Galardo-Delivery": delivery_id,
                          "X-Galardo-Signature": f"sha256={sig}",
                          "User-Agent": "galardo-webhook/1.0"})
-            with urllib.request.urlopen(req, timeout=8) as r:
+            with urllib.request.urlopen(req, timeout=8, context=_ns.context()) as r:
                 code = r.status
             ok = code == 200
             attempts.append({"attempt": attempt, "status": code,

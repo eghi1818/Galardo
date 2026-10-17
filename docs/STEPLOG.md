@@ -78,5 +78,6 @@
 | 71 | klien PostgreSQL minimal (wire v3, scram/md5) + service pg + uji live + F-13/F-14 (terminator startup, SCRAM, vektor RFC 7677, F-1b anggaran retry) | lihat docs/HASIL-71.md |
 | 72 | adapter db -> PostgreSQL dengan fallback JSON (db_pg.py, cermin JSON, fail-open) + F-15/F-16/F-17 | lihat docs/HASIL-72.md |
 | 73 | e2e nyata: jalur lokal (demo DOWN->RECOVERED, 404/blank) + jalur Docker sehat (port publish 200) + F-18/F-19/F-20/F-21 | lihat docs/HASIL-73.md |
+| 74 | P0.1b TUTUP: urlopen tanpa netssl.context di 4 modul + verifier urlopen/AST + verify_devup | lihat docs/HASIL-74.md |
 
-Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, smoke.sh (termasuk uji HTTP). Titik aman: checkpoint/galardo-v1.3-e2e-terbukti
+Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_wired 20/20, verify_devup 2/2, smoke.sh (termasuk uji HTTP). Titik aman: checkpoint/galardo-v1.3-e2e-terbukti

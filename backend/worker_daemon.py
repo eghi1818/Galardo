@@ -24,6 +24,8 @@ import time
 import urllib.error
 import urllib.request
 
+import netssl as _ns
+
 POLL_INTERVAL = 2.0
 HEARTBEAT_INTERVAL = 5.0
 ABORT_POLL = 1.0
@@ -59,7 +61,7 @@ class WorkerDaemon:
         data = json.dumps(body).encode() if body is not None else None
         req = urllib.request.Request(self.api + path, data=data, method=method,
                                      headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with urllib.request.urlopen(req, timeout=timeout, context=_ns.context()) as r:
             return json.loads(r.read() or b"{}")
 
     def register(self):

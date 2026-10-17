@@ -30,6 +30,8 @@ import time
 import urllib.error
 import urllib.request
 
+import netssl as _ns
+
 __all__ = [
     "LEVELS", "LEVEL_RANK", "LEVEL_IS_PROOF", "DEFAULT_ATTEST_TTL",
     "WELL_KNOWN_TEMPLATE", "ECHO_HEADER", "ECHO_META_TEMPLATE", "VALUE_TEMPLATE",
@@ -84,7 +86,7 @@ def default_fetcher(url, timeout=6.0, max_bytes=131072):
         url, method="GET",
         headers={"User-Agent": "galardo-ownership-ladder/1.0", "Accept": "*/*"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout, context=_ns.context()) as resp:
             body = resp.read(max_bytes)
             headers = dict((k.lower(), v) for k, v in resp.headers.items())
             code = getattr(resp, "status", None) or resp.getcode()

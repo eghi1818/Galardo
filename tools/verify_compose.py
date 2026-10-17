@@ -57,6 +57,16 @@ check("D ada modul yang menghormati GALARDO_BIND", bool(hits), hits)
 check("D default tetap 127.0.0.1",
       'os.environ.get("GALARDO_BIND", "127.0.0.1")' in read("backend/run_local.py"))
 
+
+print("== E. NATS ==")
+check("E service nats ada", "nats:" in dc)
+check("E image nats", "nats:2.10-alpine" in dc)
+check("E GALARDO_NATS_URL di env", "GALARDO_NATS_URL" in dc)
+check("E depends_on nats", "depends_on" in dc and "- nats" in dc)
+check("E modul bus ada", bool(read("backend/bus.py")))
+check("E bus fail-open (tanpa env -> skipped)",
+      "nats nonaktif" in read("backend/bus.py"))
+
 print()
 print("RESULTS: %d passed, %d failed" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

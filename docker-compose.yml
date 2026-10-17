@@ -10,9 +10,21 @@ services:
     environment:
       GALARDO_BIND: "0.0.0.0"
       GALARDO_DEV_TOKEN: "${GALARDO_DEV_TOKEN:-dev-token}"
+      GALARDO_NATS_URL: "nats://nats:4222"
     volumes:
       - ./data:/app/data
     env_file:
       - path: .env
         required: false
+    depends_on:
+      - nats
+    restart: unless-stopped
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: galardo-nats
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
     restart: unless-stopped

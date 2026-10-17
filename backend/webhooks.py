@@ -50,6 +50,7 @@ def _validate_url(url):
 
 
 def register(name, url, secret, events):
+    import bus
     import db
     err = _validate_url(url)
     if err:
@@ -126,6 +127,11 @@ def fire(event_type, payload):
             delivery_id = gen_id("dlv")
             threading.Thread(target=_deliver, args=(hook, event_type, payload, delivery_id),
                              daemon=True, name=f"wh-{hook['id']}").start()
+    except Exception:
+        pass
+    try:
+        bus.publish(event_type, {"event": event_type, "hook": hook.get("id"),
+                                 "delivery": delivery_id, "payload": payload})
     except Exception:
         pass
 

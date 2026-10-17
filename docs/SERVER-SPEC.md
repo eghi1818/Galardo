@@ -126,6 +126,6 @@ Urutan migrasi (sesuai Improvement.md §3):
 
 ## 7. Yang BELUM / butuh keputusan
 
-- Docker Compose file final (butuh keputusan: NATS aktif atau polling dulu?)
+- Docker Compose file final (keputusan STEP-68: NATS aktif tapi opt-in (GALARDO_NATS_URL); polling tetap default)
 - VictoriaMetrics/OTel pipeline (relevan saat fleet >10 worker)
 - Backup strategy Server A (audit + evidence adalah artefak kepatuhan)

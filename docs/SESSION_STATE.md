@@ -1,13 +1,13 @@
 # GALARDO - Status Sesi (kanonik, ~20 baris)
 
-- Diperbarui    : STEP-67
+- Diperbarui    : STEP-68
 - HEAD          : lihat output tools/resume.sh (jangan simpan hash di sini)
 - Branch        : main (tracking origin/main, sinkron)
 - Tes           : make test 61 passed / 0 failed
 - Smoke         : OK
 - Guard         : step_guard OK, git_discipline OK, tree bersih
-- STEP terakhir : STEP-67 - Docker Compose; ITEM 8 TUTUP (docs/HASIL-67.md)
-- Item berikutnya: HANDOFF bagian 8 item 9
+- STEP terakhir : STEP-68 - bus NATS opt-in + service nats (docs/HASIL-68.md)
+- Item berikutnya: item 9 lanjutan = alerting (STEP-69)
 - Blocker       : tidak ada
 - Eksekusi      : STEP-56 selesai; siap STEP-57
 - Temuan terbuka: P0.1b, F-1 (flaky 409), F-3 (tanpa CSP), F-4 (CORS * + Bearer)

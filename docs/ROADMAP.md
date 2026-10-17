@@ -87,8 +87,8 @@ dianggap "intrusi" diukur dari bukti, bukan dari daftar.
 |---|---|
 | Envelope signing Ed25519 | belum |
 | Auth production (RBAC + MFA/SSO) | belum — sekarang `Authorization` kosong = 401, absen = anonim lab |
-| Backup otomatis | belum |
-| Docker Compose final | belum |
+| Backup otomatis | SELESAI (STEP-66) |
+| Docker Compose final | SELESAI (STEP-67) |
 
 ### Tier 2 — Scale
 | Item | Status |

@@ -72,5 +72,6 @@
 | 65 | MFA TOTP: backend/mfa.py + tools/verify_mfa.py (vektor RFC 6238) + /me/mfa/{enroll,verify,disable} + 5 cek integrasi | lihat docs/HASIL-65.md |
 | 66 | backup otomatis: tools/backup.py + verify_backup + target make, retensi, restore | lihat docs/HASIL-66.md |
 | 67 | Docker Compose + Dockerfile + verify_compose + dukungan GALARDO_BIND - ITEM 8 TUTUP | lihat docs/HASIL-67.md |
+| 68 | bus NATS opt-in (fail-open) + service nats di compose + verify_bus | lihat docs/HASIL-68.md |
 
 Acuan tes: make test 61/61. Titik aman: checkpoint/galardo-v1.1-mulai

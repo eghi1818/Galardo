@@ -8,3 +8,9 @@
 - Bukti  : panel menampilkan forced + override_header dari probe, bukan sekadar status
 - Catatan: editor probe-contract (POST /targets/*/probe-contract) belum disambungkan - kandidat STEP-62
 - Catatan: heredoc bersarang pernah membuat terminal macet; JS kini ditulis ke file dulu
+
+## Penerimaan (bukti live)
+- POST /overrides -> 201 applied_tiers=[T2] failed_tiers=[] shim_url terisi (id=ovr-995dc36a9641)
+- POST /overrides/*/probe -> status=404 forced=true override_header="404" shim running=true forced_hits=2
+- POST /overrides/*/revert -> ok=true reverted=[T2] (audit spec_id ov-1792206822555)
+- Catatan: shim tier T2 memang jalan di make dev-up, jadi tidak ada failed_tiers.

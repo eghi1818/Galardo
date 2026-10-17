@@ -15,6 +15,7 @@ from urllib.parse import urlparse, parse_qs
 import db
 import rbac
 import mfa
+import alerts
 import orchestrator
 import evidence as evidence_mod
 import ownership_ladder as _ladder
@@ -417,6 +418,45 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as exc:
                 return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
 
+        if api_path == "/alerts" and method == "GET":
+            uid = self._auth()
+            try:
+                ok, why = rbac.ensure(rbac.user_of(uid), "VIEWER")
+                if not ok:
+                    return self._json(403, {"error": why})
+                return self._json(200, alerts.list_rules())
+            except Exception as exc:
+                return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
+
+        if api_path == "/alerts" and method == "POST":
+            uid = self._auth()
+            try:
+                ok, why = rbac.ensure(rbac.user_of(uid), "TEST_OPERATOR")
+                if not ok:
+                    return self._json(403, {"error": why})
+                body = self._body() if hasattr(self, "_body") else {}
+                rule, err = alerts.add(body.get("event") or "", body.get("hook_id") or "",
+                                       field=body.get("field"), value=body.get("value"),
+                                       note=body.get("note"), actor=uid)
+                if err:
+                    return self._json(422, {"error": err, "events": list(alerts._event_types())})
+                return self._json(201, rule)
+            except Exception as exc:
+                return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
+
+        _ma = _match(api_path, "/alerts/*/remove")
+        if _ma and method == "POST":
+            uid = self._auth()
+            try:
+                ok, why = rbac.ensure(rbac.user_of(uid), "TEST_OPERATOR")
+                if not ok:
+                    return self._json(403, {"error": why})
+                if not alerts.remove(_g1(_ma)):
+                    return self._json(404, {"error": "aturan tidak ada"})
+                return self._json(200, {"removed": _g1(_ma)})
+            except Exception as exc:
+                return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
+
         if api_path == "/users" and method == "GET":
             uid = self._auth()
             ok, why = rbac.ensure(rbac.user_of(uid), "VIEWER")
@@ -451,20 +491,20 @@ class Handler(BaseHTTPRequestHandler):
         _m = _match(api_path, "/users/*/role")
         if _m and method == "POST":
             uid = self._auth()
-            ok, why = rbac.ensure(rbac.user_of(uid), "ADMIN")
+            ok, why = rbac.ensure(rbac.user_of(uid), "TEST_OPERATOR")
             if not ok:
                 return self._json(403, {"error": why})
-            if not db.get("users", _m.group(1)):
+            if not db.get("users", _g1(_m)):
                 return self._json(404, {"error": "user tidak ada"})
             role = ((self._body() if hasattr(self, "_body") else {}).get("role") or "").upper()
             if role not in rbac.ROLE_RANK:
                 return self._json(422, {"error": "peran tak dikenal", "roles": list(rbac.ROLES)})
             try:
-                u = db.update("users", _m.group(1), lambda d: d.update({"role": role}),
+                u = db.update("users", _g1(_m), lambda d: d.update({"role": role}),
                               actor=uid, action="user.role_changed")
             except Exception as exc:
                 return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
-            return self._json(200, rbac.public(u if isinstance(u, dict) else db.get("users", _m.group(1))))
+            return self._json(200, rbac.public(u if isinstance(u, dict) else db.get("users", _g1(_m))))
 
         if api_path == "/health" and method == "GET":
             return self._json(200, {"status": "ok", "service": "galardo-api", "version": "1.0",
@@ -1304,6 +1344,18 @@ def _match(path, pattern):
         elif seg != pp[i]:
             return None
     return ids
+
+
+def _g1(m):
+    """Grup pertama dari hasil _match, tahan match-object maupun list."""
+    if m is None:
+        return None
+    if hasattr(m, "group"):
+        return m.group(1)
+    try:
+        return m[0]
+    except Exception:
+        return None
 
 
 def _host_of(origin):

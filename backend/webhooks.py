@@ -115,8 +115,9 @@ def _deliver(hook, event_type, payload, delivery_id):
 
 
 def fire(event_type, payload):
-    """Non-blocking dispatch to all ACTIVE hooks subscribed to event_type.
-    Never raises - hooks must not break the state machine."""
+    """Non-blocking dispatch ke semua hook ACTIVE yang berlangganan event_type.
+    Tidak pernah melempar. Juga menerbitkan ke bus NATS dan mengevaluasi aturan alert."""
+    delivered = []
     try:
         if event_type not in EVENT_TYPES:
             return
@@ -125,16 +126,20 @@ def fire(event_type, payload):
                  if h.get("status") == "ACTIVE" and event_type in h.get("events", [])]
         for hook in hooks:
             delivery_id = gen_id("dlv")
+            delivered.append({"hook": hook.get("id"), "delivery": delivery_id})
             threading.Thread(target=_deliver, args=(hook, event_type, payload, delivery_id),
-                             daemon=True, name=f"wh-{hook['id']}").start()
+                             daemon=True, name="wh-" + str(hook.get("id"))).start()
     except Exception:
         pass
     try:
-        bus.publish(event_type, {"event": event_type, "hook": hook.get("id"),
-                                 "delivery": delivery_id, "payload": payload})
+        bus.publish(event_type, {"event": event_type, "deliveries": delivered, "payload": payload})
     except Exception:
         pass
-
+    try:
+        import alerts
+        alerts.run(event_type, payload)
+    except Exception:
+        pass
 
 def send_test(hook_id):
     import db

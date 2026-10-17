@@ -480,6 +480,28 @@ def main():
     st, off = req("POST", "/me/mfa/disable", {})
     check("mfa: disable -> nonaktif", st == 200 and (off or {}).get("mfa_enabled") is False, off)
 
+    print("== ALERTS (STEP-69) ==")
+    st, hk = req("POST", "/webhooks", {"name": "alr-uji", "url": "https://contoh.test/alr", "events": ["job.failed"]})
+    hid = (hk or {}).get("id")
+    check("alerts: hook uji dibuat", st == 201 and bool(hid), hk)
+    st, rl = req("POST", "/alerts", {"event": "job.failed", "hook_id": hid, "note": "uji"})
+    check("alerts: aturan dibuat", st == 201 and (rl or {}).get("id"), rl)
+    st, ls = req("GET", "/alerts")
+    check("alerts: daftar memuat aturan", st == 200 and isinstance(ls, list) and len(ls) >= 1, st)
+    st, bad = req("POST", "/alerts", {"event": "event.ngawur", "hook_id": hid})
+    check("alerts: event tak dikenal 422", st == 422, st)
+    st, rm = req("POST", "/alerts/%s/remove" % (rl or {}).get("id", "x"), {})
+    check("alerts: hapus aturan", st == 200 and (rm or {}).get("removed"), rm)
+
+    print("== ROLE (STEP-69) ==")
+    st, nu2 = req("POST", "/users", {"email": "uji-role@contoh.test", "role": "VIEWER"})
+    uid2 = (nu2 or {}).get("id")
+    check("role: user uji dibuat", st == 201 and bool(uid2), nu2)
+    st, ch = req("POST", "/users/%s/role" % uid2, {"role": "APPROVER"})
+    check("role: ubah role -> 200 APPROVER", st == 200 and (ch or {}).get("role") == "APPROVER", ch)
+    st, bad = req("POST", "/users/%s/role" % uid2, {"role": "SUPERMAN"})
+    check("role: peran ngawur -> 422", st == 422, st)
+
     print(f"\n{'='*60}\nRESULTS: {len(PASS)} passed, {len(FAIL)} failed")
     if FAIL:
         for name, detail in FAIL:

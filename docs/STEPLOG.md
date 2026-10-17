@@ -62,5 +62,7 @@
 | 56 | sinkron audit dashboard: item 6 SELESAI + upgrade DASHBOARD-AUDIT.md + temuan F-2..F-4 | lihat docs/HASIL-56.md |
 | 57 | tutup F-2 sebagai reklasifikasi (path target, bukan route API) + koreksi UI-API-GAP | lihat docs/HASIL-57.md |
 | 58 | panel Ownership di dashboard (irisan 1/6 item 7) + verifier halaman + F-6 | lihat docs/HASIL-58.md |
+| 59 | panel Sources di dashboard (irisan 2/6 item 7) | lihat docs/HASIL-59.md |
+| 60 | kartu Bukti & observer di halaman live (irisan 3/6 item 7) + tutup F-1 | lihat docs/HASIL-60.md |
 
 Acuan tes: make test 61/61. Titik aman: checkpoint/galardo-v1.1-mulai

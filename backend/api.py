@@ -6,6 +6,7 @@ Base path /api/v1 per Technical Design §12. HTTP semantics: 400 malformed,
 """
 import json
 import os
+import os
 import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -1214,11 +1215,13 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(404, {"error": "source not found"})
                 b = self._body()
                 r = _up.probe_all(qname=b.get("qname") or _up.DEFAULT_QNAME,
+                                  budget=float(b.get("budget") or os.environ.get("GALARDO_UDP_BUDGET") or 8.0),
                                   qtype=b.get("qtype") or "TXT",
                                   timeout=float(b.get("timeout") or 3.0),
                                   ports_n=int(b.get("ports_n") or 6))
                 if b.get("spoof", True):
-                    r["spoof"] = _up.probe_spoof(qname=b.get("qname") or _up.DEFAULT_QNAME)
+                    r["spoof"] = _up.probe_spoof(qname=b.get("qname") or _up.DEFAULT_QNAME,
+                                                 timeout=float(b.get("spoof_timeout") or 5.0))
                 if r.get("reflection_capable"):
                     _sc.mark_proven(m[0], ["udp"], {"udp": r})
                 if (r.get("spoof") or {}).get("spoof_proven"):

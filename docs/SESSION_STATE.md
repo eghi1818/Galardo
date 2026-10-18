@@ -15,5 +15,5 @@
 - Konvensi bukti: docs/HASIL-<step>.md (satu tempat, bukan .out/)
 - Istilah      : "rung 1 kepemilikan" = dns_txt (rank 4). Jangan tulis "rank 1" (itu operator_attestation)
 
-- Langkah terakhir : STEP-74 (P0.1b TUTUP: urlopen telanjang + penjaga verifier/AST/devup)
-- Langkah berikut  : F-7 (probe UDP lambat — akar F-1b), lalu F-4 (CORS * + Bearer), F-3 (CSP)
+- Langkah terakhir : STEP-75 (F-7 TUTUP: pagar waktu probe UDP)
+- Langkah berikut  : F-4 (CORS * + Bearer), lalu F-3 (CSP) - sisa terakhir

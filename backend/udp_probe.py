@@ -139,14 +139,17 @@ def _exchange(target, port, payload, timeout=3.0, expect=1, src_port=None, bufsi
         sock.close()
 
 
-def _probe_many(targets, port, payload_factory, timeout, expect):
+def _probe_many(targets, port, payload_factory, timeout, expect, deadline=None):
     out = []
     for t in targets:
+        if deadline is not None and time.time() >= deadline:
+            break
         try:
             payload = payload_factory() if callable(payload_factory) else payload_factory
         except Exception:
             payload = payload_factory
-        r = _exchange(t, port, payload, timeout=timeout, expect=expect)
+        t_timeout = timeout if deadline is None else max(0.05, min(timeout, deadline - time.time()))
+        r = _exchange(t, port, payload, timeout=t_timeout, expect=expect)
         out.append(r)
         if r.get("responded"):
             break
@@ -158,17 +161,21 @@ def _probe_many(targets, port, payload_factory, timeout, expect):
 # ---------------------------------------------------------------------------
 # public probes
 # ---------------------------------------------------------------------------
-def probe_dns(qname=DEFAULT_QNAME, qtype="TXT", servers=DNS_SERVERS, timeout=3.0):
+def probe_dns(qname=DEFAULT_QNAME, qtype="TXT", servers=DNS_SERVERS, timeout=3.0, deadline=None):
     return _probe_many(servers, 53, lambda: dns_packet(qname, qtype)[1], timeout, 1)
 
 
-def probe_dns_best(timeout=3.0, candidates=DNS_CANDIDATES):
+def probe_dns_best(timeout=3.0, candidates=DNS_CANDIDATES, deadline=None):
     """Coba beberapa kombinasi qname/qtype, kembalikan yang amplifikasinya terbesar."""
     tried = []
     best = None
     for qname, qtype in candidates:
+        if deadline is not None and time.time() >= deadline:
+            break
+        if deadline is not None and time.time() >= deadline:
+            break
         r = _probe_many(DNS_SERVERS, 53, lambda q=qname, t=qtype: dns_packet(q, t)[1],
-                        min(timeout, 2.5), 1)
+                        min(timeout, 2.5), 1, deadline=deadline)
         b = r.get("best") or {}
         tried.append({"qname": qname, "qtype": qtype,
                       "responded": b.get("responded"),
@@ -182,9 +189,9 @@ def probe_dns_best(timeout=3.0, candidates=DNS_CANDIDATES):
             "qname": (best or {}).get("qname"), "qtype": (best or {}).get("qtype")}
 
 
-def probe_ntp(mode=3, servers=None, timeout=3.0):
+def probe_ntp(mode=3, servers=None, timeout=3.0, deadline=None):
     servers = servers or (NTP_CTRL_SERVERS if mode == 6 else NTP_SERVERS)
-    return _probe_many(servers, 123, lambda: ntp_packet(mode), timeout, 1)
+    return _probe_many(servers, 123, lambda: ntp_packet(mode), timeout, 1, deadline=deadline)
 
 
 def _ssdp_once(iface, window):
@@ -240,6 +247,8 @@ def rotate_source_ports(target="1.1.1.1", port=53, n=8, timeout=1.5, qname=DEFAU
     """Rate-limit sering per source port. Kirim dari n port berbeda, hitung yang dijawab."""
     results = []
     for i in range(n):
+        if deadline is not None and time.time() >= deadline:
+            break
         payload = dns_packet(qname, "TXT")[1]
         r = _exchange(target, port, payload, timeout=timeout, expect=1,
                       src_port=40000 + random.randint(0, 20000))
@@ -251,16 +260,45 @@ def rotate_source_ports(target="1.1.1.1", port=53, n=8, timeout=1.5, qname=DEFAU
             "rate_limited": ok < n, "results": results}
 
 
-def probe_all(qname=DEFAULT_QNAME, qtype="TXT", timeout=3.0, ports_n=6):
-    if qname and qname != DEFAULT_QNAME:
-        dns = probe_dns(qname, qtype, timeout=timeout)
+def probe_all(qname=DEFAULT_QNAME, qtype="TXT", timeout=3.0, ports_n=6, budget=None):
+    """Probe semua jalur UDP dengan PAGAR WAKTU TOTAL.
+
+    budget = batas detik untuk SELURUH fungsi (default GALARDO_UDP_BUDGET atau 8.0).
+    Tahap yang tidak sempat berjalan ditandai {"skipped": "budget"} - BUKAN dianggap gagal.
+    Setiap tahap memakai timeout=min(timeout, sisa budget) supaya tak bisa menembus pagar.
+    """
+    if budget is None:
+        try:
+            budget = float(os.environ.get("GALARDO_UDP_BUDGET") or 8.0)
+        except ValueError:
+            budget = 8.0
+    budget = max(0.2, float(budget))
+    deadline = time.time() + budget
+    skipped = []
+
+    def sisa():
+        return max(0.0, deadline - time.time())
+
+    def lewat(nama):
+        if sisa() <= 0.2:
+            skipped.append(nama)
+            return True
+        return False
+
+    if lewat("dns"):
+        dns = {"skipped": "budget"}
+    elif qname and qname != DEFAULT_QNAME:
+        dns = probe_dns(qname, qtype, timeout=min(timeout, sisa()), deadline=deadline)
         dns["best"] = dict(dns.get("best") or {}, qname=qname, qtype=qtype)
     else:
-        dns = probe_dns_best(timeout=timeout)
-    ntp3 = probe_ntp(3, timeout=timeout)
-    ntp6 = probe_ntp(6, timeout=timeout)
-    ssdp = probe_ssdp(timeout=timeout)
-    rot = rotate_source_ports(qname=qname, n=ports_n, timeout=min(1.5, timeout))
+        dns = probe_dns_best(timeout=min(timeout, sisa()), deadline=deadline)
+
+    ntp3 = {"skipped": "budget"} if lewat("ntp_mode3") else probe_ntp(3, timeout=min(timeout, sisa()), deadline=deadline)
+    ntp6 = {"skipped": "budget"} if lewat("ntp_mode6") else probe_ntp(6, timeout=min(timeout, sisa()), deadline=deadline)
+    ssdp = {"skipped": "budget"} if lewat("ssdp") else probe_ssdp(timeout=min(timeout, sisa()))
+    rot = ({"skipped": "budget"} if lewat("port_rotation")
+           else rotate_source_ports(qname=qname, n=ports_n, timeout=min(1.5, timeout, sisa())))
+
     best = max([dns.get("best") or {}, ntp3.get("best") or {},
                 ntp6.get("best") or {}, ssdp.get("best") or {}],
                key=lambda r: r.get("amplification", 0.0))
@@ -272,6 +310,9 @@ def probe_all(qname=DEFAULT_QNAME, qtype="TXT", timeout=3.0, ports_n=6):
         "best": best,
         "best_amplification": best.get("amplification", 0.0),
         "reflection_capable": bool(best.get("responded") and best.get("amplification", 0) > 1.0),
+        "budget": budget,
+        "elapsed": round(budget - sisa(), 2),
+        "skipped": skipped,
         "at": time.time(),
     }
 

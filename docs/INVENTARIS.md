@@ -68,7 +68,7 @@ T1 SEBAGIAN (Ed25519 selesai; RBAC+MFA, backup, Docker pending) | T2-T4 PENDING
 | F-4 | CORS "*" digabung Bearer token (STEP-56) | TERBUKA |
 | F-5 | UI tidak mengirim Authorization ke API - by design D14 (header absen = boleh) | BUKAN TEMUAN |
 | F-6 | Gate STEP-58 tidak memuat verifier & node --check, sehingga commit lolos membawa JS rusak (sudah diperbaiki STEP-58b) | TUTUP |
-| F-7 | Probe UDP (/sources/*/udp) melebihi timeout 15s -> suite crash. Tes kini timeout=45. Endpoint perlu ditinjau. | TERBUKA |
+| F-7 | Probe UDP (/sources/*/udp) melebihi timeout 15s -> suite crash. Tes kini timeout=45. Endpoint perlu ditinjau. | TUTUP DITUTUP STEP-75: budget total (GALARDO_UDP_BUDGET, default 8s) + deadline ke loop fan-out + timeout per-target dibatasi + endpoint teruskan budget; verifier verify_udp_budget 16/0. |
 | F-8 | /start balas 409 untuk preflight belum siap (fail-fast) - keputusan desain, bukan bug. | BUKAN TEMUAN |
 | Item 8a RBAC | SELESAI | docs/HASIL-64.md |
 | Item 8b MFA TOTP | SELESAI | docs/HASIL-65.md |

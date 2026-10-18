@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse, parse_qs
 
 import db
+import exttool
 import rbac
 import mfa
 import alerts
@@ -456,6 +457,27 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, {"mfa_enabled": False})
             except Exception as exc:
                 return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
+
+        if api_path == "/exttools" and method == "GET":
+            uid = self._auth()
+            ok, why = rbac.ensure(rbac.user_of(uid), "VIEWER")
+            if not ok:
+                return self._json(403, {"error": why})
+            return self._json(200, exttool.status())
+
+        _mxt = _match(api_path, "/exttools/*/run")
+        if _mxt and method == "POST":
+            uid = self._auth()
+            ok, why = rbac.ensure(rbac.user_of(uid), "TEST_OPERATOR")
+            if not ok:
+                return self._json(403, {"error": why})
+            body = (self._body() if hasattr(self, "_body") else {}) or {}
+            args = body.get("args")
+            if args is not None and not isinstance(args, list):
+                return self._json(422, {"error": "args harus list"})
+            hasil = exttool.run(_g1(_mxt), args=args,
+                               timeout=body.get("timeout"), target=body.get("target"))
+            return self._json(200, hasil)
 
         if api_path == "/alerts" and method == "GET":
             uid = self._auth()

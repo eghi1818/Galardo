@@ -15,5 +15,5 @@
 - Konvensi bukti: docs/HASIL-<step>.md (satu tempat, bukan .out/)
 - Istilah      : "rung 1 kepemilikan" = dns_txt (rank 4). Jangan tulis "rank 1" (itu operator_attestation)
 
-- Langkah terakhir : STEP-76 (F-3/F-4 TUTUP: CSP + header keamanan + CORS strict)
-- Langkah berikut  : temuan terbuka KOSONG; opsi: integrasi Subfinder/Nikto/Traceroute, atau bootstrap repo REA
+- Langkah terakhir : STEP-77 (integrasi tool eksternal Subfinder/Nikto/Traceroute, fail-open + endpoint /exttools)
+- Langkah berikut  : opsional: panel dashboard Tools, atau bootstrap repo REA

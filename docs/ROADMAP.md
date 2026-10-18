@@ -145,3 +145,4 @@ Lihat `docs/CAPACITY-BASELINE.md`: plafon generator laptop ~5.900 rps (rute ring
 | D20 | `import os` hilang di `srccap.py` (NameError) | **fixed** |
 | D21 | hitungan `expected_agents` worm salah (6 vs 14) | **fixed** |
 | End-to-end nyata | selesai (STEP-73): demo DOWN->RECOVERED, 404/blank, container sehat + port publish 200 |
+| Tool eksternal (subfinder/nikto/traceroute) | adapter fail-open + endpoint /exttools + verifier 16/16 (STEP-77) |

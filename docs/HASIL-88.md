@@ -20,3 +20,11 @@ Status: SELESAI keduanya.
     HTTP limit 5/m: 5 permintaan pertama 200, sisanya 429 + header Retry-After
     /api/v1/health tetap 200 walau limit habis
     make gate rc=0 ; make test 79/0
+
+## Koreksi (blok 89) — jujur
+1. Commit a6935fc ter-push dengan gate MERAH (rc=2) karena cek commit memakai
+   `grep GAGAL` alih-alih exit code. Kini memakai rc.
+2. verify_ratelimit 16/1: kunci() mengambil 24 karakter terakhir header UTUH sehingga
+   jadi "tok:Bearer ...". Diperbaiki: skema auth dibuang dulu; verifier menambah kasus
+   header tanpa skema.
+3. make test flake (kegagalan ketiga) -> dilacak di blok ini; lihat catatan di bawah.

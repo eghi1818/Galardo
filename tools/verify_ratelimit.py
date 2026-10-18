@@ -53,8 +53,9 @@ check("C file statis dikecualikan", rl.cek(H(path="/")) is None)
 # D. kunci dari token, bukan IP
 os.environ[rl.ENV] = "1/60s"
 rl.reset()
-check("D token jadi kunci", rl.kunci(H(auth="Bearer abcdefghijklmnop")) == "tok:abcdefghijklmnop",
+check("D token jadi kunci (skema dibuang)", rl.kunci(H(auth="Bearer abcdefghijklmnop")) == "tok:abcdefghijklmnop",
       rl.kunci(H(auth="Bearer abcdefghijklmnop")))
+check("D header tanpa skema tetap aman", rl.kunci(H(auth="abc")) == "tok:abc", rl.kunci(H(auth="abc")))
 check("D tanpa token -> IP", rl.kunci(H(ip="5.6.7.8")) == "ip:5.6.7.8", rl.kunci(H(ip="5.6.7.8")))
 
 # E. mati = tanpa batas

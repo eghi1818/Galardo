@@ -59,7 +59,8 @@ def kunci(handler):
     except Exception:
         auth = ""
     if auth:
-        return "tok:" + auth[-24:]
+        tok = auth.split(None, 1)[1] if " " in auth else auth   # buang skema (Bearer/dll)
+        return "tok:" + tok[-24:]
     try:
         return "ip:" + (handler.client_address[0] if handler.client_address else "?")
     except Exception:

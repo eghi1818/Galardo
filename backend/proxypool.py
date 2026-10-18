@@ -88,6 +88,12 @@ def resolve(name):
         if not spec:
             return None
         entry = parse_spec(spec)
+    try:                       # provider pihak ketiga (fail-open)
+        import proxy_provider
+        if proxy_provider.ensure(name):
+            return _REGISTRY.get(name)
+    except Exception:
+        pass
     return (entry[0], entry[1])
 
 

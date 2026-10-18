@@ -30,9 +30,10 @@ Uji: buka tab Actions, pastikan run terakhir hijau.
    - Zone Resources: Include → Specific zone → domain Anda
 4. Salin dua nilai: **API Token** dan **Zone ID** (di halaman Overview domain,
    kolom kanan bawah).
-5. Set di Galardo (nama env lengkap ada di Lampiran A; yang dipakai kode: token zona):
-       GALARDO_CF_TOKEN=<token>
-       GALARDO_CF_ZONE=<zone id atau nama zona>
+5. Set di Galardo (nama env dari kode - lihat Lampiran A/B):
+       GALARDO_CF_TOKEN=<api token>
+       GALARDO_CF_ACCOUNT_ID=<account id>
+       GALARDO_CF_ZONE_ID=<zone id>          # atau GALARDO_CF_ZONE_NAME=<domain>
 6. Uji: `make t3` → harus mencetak status/verdict, bukan 401/403.
 Catatan: zona Cloudflare hanya perlu kalau Anda mau uji live; tanpa itu `make dev-up`
 tetap jalan penuh.

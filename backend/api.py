@@ -15,6 +15,7 @@ from urllib.parse import urlparse, parse_qs
 
 import db
 import exttool
+import proxy_provider
 import rbac
 import mfa
 import alerts
@@ -457,6 +458,21 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, {"mfa_enabled": False})
             except Exception as exc:
                 return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
+
+        if api_path == "/proxy/status" and method == "GET":
+            uid = self._auth()
+            ok, why = rbac.ensure(rbac.user_of(uid), "VIEWER")
+            if not ok:
+                return self._json(403, {"error": why})
+            return self._json(200, proxy_provider.status())
+
+        if api_path in ("/proxy/refresh", "/proxy/rotate") and method == "POST":
+            uid = self._auth()
+            ok, why = rbac.ensure(rbac.user_of(uid), "TEST_OPERATOR")
+            if not ok:
+                return self._json(403, {"error": why})
+            fn = proxy_provider.refresh if api_path.endswith("refresh") else proxy_provider.rotate
+            return self._json(200, fn())
 
         if api_path == "/exttools" and method == "GET":
             uid = self._auth()

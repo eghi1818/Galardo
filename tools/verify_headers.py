@@ -55,6 +55,8 @@ check("A CSP terpasang pada HTML", 'send_header("Content-Security-Policy", CSP)'
 check("A header keamanan lengkap",
       all(h in src for h in ("X-Content-Type-Options", "Referrer-Policy", "X-Frame-Options")))
 check("A preflight OPTIONS balas 204", "def do_OPTIONS(self):" in src and "send_response(204)" in src)
+_html = open(os.path.join(ROOT, "dashboard", "index.html"), encoding="utf-8").read()
+check("A dashboard tanpa aset eksternal (CSP 'self' aman)", 'src="http' not in _html)
 
 # B. default (tanpa env) -> "*" tanpa Vary
 proc = boot()

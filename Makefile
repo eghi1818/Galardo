@@ -129,3 +129,14 @@ docker-up:
 	docker compose up -d
 docker-down:
 	docker compose down
+
+gate: test
+	@echo "== GATE: menjalankan semua verifier =="
+	@rc=0; for v in tools/verify_*.py; do \
+		if python3 "$$v" > /tmp/gate_$$(basename $$v).log 2>&1; then \
+			printf "  ok   %s\n" "$$(basename $$v)"; \
+		else \
+			printf "  GAGAL %s\n" "$$(basename $$v)"; rc=1; \
+		fi; \
+	done; \
+	echo "== GATE selesai (rc=$$rc) =="; exit $$rc

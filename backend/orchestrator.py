@@ -198,7 +198,9 @@ def _knee_stage(job_id, tgt):
         return None, None, {"reason": "target tidak merespons (semua request gagal)", "raw": raw}
     est = knee_mod.estimate(samples)
     rec = knee_mod.recommend(est.get("knee"))
-    if est and est.get("knee"):
+    if est:
+        # cache setiap estimate (termasuk "tanpa knee"): pengukuran ini mahal (~beberapa detik),
+        # jadi panggilan berikutnya untuk origin yang sama tidak perlu mengukur ulang.
         with _KNEE_LOCK:
             _KNEE_CACHE[origin] = {"at": time.time(), "estimate": est, "recommend": rec}
     return est, rec, raw

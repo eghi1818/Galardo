@@ -64,8 +64,8 @@ T1 SEBAGIAN (Ed25519 selesai; RBAC+MFA, backup, Docker pending) | T2-T4 PENDING
 | P0.1b | backend/ownership_ladder.default_fetcher() masih urllib.request.urlopen polos, bukan netssl.context() (temuan STEP-55) | TUTUP (STEP-74): context=_ns.context() di ownership_ladder/webhooks/worker_daemon/run_local; verifier memindai urlopen telanjang (E) + AST import level modul (E2); verify_devup.py menjaga run_local. |
 | F-1 | flaky 409 pada dispatch job. SEBAB SEBENARNYA: /start fail-fast balas 409 bila preflight async belum PASS (api.py:845). DITUTUP STEP-60c/64-K: helper start_job toleran 409 (30x0.4s), berlaku untuk semua bentuk pemanggilan /start. | TUTUP |
 | F-2 | UI memanggil GET /admin/secret & GET /healthz - TUTUP: keduanya path sisi-target, bukan route API (STEP-57) | TUTUP |
-| F-3 | Tidak ada Content-Security-Policy pada respons API/dashboard (STEP-56) | TUTUP ( STEP-76: CSP + nosniff + Referrer-Policy + X-Frame-Options pada dokumen; verify_headers 21/0.) |
-| F-4 | CORS "*" digabung Bearer token (STEP-56) | TUTUP ( STEP-76: GALARDO_CORS_ORIGINS + Vary: Origin + omit strict untuk origin tak terdaftar; preflight diuji.) |
+| F-3 | Tidak ada Content-Security-Policy pada respons API/dashboard (STEP-56) | TUTUP (STEP-76: CSP + nosniff + Referrer-Policy + X-Frame-Options pada dokumen; verify_headers 21/0.) |
+| F-4 | CORS "*" digabung Bearer token (STEP-56) | TUTUP (STEP-76: GALARDO_CORS_ORIGINS + Vary: Origin + omit strict untuk origin tak terdaftar; preflight diuji.) |
 | F-5 | UI tidak mengirim Authorization ke API - by design D14 (header absen = boleh) | BUKAN TEMUAN |
 | F-6 | Gate STEP-58 tidak memuat verifier & node --check, sehingga commit lolos membawa JS rusak (sudah diperbaiki STEP-58b) | TUTUP |
 | F-7 | Probe UDP (/sources/*/udp) melebihi timeout 15s -> suite crash. Tes kini timeout=45. Endpoint perlu ditinjau. | TUTUP (STEP-75): budget total (GALARDO_UDP_BUDGET, default 8s) + deadline ke loop fan-out + timeout per-target dibatasi + endpoint teruskan budget; verifier verify_udp_budget 16/0. |

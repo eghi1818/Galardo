@@ -16,6 +16,7 @@ from urllib.parse import urlparse, parse_qs
 import db
 import exttool
 import proxy_provider
+import ratelimit
 import rbac
 import mfa
 import alerts
@@ -213,6 +214,8 @@ class Handler(BaseHTTPRequestHandler):
         body = json.dumps(obj, default=str).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
+        if getattr(self, "_retry_after", None):
+            self.send_header("Retry-After", str(self._retry_after))
         self.send_header("Content-Length", str(len(body)))
         self._cors()
         self.end_headers()
@@ -391,6 +394,10 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---- router --------------------------------------------------------
     def _dispatch(self, method):
+        _rl = ratelimit.cek(self)
+        if _rl:
+            self._retry_after = _rl
+            return self._json(429, {"error": "rate limit terlampaui", "retry_after": _rl})
         path, q = self._route()
         if not path.startswith("/api"):
             if method == "GET":
@@ -458,6 +465,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, {"mfa_enabled": False})
             except Exception as exc:
                 return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
+
+        if api_path == "/ratelimit" and method == "GET":
+            uid = self._auth()
+            ok, why = rbac.ensure(rbac.user_of(uid), "VIEWER")
+            if not ok:
+                return self._json(403, {"error": why})
+            return self._json(200, ratelimit.status())
 
         if api_path == "/proxy/status" and method == "GET":
             uid = self._auth()

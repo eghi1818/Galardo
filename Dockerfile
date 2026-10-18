@@ -7,7 +7,8 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # --- tool eksternal untuk panel Tools (P3) ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates curl perl unzip \
+        ca-certificates curl perl unzip traceroute \
+        libnet-ssleay-perl libio-socket-ssl-perl \
     && rm -rf /var/lib/apt/lists/*
 
 # nikto (perl)

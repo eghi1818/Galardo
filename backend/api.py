@@ -33,6 +33,33 @@ except Exception:
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DASH_DIR = os.path.normpath(os.path.join(BASE, "..", "dashboard"))
+
+# --- F-3/F-4: header keamanan + CORS terkonfigurasi (default tetap "*" agar tak ada regresi) ---
+CORS_ENV = "GALARDO_CORS_ORIGINS"
+CSP = os.environ.get("GALARDO_CSP") or (
+    "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+    "script-src 'self' 'unsafe-inline'; "
+    "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+)
+
+
+def _cors_mode():
+    """Mode CORS dari env: "*" (semua origin) atau daftar origin dipisah koma."""
+    return (os.environ.get(CORS_ENV) or "*").strip() or "*"
+
+
+def _cors_allow(origin, mode=None):
+    """Origin yang boleh di-echo, atau None bila header harus diomit (strict).
+
+    "*" -> "*". Daftar -> hanya origin terdaftar yang di-echo; origin lain diomit
+    supaya browser benar-benar memblokir (bukan mengirim origin yang salah).
+    """
+    mode = mode or _cors_mode()
+    if mode == "*":
+        return "*"
+    if not origin:
+        return None
+    return origin if origin in [x.strip() for x in mode.split(",") if x.strip()] else None
 DEV_TOKEN = os.environ.get("GALARDO_DEV_TOKEN", "dev-token")  # MVP lab: seeded dev users only
 MAX_BODY = 262144
 
@@ -167,9 +194,18 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---- helpers -------------------------------------------------------
     def _cors(self):
-        self.send_header("Access-Control-Allow-Origin", "*")
+        _mode = _cors_mode()
+        _allow = _cors_allow(self.headers.get("Origin"), _mode)
+        if _allow:
+            self.send_header("Access-Control-Allow-Origin", _allow)
+        if _mode != "*":
+            self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, Idempotency-Key")
+        self.send_header("Access-Control-Max-Age", "600")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("X-Frame-Options", "DENY")
 
     def _json(self, code, obj):
         body = json.dumps(obj, default=str).encode("utf-8")
@@ -318,6 +354,8 @@ class Handler(BaseHTTPRequestHandler):
         data = open(fp, "rb").read()
         self.send_response(200)
         self.send_header("Content-Type", MIME.get(ext, "application/octet-stream"))
+        if ext in (".html", ".htm"):
+            self.send_header("Content-Security-Policy", CSP)
         self.send_header("Content-Length", str(len(data)))
         self._cors()
         self.end_headers()

@@ -80,5 +80,6 @@
 | 73 | e2e nyata: jalur lokal (demo DOWN->RECOVERED, 404/blank) + jalur Docker sehat (port publish 200) + F-18/F-19/F-20/F-21 | lihat docs/HASIL-73.md |
 | 74 | P0.1b TUTUP: urlopen tanpa netssl.context di 4 modul + verifier urlopen/AST + verify_devup | lihat docs/HASIL-74.md |
 | 75 | F-7 TUTUP: probe UDP berpagar waktu (budget total + deadline fan-out + clamp per-target) | lihat docs/HASIL-75.md |
+| 76 | F-3/F-4 TUTUP: CSP + header keamanan + CORS terkonfigurasi (strict) + verifier header | lihat docs/HASIL-76.md |
 
-Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_wired 20/20, verify_udp_budget 16/16, verify_devup 2/2, smoke.sh (termasuk uji HTTP). Titik aman: checkpoint/galardo-v1.3-e2e-terbukti
+Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_wired 20/20, verify_udp_budget 16/16, verify_headers 21/21, verify_devup 2/2, smoke.sh. Titik aman: checkpoint/galardo-v1.4-header

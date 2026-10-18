@@ -15,5 +15,5 @@
 - Konvensi bukti: docs/HASIL-<step>.md (satu tempat, bukan .out/)
 - Istilah      : "rung 1 kepemilikan" = dns_txt (rank 4). Jangan tulis "rank 1" (itu operator_attestation)
 
-- Langkah terakhir : STEP-75 (F-7 TUTUP: pagar waktu probe UDP)
-- Langkah berikut  : F-4 (CORS * + Bearer), lalu F-3 (CSP) - sisa terakhir
+- Langkah terakhir : STEP-76 (F-3/F-4 TUTUP: CSP + header keamanan + CORS strict)
+- Langkah berikut  : temuan terbuka KOSONG; opsi: integrasi Subfinder/Nikto/Traceroute, atau bootstrap repo REA

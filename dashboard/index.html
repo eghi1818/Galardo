@@ -166,6 +166,7 @@ details{margin-top:8px}summary{cursor:pointer;font-size:12px;color:var(--cyan)}
       <a data-p="sources"><span class="ico">⚖</span> Sources</a>
       <a data-p="overrides"><span class="ico">⚖</span> Overrides</a>
       <a data-p="webhooks"><span class="ico">⚖</span> Webhooks</a>
+      <a data-p="tools"><span class="ico">🛠</span> Tools</a>
 </nav>
 </aside>
 <main>
@@ -227,6 +228,7 @@ const $ = s => document.querySelector(s);
 const PAGE_TITLES = {overview:'Overview',engagements:'Engagements',targets:'Targets',scenarios:'Scenarios',
   plans:'Test Plans',live:'Live Execution',workers:'Workers',evidence:'Reports & Evidence',audit:'Audit Log',policy:'Safety Policy (restricted)',
   ownership: 'Ownership', sources: 'Sources', overrides: 'Overrides', webhooks: 'Webhooks',
+  tools: 'Tools',
 };
 let CURRENT_PAGE = 'overview';
 let LIVE_POLL = null, GEN_POLL = null, SELECTED_JOB = localStorage.getItem('galardo.job') || '';
@@ -1182,6 +1184,58 @@ RENDER.workers = async function(){
     Contoh: skenario multi-rute berbobot (70/30) → <code>w08-mixed Mix Maestro</code>; durasi panjang → <code>w04-soak Soak Surfer</code>;
     spike pendek → <code>w05-spike Spike Scout</code>. Satu worker satu job (TD §7); selesai/abort otomatis kembali IDLE.</div>
   </div>`;
+};
+
+/* ---- Tools eksternal (subfinder / nikto / traceroute) ---- */
+RENDER.tools = async function(){
+  const st = await api('/exttools');
+  const nama = Object.keys(st).filter(k=>k.charAt(0)!=='_');
+  window._xtOut = window._xtOut || '';
+  $('#view').innerHTML=`
+  <div class="card"><h3>Tool eksternal <span class="note">— adapter fail-open: tool yang belum terpasang tetap dilaporkan, bukan error</span></h3>
+    <div class="grid g3" style="gap:10px">
+      ${nama.map(n=>{const t=st[n];return `<div class="card" style="padding:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <b class="mono">${esc(n)}</b>${badge(t.available?'HEALTHY':'FAILED')}
+        </div>
+        <div class="note" style="margin-top:6px">${esc(t.desc)}</div>
+        <div class="note mono" style="margin-top:4px">GOAL: ${esc(t.goal)}</div>
+        <div class="note mono" style="font-size:10px;word-break:break-all">${esc(t.path||'(tidak di PATH)')}</div>
+      </div>`;}).join('')}
+    </div>
+    <div class="note" style="margin-top:8px">timeout default: <code>${esc(st._timeout_default)}s</code> — ubah via env <code>GALARDO_EXTTOOL_TIMEOUT</code></div>
+  </div>
+  <div class="card" style="margin-top:14px"><h3>Jalankan</h3>
+    <div class="grid g4" style="gap:8px;align-items:end">
+      <label style="margin:0">Tool<select id="xtTool" style="width:auto">${nama.map(n=>`<option ${st[n].available?'':'disabled'}>${esc(n)}</option>`).join('')}</select></label>
+      <label style="margin:0">Target<input id="xtTarget" value="127.0.0.1"></label>
+      <label style="margin:0">Args<input id="xtArgs" placeholder="-n -m 3"></label>
+      <label style="margin:0">Timeout (s)<input id="xtTmo" value="15"></label>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+      <button class="btn primary" onclick="xtRun()">▶ Jalankan</button>
+      <span id="xtState" class="note"></span>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px"><h3>Hasil</h3>
+    <div id="xtOut" class="note mono" style="white-space:pre-wrap;max-height:420px;overflow:auto">${esc(window._xtOut)}</div>
+  </div>`;
+};
+
+window.xtRun = async function(){
+  const tool=$('#xtTool').value, target=$('#xtTarget').value.trim();
+  const raw=$('#xtArgs').value.trim();
+  const args=raw?raw.split(/\s+/):[];
+  const timeout=parseFloat($('#xtTmo').value)||15;
+  $('#xtState').textContent='menjalankan…';
+  try{
+    const r=await api('/exttools/'+tool+'/run',{method:'POST',body:{args:args,target:target,timeout:timeout}});
+    window._xtOut=JSON.stringify({ok:r.ok,available:r.available,rc:r.rc,elapsed:r.elapsed,
+      reason:r.reason,goal:r.goal,parsed:r.parsed},null,2)+'\n\n'+(r.output||'');
+    $('#xtState').textContent=r.ok?('selesai ('+r.elapsed+'s)'):('gagal: '+(r.reason||('rc '+r.rc)));
+    toast(r.ok?'Tool selesai':'Tool gagal: '+(r.reason||r.rc), r.ok?'ok':'err');
+    RENDER.tools();
+  }catch(e){ $('#xtState').textContent='error: '+e.message; toast(e.message,'err'); }
 };
 
 /* ---- Evidence ---- */

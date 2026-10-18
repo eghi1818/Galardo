@@ -84,6 +84,8 @@ def fetcher():
 
 st = pp.refresh(fetcher=fetcher)
 check("D refresh mengisi daftar", st["count"] == 2, st)
+check("D resolve() selalu 2-tuple", len(proxypool.resolve("residential")) == 2,
+      proxypool.resolve("residential"))
 check("D pool terdaftar di proxypool", proxypool.resolve("residential") == ("10.0.0.1", 9001),
       proxypool.resolve("residential"))
 st = pp.refresh(fetcher=fetcher)
@@ -108,7 +110,7 @@ check("E resolve tetap jalan", proxypool.resolve("residential") is not None)
 
 # F. env spec langsung (tanpa provider) tetap dipakai
 bersih()
-os.environ["GALARDO_PROXY_residential"] = "u:p@11.11.11.11:9999"
+os.environ[proxypool.env_key("residential")] = "u:p@11.11.11.11:9999"
 check("F env GALARDO_PROXY_<nama> menang", proxypool.resolve("residential") == ("11.11.11.11", 9999),
       proxypool.resolve("residential"))
 bersih()

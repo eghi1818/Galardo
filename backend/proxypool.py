@@ -91,7 +91,9 @@ def resolve(name):
     try:                       # provider pihak ketiga (fail-open)
         import proxy_provider
         if proxy_provider.ensure(name):
-            return _REGISTRY.get(name)
+            e = _REGISTRY.get(name)
+            if e:
+                return (e[0], e[1])   # konsisten: resolve() selalu 2-tuple
     except Exception:
         pass
     return (entry[0], entry[1])

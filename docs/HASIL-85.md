@@ -32,3 +32,12 @@ Yang belum ada: pengambil daftar dari API provider + rotasi.
        GALARDO_PROXY_POOL=residential
 3. Kirim bentuk respons API-nya ke agen; bila perlu tinggal sempitkan parser.
 4. Uji: GET /api/v1/proxy/status -> configured true, count > 0.
+
+## Koreksi (blok 86) — jujur
+Commit 752fccf ter-push padahal gate MERAH (rc=2). Sebab: `make gate` bergantung pada
+`test:`, jadi saat `make test` gagal, make berhenti sebelum loop verifier -> 0 verifier
+dijalankan. Dua bug ikut ketahuan dan ditutup:
+1. hook resolve() mengembalikan 4-tuple (registry mentah) padahal resolve() = 2-tuple
+   -> kini `return (e[0], e[1])`; verifier menambah cek "resolve selalu 2-tuple".
+2. verifier memakai nama env huruf kecil, padahal env_key() menghasilkan huruf besar
+   -> kini memakai proxypool.env_key().

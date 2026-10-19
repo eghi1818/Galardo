@@ -83,4 +83,35 @@ except Exception as e:
 pp.clear()
 print()
 print("HASIL: %d passed, %d failed" % (PASS, FAIL))
+print("== tabrakan namespace env (P2) ==")
+import os as _os
+_SIMPAN = dict(_os.environ)
+for _k in [k for k in _os.environ if k.startswith(("GALARDO_PROXY_", "GALARDO_POOL_"))]:
+    _os.environ.pop(_k, None)
+try:
+    pp.clear()
+    check("env_key pakai namespace POOL",
+          pp.env_key("residential") == "GALARDO_POOL_RESIDENTIAL", pp.env_key("residential"))
+    _os.environ[pp.env_key("rumah")] = "198.51.100.7:1080"
+    check("namespace baru terbaca", pp.resolve("rumah") == ("198.51.100.7", 1080))
+    _os.environ["GALARDO_PROXY_LAMA"] = "203.0.113.5:8080"
+    check("warisan non-reserved masih terbaca", pp.resolve("lama") == ("203.0.113.5", 8080))
+    _os.environ["GALARDO_PROXY_KEY"] = "sk-rahasia-123"
+    _os.environ["GALARDO_PROXY_TTL"] = "300"
+    _os.environ["GALARDO_PROXY_URL"] = "https://contoh.test/api/proxies"
+    for _n in ("key", "ttl", "url"):
+        try:
+            pp.resolve(_n)
+            check("reserved %r tidak melempar" % _n, True)
+        except Exception as _e:
+            check("reserved %r tidak melempar" % _n, False, "%s: %s" % (type(_e).__name__, _e))
+    _os.environ[pp.env_key("key")] = "10.9.9.9:9000"
+    check("GALARDO_POOL_KEY menang atas GALARDO_PROXY_KEY",
+          pp.resolve("key") == ("10.9.9.9", 9000), pp.resolve("key"))
+finally:
+    _os.environ.clear()
+    _os.environ.update(_SIMPAN)
+    pp.clear()
+
+
 sys.exit(1 if FAIL else 0)

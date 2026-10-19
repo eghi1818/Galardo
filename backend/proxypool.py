@@ -10,14 +10,19 @@ diisi kapan pun pihak ketiga dilanggani.
 
 Urutan sumber resolusi:
   1. registry in-memory (:func:`register`) - untuk uji dan pemakaian program
-  2. variabel lingkungan ``GALARDO_PROXY_<NAMA>`` - mis. "host:port",
+  2. variabel lingkungan ``GALARDO_POOL_<NAMA>`` - mis. "host:port",
      "user:pass@host:port", atau "scheme://user:pass@host:port"
+  3. warisan ``GALARDO_PROXY_<NAMA>`` - dibaca hanya bila nama pool BUKAN nama
+     env provider (URL/KEY/AUTH/POOL/TTL/TIMEOUT), supaya tidak saling tabrak
 
 Python 3.9, stdlib saja.
 """
 import os
 
-PREFIX = "GALARDO_PROXY_"
+PREFIX = "GALARDO_PROXY_"          # warisan; juga namespace env proxy_provider
+POOL_PREFIX = "GALARDO_POOL_"      # namespace kanonik untuk pool
+# Nama pool ini bertabrakan dengan env provider bila dibaca dari PREFIX.
+RESERVED = frozenset(("URL", "KEY", "AUTH", "POOL", "TTL", "TIMEOUT"))
 _REGISTRY = {}
 
 
@@ -54,7 +59,25 @@ def parse_spec(spec):
 
 
 def env_key(name):
-    return PREFIX + name.upper().replace("-", "_")
+    return POOL_PREFIX + name.upper().replace("-", "_")
+
+
+def legacy_env_key(name):
+    """Kunci warisan ``GALARDO_PROXY_<NAMA>``, atau None kalau nama bertabrakan."""
+    up = name.upper().replace("-", "_")
+    if up in RESERVED:
+        return None
+    return PREFIX + up
+
+
+def _spec_dari_env(name):
+    """Spesifikasi pool dari env: POOL_PREFIX dulu, lalu warisan. None bila kosong."""
+    for key in (env_key(name), legacy_env_key(name)):
+        if key:
+            spec = os.environ.get(key)
+            if spec:
+                return spec
+    return None
 
 
 def register(name, spec):
@@ -84,7 +107,7 @@ def resolve(name):
         return None
     entry = _REGISTRY.get(name)
     if entry is None:
-        spec = os.environ.get(env_key(name))
+        spec = _spec_dari_env(name)
         if not spec:
             return None
         entry = parse_spec(spec)
@@ -103,7 +126,7 @@ def credentials(name):
     """Kembalikan (user, password) atau (None, None)."""
     entry = _REGISTRY.get(name)
     if entry is None:
-        spec = os.environ.get(env_key(name))
+        spec = _spec_dari_env(name)
         if not spec:
             return (None, None)
         entry = parse_spec(spec)

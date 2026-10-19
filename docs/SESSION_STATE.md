@@ -15,9 +15,8 @@
 - Konvensi bukti: docs/HASIL-<step>.md (satu tempat, bukan .out/)
 - Istilah      : "rung 1 kepemilikan" = dns_txt (rank 4). Jangan tulis "rank 1" (itu operator_attestation)
 
-- Langkah terakhir : STEP-79 (penutup: ringkasan akhir + panduan resume)
+- Langkah terakhir : STEP-97 (F-1b & F-24 ditutup pada akarnya; gate 31 ok)
 - Langkah berikut: P5 lalu P6; P7 (botnet) menunggu keputusan
 
-STEP: 97 (F-1b & F-24 TUTUP; 42 run bersih; gate 31 ok)
-- Verifier baru : tools/verify_start_reject.py (9 cek, masuk make gate)
-- Titik aman    : tag v1.7 (commit 250c713)
+- Verifier baru  : tools/verify_start_reject.py (9 cek, masuk make gate)
+- Titik aman     : tag v1.7 (commit 250c713)

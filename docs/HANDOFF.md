@@ -58,6 +58,12 @@ ekor backup chat, dokumen REA lanjutan, isi 14 poin list kendala per-item.
 
 ## 8. PENDING BERIKUTNYA (URUT PRIORITAS - jangan dilompati)
 
+STATUS STEP-102: item 1-10 di bawah SEMUA SELESAI. Backlog resmi + status + bukti ada di
+docs/PENDING.md (bagian "Status per ..."). SISA: usul P7 (botnet) dan Tier 3-4 (NATS, OTel,
+alerting). Jangan buka lebih dari satu item sekaligus (lihat 8b).
+
+RIWAYAT (jangan dikerjakan ulang):
+
 P0 - Goal 2 inti (paling menentukan)
   1. [SELESAI STEP-26] Migrasi SEMUA modul HTTPS ke backend/netssl.context():
      engine.py, observer.py, routeoverride.py, safety.py, srccap.py,
@@ -77,7 +83,7 @@ P2 - Produk (yang dipakai manusia)
 
 P3 - Kesiapan produksi
   8. [SELESAI STEP-64..67] Tier 1: RBAC(64) + MFA(65) + backup(66) + Docker Compose(67)
-  9. Tier 2-4: Postgres, NATS, OTel, alerting
+  9. [SEBAGIAN SELESAI STEP-72] Tier 2-3: Postgres; sisa NATS, OTel, alerting
  10. Run end-to-end nyata pasca semua perubahan  [SELESAI STEP-73 - docs/HASIL-73.md]
 
 ## 8b. ATURAN PRIORITAS
@@ -85,12 +91,13 @@ P3 - Kesiapan produksi
   menghalangi item P0.
 - Satu item P0 selesai -> baru naik ke P1.
 - Jangan buka lebih dari satu item sekaligus.
-- P0.1b (temuan STEP-55): backend/ownership_ladder.default_fetcher() masih urllib polos, bukan netssl.context(). DICATAT, belum dikerjakan.
-- F-2 DITUTUP (STEP-57): /healthz & /admin/secret adalah path sisi-target, bukan route API; API sudah punya GET /health. F-3 (CSP) & F-4 (CORS *) masih terbuka.
+- P0.1b: TUTUP (STEP-74) - ownership_ladder.default_fetcher() sudah lewat netssl.context().
+- F-2 DITUTUP (STEP-57): /healthz & /admin/secret adalah path sisi-target, bukan route API; API sudah punya GET /health. F-3 CSP TUTUP (STEP-76, diperketat nonce di STEP-98); F-4 CORS TUTUP (STEP-76).
 
 ## 8c. INVENTARIS LENGKAP
 Status per item (V/D/goals/dokumen/tier) ada di docs/INVENTARIS.md.
 CEK DULU sebelum mengerjakan apa pun, supaya tidak overlap.
 
 ## 9. DONE RINGKAS (jangan dikerjakan ulang)
-STEP 01-15 selesai. Rincian: docs/STEPLOG.md
+STEP 01-101 selesai (termasuk F-1..F-24, P0.1b, P1-P6). Rincian: docs/STEPLOG.md.
+Langkah terakhir: STEP-102 (dokumen handoff ini).

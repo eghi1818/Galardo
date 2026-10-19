@@ -181,10 +181,10 @@ backend/scenario.py:85:                errors.append({"field": "proxy_pool", "co
 
 | Item | Status | Bukti |
 |---|---|---|
-| P1 CI gate | SELESAI | `.github/workflows/gate.yml` (commit 58d8261). Belum dikonfirmasi run hijau di Actions (`gh` tidak terpasang). |
+| P1 CI gate | SELESAI | `.github/workflows/gate.yml` (58d8261). Terbukti hijau di Actions: run 1ea6864, 5f22956, 5d753ad, 34be942 (repo publik, dicek lewat API). |
 | P2 proxy provider | SELESAI | `backend/proxy_provider.py` (752fccf + 0dda19b) + `tools/verify_proxy_provider.py`. Celah: tabrakan nama env dengan `proxypool`. |
 | P3 subfinder/nikto | SELESAI | Dockerfile (d3d6d50) + panel exttools. |
 | P4 rate limit | SELESAI | token bucket + 429 + Retry-After (a6935fc + 3f64fd9) + `tools/verify_ratelimit.py`. |
 | P5 PG multi-proses | SELESAI | STEP-99: mtime cermin sebagai kanal deteksi + hydrate ulang dari PG + `tools/verify_pg_multiproc.py`. |
 | P6 nonce CSP | SELESAI | STEP-98 (5f22956). |
-| P7 botnet | usul | belum masuk tabel ini. |
+| P7 botnet | usul | lihat docs/ROADMAP.md; belum masuk tabel PENDING. |

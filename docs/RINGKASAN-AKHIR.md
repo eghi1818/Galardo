@@ -1,6 +1,6 @@
 # GALARDO — Ringkasan Akhir & Panduan Resume
 
-Status: SELESAI. Backlog HANDOFF item 1-10 tuntas. Temuan terbuka: NOL.
+Status: SELESAI. Backlog HANDOFF item 1-10 + P1-P6 tuntas. Temuan terbuka: NOL.
 
 ## Apa yang dikerjakan (item 1-10)
 1-8 : netssl/knee/proxypool, audit dashboard, enam slice UI, Tier-1 (RBAC, MFA TOTP, backup, Docker)
@@ -54,8 +54,16 @@ F-21 f-string 3.12. Plus P0.1b urlopen tanpa netssl.context.
 Pelajaran berulang: hijau offline != benar. Uji live + verifier AST menutup kelas bug ini.
 
 ## Risiko/sisa yang jujur
-- Mode PG: koherensi antar-proses hanya lewat PG; file JSON = cermin (aplikasi diasumsikan satu proses).
-- CSP memakai 'unsafe-inline' untuk script/style karena dashboard satu file (belum nonce).
-- subfinder & nikto belum terpasang di mesin ini (jalur fail-open sudah terbukti).
-- Belum ada CI; gate masih manual.
+- Mode PG: SELESAI STEP-99 - koherensi antar-proses lewat mtime cermin + hydrate ulang dari PG
+  (verifier tools/verify_pg_multiproc.py, dua proses nyata).
+- CSP: SELESAI STEP-98 - nonce per-respons; 'unsafe-inline' hanya di direktif atribut.
+- subfinder & nikto: ada di image (P3, commit d3d6d50).
+- CI: ADA (P1) dan terbukti hijau - .github/workflows/gate.yml; run 1ea6864, 5f22956, 5d753ad, 34be942.
+- P1-P6 SELESAI semua; sisa usul P7 (botnet) + Tier 3-4.
 - Baris ROADMAP yang dulu dinormalkan: sebutan "VictoriaMetrics" opsional dikembalikan.
+
+## Pembaruan STEP-102
+Angka pada daftar gate di atas berasal dari STEP-79. Angka terkini: make gate menjalankan
+36 verifier; verify_headers 23/0, verify_dashboard_pages 16/0, verify_proxypool 27/0,
+plus verifier baru verify_pg_multiproc 8/0. Semua dijalankan lewat `make gate` - tidak ada
+lagi yang "dijalankan manual".

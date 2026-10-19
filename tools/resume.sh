@@ -10,9 +10,10 @@ echo "DIRTY  : $(git status --porcelain | wc -l | tr -d ' ') file"
 git status --porcelain | head -n 8
 echo "-- 3 step terakhir --"
 grep -E '^\| [0-9]+' docs/STEPLOG.md | tail -n 3
-echo "-- pending HANDOFF bagian 8 --"
-sed -n '/^#\{1,4\}[[:space:]]*8[.)[:space:]]/,/^#\{1,4\}[[:space:]]*9[.)[:space:]]/p' docs/HANDOFF.md \
-  | grep -E '^[[:space:]]+[0-9]+\.' | head -n 12
+echo "-- status PENDING --"
+sed -n '/^## Status per/,$p' docs/PENDING.md | head -n 16
+echo "-- HASIL terbaru --"
+ls -1t docs/HASIL-*.md 2>/dev/null | head -n 3
 echo "-- .out terbaru --"
 ls -1t .out 2>/dev/null | head -n 3
 echo "-- guard --"

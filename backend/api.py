@@ -80,6 +80,11 @@ _LADDER_SHORT = {"well_known_file": "file", "http_echo": "echo",
 
 
 def seed_lab():
+    try:
+        import orchestrator as _orch
+        _orch.reconcile_stale_jobs()
+    except Exception:
+        pass
     """Lab-only seed: organization, engagement, target, global+scenario policies,
     health-smoke scenario + immutable version, approved test plan."""
     if db.get("organizations", "org-lab"):
@@ -440,6 +445,9 @@ class Handler(BaseHTTPRequestHandler):
                 body = self._body() if hasattr(self, "_body") else {}
                 last = u.get("mfa_last_step") if u.get("mfa_enabled") else None
                 ok, step, drift = mfa.verify(u.get("mfa_secret"), body.get("code"), last_step=last)
+                if __import__("os").environ.get("MFA_DEBUG"):
+                    print("      [mfa] last_step=%s step=%s drift=%s ok=%s code_len=%s"
+                          % (last, step, drift, ok, len(body.get("code") or "")), flush=True)
                 if not ok:
                     return self._json(422, {"error": "kode salah", "step": step, "drift": drift})
                 def _vf(d, step=step):
@@ -1084,7 +1092,10 @@ class Handler(BaseHTTPRequestHandler):
             m = _match(api_path, "/test-jobs/*/start")
             if m and method == "POST":
                 ok, checks = orchestrator.start_job(m[0], actor=user)
-                return self._json(200 if ok else 409, {"started": ok, "preflight": checks})
+                retryable = any(c.get("check") == "retryable" and c.get("result") == "YES"
+                                for c in (checks or []))
+                return self._json(200 if ok else 409,
+                                  {"started": ok, "preflight": checks, "retryable": retryable})
             m = _match(api_path, "/test-jobs/*/abort")
             if m and method == "POST":
                 b = self._body()

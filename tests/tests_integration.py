@@ -71,16 +71,52 @@ def target_req(path):
         return r.status, json.loads(r.read())
 
 
-def start_job(job_id, tries=60, delay=0.5):
+def _start_job_asli(job_id, tries=60, delay=0.5):
     """POST /start dengan toleransi 409 (preflight async belum siap). F-1."""
     st, r = None, None
-    for _ in range(tries):
+    for i in range(tries):
         st, r = req("POST", f"/test-jobs/{job_id}/start")
         if st != 409:
+            if os.environ.get("F1_DEBUG"):
+                print("      [start ok setelah %d coba] checks=%s" % (i, (r or {}).get("preflight")))
             return st, r
+        if os.environ.get("F1_DEBUG"):
+            cek = (r or {}).get("preflight")
+            gagal = [k for k, v in cek.items() if not v] if isinstance(cek, dict) else cek
+            print("      [409 #%d] cek gagal: %s" % (i + 1, gagal))
         time.sleep(delay)
     return st, r
 
+
+AKTIF = ("QUEUED", "PREFLIGHT", "DISPATCHING", "RUNNING", "SPIKING", "RECOVERING", "ABORTING")
+
+
+def bersihkan_job_aktif(timeout=60):
+    """Buang job sisa berstatus aktif supaya preflight 'no conflicting active job' lolos.
+
+    Akar F-1b: run yang mati di tengah meninggalkan job aktif di data/state.json;
+    /start lalu SELALU 409 dan retry 30s tidak menolong.
+    """
+    st, jobs = req("GET", "/test-jobs")
+    if st != 200 or not isinstance(jobs, list):
+        return 0
+    n = 0
+    for j in jobs:
+        if (j.get("status") or j.get("state")) in AKTIF:
+            req("POST", f"/test-jobs/{j['id']}/abort")
+            wait_terminal(j["id"], timeout)
+            n += 1
+    if n and os.environ.get("F1_DEBUG"):
+        print("      [bersih] %d job aktif sisa di-abort" % n)
+    return n
+
+
+def start_job(job_id, tries=60, delay=0.5):
+    """Wrapper debug: kalau tetap 409, cetak body preflight terakhir."""
+    st, body = _start_job_asli(job_id, tries=tries, delay=delay)
+    if st != 200:
+        print("    [debug] start_job st=%s body=%s" % (st, str(body)[:400]))
+    return st, body
 
 def wait_terminal(job_id, timeout=90):
     deadline = time.time() + timeout
@@ -108,6 +144,7 @@ def main():
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     time.sleep(0.3)
     print(f"[test] stack up: api={API} target={TGT} data={DATA_DIR}")
+    bersihkan_job_aktif()
 
     # ---- 0. lab target health ----
     st, body = target_req("/healthz")
@@ -473,10 +510,13 @@ def main():
     secret = (en or {}).get("secret")
     check("mfa: enroll 200 + secret", st == 200 and bool(secret), st)
     check("mfa: enroll beri otpauth uri", "otpauth://" in ((en or {}).get("otpauth") or ""), en)
-    st, vf = req("POST", "/me/mfa/verify", {"code": _mfa.totp(secret) if secret else "000000"})
+    _c1 = _mfa.totp(secret) if secret else "000000"
+    st, vf = req("POST", "/me/mfa/verify", {"code": _c1})
     check("mfa: verify kode benar -> enabled", st == 200 and (vf or {}).get("mfa_enabled") is True, vf)
-    st, vf2 = req("POST", "/me/mfa/verify", {"code": _mfa.totp(secret) if secret else "000000"})
-    check("mfa: replay step sama ditolak", st == 422, st)
+    _c2 = _mfa.totp(secret) if secret else "000000"
+    # pakai kode TER-CACHE supaya benar-benar step yang sama (batas 30s bisa lewat di antara 2 request)
+    st, vf2 = req("POST", "/me/mfa/verify", {"code": _c1})
+    check("mfa: replay step sama ditolak", st == 422, "st=%s code_sama=%s" % (st, _c1 == _c2))
     st, off = req("POST", "/me/mfa/disable", {})
     check("mfa: disable -> nonaktif", st == 200 and (off or {}).get("mfa_enabled") is False, off)
 
@@ -628,3 +668,4 @@ def wait_terminal(job_id, timeout=90):   # noqa: F811
 
 if __name__ == "__main__":
     main()
+

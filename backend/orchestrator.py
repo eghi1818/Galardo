@@ -306,6 +306,9 @@ def _conflicting_active_job(job_id, target_id):
     for j in actives:
         p = db.get("test_plans", j.get("test_plan_id") or "")
         if p and p.get("target_id") == target_id:
+            if os.environ.get("F1_DEBUG"):
+                print("      [conflict] %s tertahan oleh %s status=%s"
+                      % (job_id[:12], j.get("id", "?")[:12], j.get("status")), flush=True)
             return True
     return False
 
@@ -351,7 +354,7 @@ def start_job(job_id, actor="operator"):
     job = db.get("test_jobs", job_id)
     if not job:
         return False, [{"check": "job", "result": "FAIL", "reason": "not found", "mandatory": True}]
-    if job["status"] not in ("PENDING",):
+    if job["status"] not in ("PENDING", "PREFLIGHT"):
         return False, [{"check": "state", "result": "FAIL",
                         "reason": f"job in state {job['status']}, only PENDING can start", "mandatory": True}]
 
@@ -360,9 +363,19 @@ def start_job(job_id, actor="operator"):
     db.update("test_jobs", job_id, lambda j: j.update({"preflight": checks}), audit=False)
     failed = [c for c in checks if c["mandatory"] and c["result"] != "PASS"]
     if failed:
-        # soft-terminal: no traffic ever dispatched; operator may inspect and re-create.
-        # (Job creation is idempotent by key, so a new attempt = new idempotency key.)
-        _set_state(job_id, "REJECTED", actor=actor, reason=f"preflight failed: {failed[0]['check']}")
+        # Konflik aktif = kondisi SESAAT (job lain di target sama belum terminal).
+        # Jangan soft-terminal: kembalikan ke PENDING supaya retry benar-benar berguna.
+        retryable = all(c.get("check") == "no conflicting active job" for c in failed)
+        if retryable:
+            _set_state(job_id, "PENDING", actor=actor,
+                       reason="preflight: konflik aktif sesaat; siap distart ulang")
+        else:
+            # soft-terminal: no traffic ever dispatched; operator may inspect and re-create.
+            # (Job creation is idempotent by key, so a new attempt = new idempotency key.)
+            _set_state(job_id, "REJECTED", actor=actor, reason=f"preflight failed: {failed[0]['check']}")
+        checks = checks + [{"check": "retryable", "result": "YES" if retryable else "NO",
+                            "reason": "ulangi start" if retryable else "perbaiki data dulu",
+                            "mandatory": False}]
         return False, checks
 
     _set_state(job_id, "DISPATCHING", actor=actor, reason="preflight all PASS; reserving execution slot")
@@ -813,3 +826,20 @@ def get_runtime_snapshot(job_id):
             last = sorted(runs, key=lambda r: r.get("started_at") or "")[-1]
             snap["safety"] = {"decisions": last.get("timeline") or []}
     return snap
+
+
+def reconcile_stale_jobs(actor="orchestrator"):
+    """Tandai job berstatus aktif sebagai ABORTED saat proses baru mulai.
+
+    Akar F-1b: proses yang berhenti di tengah meninggalkan job aktif di data/state.json.
+    Preflight 'no conflicting active job' lalu SELALU gagal -> /start 409 selamanya
+    dan retry 30s tak menolong.
+    """
+    ACTIVE = ("PENDING", "PREFLIGHT", "DISPATCHING", "RUNNING", "ABORT_REQUESTED",
+              "ABORTING", "STOPPING", "RECOVERY_WAIT")
+    n = 0
+    for j in db.list("test_jobs", lambda x: x.get("status") in ACTIVE):
+        _set_state(j["id"], "ABORTED", actor=actor,
+                   reason="stale: proses sebelumnya berhenti sebelum job selesai")
+        n += 1
+    return n

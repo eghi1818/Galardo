@@ -85,5 +85,6 @@
 | 78 | panel dashboard Tools (status tool + form jalankan + hasil) untuk subfinder/nikto/traceroute | lihat docs/HASIL-78.md |
 | 79 | penutup: ringkasan akhir + panduan resume (docs/RINGKASAN-AKHIR.md) | - |
 | 80 | F-22 TUTUP: verify_knee_probe deterministik + target make gate (semua verifier masuk gate) | lihat docs/HASIL-80.md |
+| 97 | F-1b & F-24 ditutup pada akarnya (409 konflik=retryable; uji replay pakai kode ter-cache) + verifier verify_start_reject (9 cek) masuk gate; 42 run bersih | lihat docs/HASIL-97.md |
 
 Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_wired 20/20, verify_udp_budget 16/16, verify_headers 22/22, verify_exttool 16/16, verify_dashboard_pages 7/7, verify_devup 2/2, smoke.sh. Titik aman: checkpoint/galardo-v1.6-tools-ui

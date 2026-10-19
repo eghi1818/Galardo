@@ -17,3 +17,5 @@
 
 - Langkah terakhir : STEP-79 (penutup: ringkasan akhir + panduan resume)
 - Langkah berikut  : PROYEK SELESAI. Opsional: bootstrap repo REA / CI / nonce CSP
+
+STEP: 97 (F-1b & F-24 TUTUP; 42 run bersih; gate 31 ok)

@@ -147,3 +147,9 @@ Lihat `docs/CAPACITY-BASELINE.md`: plafon generator laptop ~5.900 rps (rute ring
 | End-to-end nyata | selesai (STEP-73): demo DOWN->RECOVERED, 404/blank, container sehat + port publish 200 |
 | Tool eksternal (subfinder/nikto/traceroute) | adapter fail-open + endpoint /exttools + verifier 16/16 (STEP-77) |
 | Panel dashboard Tools | halaman tools + jalankan dari UI (STEP-78) |
+
+## STEP-97 (selesai)
+- F-1b/F-23 tutup: 409 konflik = retryable (tetap PENDING), cek mandatory lain = REJECTED
+- F-24 tutup: uji replay TOTP pakai kode ter-cache
+- verifier `tools/verify_start_reject.py` (9 cek) masuk gate
+- sisa: P5 (PG multi-proses), P6 (nonce CSP), usul P7 (botnet)

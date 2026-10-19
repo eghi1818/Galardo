@@ -31,11 +31,11 @@ Legenda: SELESAI | SEBAGIAN | PENDING | PERLU-VERIFIKASI
 | Item 2/3 lane proxy | PENDING (proxy.py tidak ada; transport sudah punya proxy) |
 | Item 4 transport multi-lane | PENDING |
 | Item 9 botnet IoT global | PENDING |
-| Item 10 DNS manipulation | PENDING |
-| Item 13 UDP reflection | PENDING |
-| Item 14 worm/lease | PENDING |
+| Item 10 DNS manipulation | SEBAGIAN | quorum TXT /targets/*/verify/dns + lapisan dns di layer_attrib.py + probe_spoof di udp_probe; belum ada verifier khusus |
+| Item 13 UDP reflection | SEBAGIAN | backend/udp_probe.py (rasio amplifikasi, SSDP, reflection_capable) ter-wire di api.py:1378-1384; belum ada verifier khusus |
+| Item 14 worm/lease | SEBAGIAN | backend/worker_daemon.py: lease fail-closed (LEASE_GRACE) + heartbeat + /workers/*/heartbeat; bagian sebar agent belum |
 | Item 6/8/11/12 | SELESAI + teruji |
-| GOAL 2 observer tersambung | PENDING |
+| GOAL 2 observer tersambung | SELESAI | tools/verify_goal2_wiring.py (20+ cek, hijau di make gate) |
 | P1.4 kepemilikan dns_txt (rank 4) end-to-end | SELESAI | docs/HASIL-55.md + tools/verify_ownership_rung1.py |
 | Item 6 audit dashboard | SELESAI | docs/UI-API-GAP.md (v4) + docs/DASHBOARD-AUDIT.md |
 | GOAL 3 T1/T2 | SELESAI + teruji |
@@ -45,7 +45,7 @@ k6-worker/PRD-ADDENDUM-EDGE-CLIENT-SIM.md, k6-worker/READINESS-CHECKLIST.md,
 README.md, docs/SESSION-HISTORY-COMPLETE.md, docs/WEBHOOK-API.md
 
 ## E. Tier
-T1 SEBAGIAN (Ed25519 selesai; RBAC+MFA, backup, Docker pending) | T2-T4 PENDING
+T1 SELESAI (8a RBAC, 8b MFA, 8c backup, 8d Docker) | T2-T3 SELESAI (9a NATS, 9b alerting, 9c OTLP, 9d PG); T4 belum dispesifikasi
 
 ## E2. Risiko terbuka
 | Risiko | Status | Catatan |
@@ -94,3 +94,10 @@ T1 SEBAGIAN (Ed25519 selesai; RBAC+MFA, backup, Docker pending) | T2-T4 PENDING
 | F-22 | verify_knee_probe flaky (E2 cache) + 28 verifier di luar `make test`. DITUTUP STEP-80: E2 deterministik (cache diisi dulu, ambang relatif), measure_retry, dan target `make gate` yang menjalankan semua verifier. | TUTUP |
 | F-23 | start_job memindahkan state ke PREFLIGHT lalu menulis REJECTED tanpa membedakan cek yang gagal; PREFLIGHT tidak startable. DITUTUP STEP-97 (lihat F-1b). | TUTUP (STEP-97) |
 | F-24 | Uji MFA replay menghitung ulang kode TOTP sehingga bisa melewati batas step 30s (flake). Server sudah benar. DITUTUP STEP-97: kode di-cache untuk request replay + diagnostik code_sama. | TUTUP (STEP-97) |
+
+## Z. Koreksi STEP-103
+Status di atas dikoreksi dari kode + verifier, bukan dari dokumen lain. Yang benar-benar
+PENDING: item 9 botnet IoT global, item 2/3 lane proxy, item 4 transport multi-lane,
+V4 run nyata Mode Aktif, V6 4 check() tidak pernah dieksekusi. Item 10/13/14 naik ke
+SEBAGIAN (kode ada, verifier khusus belum); GOAL 2 observer SELESAI. Seksi E dulu
+bertentangan dengan tabel F di file ini sendiri.

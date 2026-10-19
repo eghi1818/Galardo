@@ -59,8 +59,9 @@ ekor backup chat, dokumen REA lanjutan, isi 14 poin list kendala per-item.
 ## 8. PENDING BERIKUTNYA (URUT PRIORITAS - jangan dilompati)
 
 STATUS STEP-102: item 1-10 di bawah SEMUA SELESAI. Backlog resmi + status + bukti ada di
-docs/PENDING.md (bagian "Status per ..."). SISA: usul P7 (botnet) dan Tier 3-4 (NATS, OTel,
-alerting). Jangan buka lebih dari satu item sekaligus (lihat 8b).
+docs/PENDING.md (bagian "Status per ..."). SISA (otoritatif docs/INVENTARIS.md): item 9 botnet IoT global, item 2/3 lane proxy,
+item 4 transport multi-lane, V4 run nyata Mode Aktif, V6 4 check() mati. Tier 1-3 SELESAI.
+Jangan buka lebih dari satu item sekaligus (lihat 8b).
 
 RIWAYAT (jangan dikerjakan ulang):
 

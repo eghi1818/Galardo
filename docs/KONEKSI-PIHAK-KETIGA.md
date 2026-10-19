@@ -71,9 +71,10 @@ Pilihan populer: AnyIP, Bright Data, IPRoyal, Smartproxy.
 1. Daftar di salah satu, ambil paket terkecil dulu untuk uji.
 2. Salin: **API base URL**, **API key/token**, dan contoh format daftar proxy
    (biasanya `host:port` + `user:pass`, atau respons JSON).
-3. Sementara ini Galardo belum membacanya (lihat PENDING.md P2). Rencana env:
-   `GALARDO_PROXY_URL`, `GALARDO_PROXY_KEY`; endpoint `GET /api/v1/proxy/status`,
-   `POST /api/v1/proxy/rotate`.
+3. Galardo sudah membacanya (P2). Env: `GALARDO_PROXY_URL`, `GALARDO_PROXY_KEY`
+   (opsional `GALARDO_PROXY_AUTH`, `GALARDO_PROXY_POOL`, `GALARDO_PROXY_TTL`,
+   `GALARDO_PROXY_TIMEOUT`); endpoint `GET /api/v1/proxy/status`,
+   `POST /api/v1/proxy/refresh`, `POST /api/v1/proxy/rotate`.
 4. Kirim ke saya: base URL + bentuk responsnya (key apa saja) supaya adapter-nya
    ditulis sesuai API provider Anda, bukan diasumsikan.
 
@@ -151,6 +152,7 @@ GALARDO_NATS_URL
 GALARDO_NO_BUSTER
 GALARDO_OTLP_URL
 GALARDO_PG_DSN
+GALARDO_POOL_
 GALARDO_PROXY_
 GALARDO_REQUIRE_AUTH
 GALARDO_SOURCES_PATH
@@ -195,8 +197,8 @@ backend/bus.py:18:    return bool((os.environ.get("GALARDO_NATS_URL") or "").str
 backend/bus.py:34:    url = (os.environ.get("GALARDO_NATS_URL") or "").strip()
 backend/nats_client.py:5:abort fanout. Set GALARDO_NATS_URL=nats://127.0.0.1:4222 to enable.
 backend/nats_client.py:143:    url = url or os.environ.get("GALARDO_NATS_URL")
-backend/proxypool.py:13:  2. variabel lingkungan ``GALARDO_PROXY_<NAMA>`` - mis. "host:port",
-backend/proxypool.py:20:PREFIX = "GALARDO_PROXY_"
+backend/proxypool.py:13:  2. variabel lingkungan ``GALARDO_POOL_<NAMA>`` - mis. "host:port",
+backend/proxypool.py:21:POOL_PREFIX = "GALARDO_POOL_"
 ```
 
 ## Lampiran C — jejak proxy/residential (untuk P2)

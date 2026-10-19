@@ -27,6 +27,10 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Info lingkungan
         run: |
           python --version
@@ -45,7 +49,7 @@ jobs:
           echo "== baris HASIL/RESULTS =="
           grep -hE "HASIL:|RESULTS:" /tmp/*.log 2>/dev/null | tail -n 40 || true
           echo "== verifier GAGAL =="
-          grep -hE "^  GAGAL|GAGAL " /tmp/make-gate.log 2>/dev/null || echo "(tidak ada)"
+          grep -hE "^  GAGAL|^  FAIL|GAGAL " /tmp/make-gate.log 2>/dev/null || echo "(tidak ada)"
 
       - name: Unggah log bila gagal
         if: failure()

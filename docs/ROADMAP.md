@@ -152,4 +152,4 @@ Lihat `docs/CAPACITY-BASELINE.md`: plafon generator laptop ~5.900 rps (rute ring
 - F-1b/F-23 tutup: 409 konflik = retryable (tetap PENDING), cek mandatory lain = REJECTED
 - F-24 tutup: uji replay TOTP pakai kode ter-cache
 - verifier `tools/verify_start_reject.py` (9 cek) masuk gate
-- sisa: P5 (PG multi-proses), P6 (nonce CSP), usul P7 (botnet)
+- sisa: usul P7 (botnet) + Tier 3-4; P1-P6 SELESAI (P5=STEP-99, P6=STEP-98)

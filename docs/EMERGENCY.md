@@ -15,7 +15,7 @@
     bash tools/step_guard.sh
     bash tools/git_discipline.sh
     git log --oneline -10
-    make test            # acuan: 61 passed, 0 failed
+    make test            # acuan: 79 passed, 0 failed
     git reset --hard checkpoint/galardo-v1.1-mulai   # kalau perlu mundur
 
 ## Kalau push gagal

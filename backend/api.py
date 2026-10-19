@@ -39,11 +39,62 @@ DASH_DIR = os.path.normpath(os.path.join(BASE, "..", "dashboard"))
 
 # --- F-3/F-4: header keamanan + CORS terkonfigurasi (default tetap "*" agar tak ada regresi) ---
 CORS_ENV = "GALARDO_CORS_ORIGINS"
-CSP = os.environ.get("GALARDO_CSP") or (
+CSP_ENV = "GALARDO_CSP"
+CSP = os.environ.get(CSP_ENV) or (
     "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
     "script-src 'self' 'unsafe-inline'; "
     "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 )
+
+
+def _nonce():
+    """P6: nonce per-respons (hex; aman untuk atribut nonce CSP)."""
+    return os.urandom(16).hex()
+
+
+def _csp_harden(base, nonce):
+    """P6: jamin nonce ada di direktif elemen, dan 'unsafe-inline' hanya di direktif atribut.
+
+    Dipakai untuk nilai GALARDO_CSP dari env, yang bisa datang tanpa placeholder
+    {nonce} dan/atau tanpa direktif *-attr.
+    """
+    tok = "'nonce-%s'" % nonce
+    parts, order = {}, []
+    for chunk in base.split(";"):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        k = chunk.split()[0]
+        if k not in parts:
+            order.append(k)
+        parts[k] = chunk
+    for k in ("script-src", "style-src"):
+        cur = parts.get(k)
+        if cur is None:
+            order.append(k)
+            cur = k + " 'self'"
+        if "nonce-" not in cur:
+            cur = cur + " " + tok
+        parts[k] = cur.replace(" 'unsafe-inline'", "")
+    for k in ("script-src-attr", "style-src-attr"):
+        if k not in parts:
+            order.append(k)
+        parts.setdefault(k, k + " 'unsafe-inline'")
+    return "; ".join(parts[k] for k in order)
+
+
+def _csp(nonce):
+    """P6: CSP untuk HTML. Elemen <script>/<style> diikat nonce; atribut on*/style=
+    lewat script-src-attr/style-src-attr sehingga 'unsafe-inline' hilang dari direktif elemen."""
+    base = os.environ.get(CSP_ENV)
+    if base:
+        return _csp_harden(base.replace("{nonce}", "'nonce-%s'" % nonce), nonce)
+    return (
+        "default-src 'self'; img-src 'self' data:; "
+        "style-src 'self' 'nonce-%s'; style-src-attr 'unsafe-inline'; "
+        "script-src 'self' 'nonce-%s'; script-src-attr 'unsafe-inline'; "
+        "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    ) % (nonce, nonce)
 
 
 def _cors_mode():
@@ -365,7 +416,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", MIME.get(ext, "application/octet-stream"))
         if ext in (".html", ".htm"):
-            self.send_header("Content-Security-Policy", CSP)
+            # P6: suntik nonce segar ke placeholder HTML, lalu kirim CSP yang cocok.
+            _n = _nonce()
+            data = data.replace(b"{{NONCE}}", _n.encode())
+            csp = _csp(_n)
+            self.send_header("Content-Security-Policy", csp)
         self.send_header("Content-Length", str(len(data)))
         self._cors()
         self.end_headers()

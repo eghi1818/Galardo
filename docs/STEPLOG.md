@@ -88,3 +88,4 @@
 | 97 | F-1b & F-24 ditutup pada akarnya (409 konflik=retryable; uji replay pakai kode ter-cache) + verifier verify_start_reject (9 cek) masuk gate; 42 run bersih | lihat docs/HASIL-97.md |
 
 Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_wired 20/20, verify_udp_budget 16/16, verify_headers 22/22, verify_exttool 16/16, verify_dashboard_pages 7/7, verify_devup 2/2, verify_start_reject 9/9, smoke.sh. Titik aman: tag v1.7 (250c713)
+| 98 | P6 TUTUP: nonce CSP per-respons (script-src/style-src ber-nonce, 'unsafe-inline' hanya di direktif atribut); verifier dashboard & headers diperkuat (regex toleran atribut, cek nonce & _csp runtime) | lihat docs/HASIL-98.md |

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GALARDO — Authorized Resilience Testing Console</title>
-<style>
+<style nonce="{{NONCE}}">
 :root{
   --bg:#07090d; --panel:#0d1117; --panel2:#111823; --line:#1f2937; --line2:#374151;
   --cyan:#22d3ee; --cyan-dim:rgba(34,211,238,.10);
@@ -199,7 +199,7 @@ details{margin-top:8px}summary{cursor:pointer;font-size:12px;color:var(--cyan)}
   </div>
 </div>
 
-<script>
+<script nonce="{{NONCE}}">
 /* ================= GALARDO dashboard (vanilla JS, no deps) ================= */
 /* API base discovery: this page may be opened from the API origin itself,
    from a static file viewer, or via a local proxy that returns 415 on JSON.

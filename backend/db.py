@@ -25,6 +25,14 @@ _state = None
 _state_mtime = 0.0
 
 
+def _mirror_mtime():
+    """P5: cap waktu modifikasi cermin JSON (ns) atau 0.0 kalau belum ada."""
+    try:
+        return float(os.stat(DB_PATH).st_mtime_ns)
+    except OSError:
+        return 0.0
+
+
 def _load():
     global _state, _state_mtime
     with LOCK:
@@ -32,15 +40,18 @@ def _load():
             st = db_pg.hydrate()
             if st is not None:
                 _state = st
-                _state_mtime = float("inf")  # file JSON = cermin, bukan sumber
+                _state_mtime = _mirror_mtime()
                 return _state
-        # multi-process coherence: reload when another process wrote the file
-        try:
-            mtime = os.path.getmtime(DB_PATH) if os.path.exists(DB_PATH) else 0.0
-        except OSError:
-            mtime = 0.0
-        if (_state is not None and mtime and mtime != _state_mtime
-                and mtime > _state_mtime and _state_mtime != float("inf")):
+        # P5 multi-process coherence: mtime cermin = kanal deteksi perubahan antar-proses.
+        # Isi dibaca ulang dari cermin (mode JSON) atau di-hydrate ulang dari PG (mode PG).
+        mtime = _mirror_mtime()
+        if _state is not None and mtime and mtime > _state_mtime:
+            if _pg_mode():
+                st = db_pg.hydrate()
+                if st is not None:
+                    _state = st
+                    _state_mtime = mtime
+                    return _state
             try:
                 with open(DB_PATH, "r", encoding="utf-8") as f:
                     _state = json.load(f)
@@ -52,7 +63,7 @@ def _load():
             if os.path.exists(DB_PATH):
                 with open(DB_PATH, "r", encoding="utf-8") as f:
                     _state = json.load(f)
-                _state_mtime = os.path.getmtime(DB_PATH)
+                _state_mtime = _mirror_mtime()
             else:
                 _state = {}
                 _state_mtime = 0.0
@@ -65,10 +76,7 @@ def _save():
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(_state, f, indent=1, default=str)
     os.replace(tmp, DB_PATH)
-    try:
-        _state_mtime = float("inf") if _pg_mode() else os.path.getmtime(DB_PATH)
-    except OSError:
-        pass
+    _state_mtime = _mirror_mtime()
 
 
 def col(name):

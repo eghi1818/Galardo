@@ -176,3 +176,15 @@ backend/scenario.py:81:                errors.append({"field": "proxy_pool", "co
 backend/scenario.py:82:                               "message": "proxy_pool must be a non-empty string"})
 backend/scenario.py:85:                errors.append({"field": "proxy_pool", "code": "invalid_proxy_pool",
 ```
+
+## Status per 2026-10-19
+
+| Item | Status | Bukti |
+|---|---|---|
+| P1 CI gate | SELESAI | `.github/workflows/gate.yml` (commit 58d8261). Belum dikonfirmasi run hijau di Actions (`gh` tidak terpasang). |
+| P2 proxy provider | SELESAI | `backend/proxy_provider.py` (752fccf + 0dda19b) + `tools/verify_proxy_provider.py`. Celah: tabrakan nama env dengan `proxypool`. |
+| P3 subfinder/nikto | SELESAI | Dockerfile (d3d6d50) + panel exttools. |
+| P4 rate limit | SELESAI | token bucket + 429 + Retry-After (a6935fc + 3f64fd9) + `tools/verify_ratelimit.py`. |
+| P5 PG multi-proses | SELESAI | STEP-99: mtime cermin sebagai kanal deteksi + hydrate ulang dari PG + `tools/verify_pg_multiproc.py`. |
+| P6 nonce CSP | SELESAI | STEP-98 (5f22956). |
+| P7 botnet | usul | belum masuk tabel ini. |

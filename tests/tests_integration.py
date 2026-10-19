@@ -37,7 +37,19 @@ TGT_PORT = 18088
 API = f"http://127.0.0.1:{API_PORT}/api/v1"
 TGT = f"http://127.0.0.1:{TGT_PORT}"
 
-PASS, FAIL = [], []
+PASS, FAIL, SKIP = [], [], []
+
+
+import re as _re
+
+_NAMA_STATIK = set(_re.findall(r'\b(?:check|skip)\(\s*["\']([^"\']+)["\']',
+                              open(__file__, encoding="utf-8").read()))
+
+
+def skip(name, reason=""):
+    """V6: check() yang cabangnya tidak diambil tetap WAJIB melapor."""
+    SKIP.append((name, reason))
+    print(f"  [SKIP] {name}  <- {reason}")
 
 
 def check(name, ok, detail=""):
@@ -258,12 +270,15 @@ def main():
         deadline = time.time() + 60
         rec_status = None
         while time.time() < deadline:
-            _, snap2 = req("GET", f"/test-jobs/{job_id_a}" if False else f"/test-jobs/{job_a}/live")
+            _, snap2 = req("GET", f"/test-jobs/{job_a}/live")
             rec_status = snap2["job"]["status"]
             if rec_status in ("COMPLETED", "RECOVERY_FAILED"):
                 break
             time.sleep(1)
         check("recovery reaches RECOVERED (COMPLETED)", rec_status == "COMPLETED", rec_status)
+    else:
+        skip("recovery monitor starts", f"prasyarat tidak dipenuhi: stt={stt}")
+        skip("recovery reaches RECOVERED (COMPLETED)", f"prasyarat tidak dipenuhi: stt={stt}")
 
     # ---- 6. evidence: build, verify, tamper ----
     st, ev = req("POST", f"/evidence/{job_a}/build")
@@ -363,6 +378,7 @@ def main():
         with urllib.request.urlopen(TGT + "/control/recover", timeout=5) as r:
             pass
         req("POST", f"/test-jobs/{job4['id']}/recovery")
+        skip("degradation job started (fallback path)", f"jalur utama dipakai (st={st})")
     else:
         check("degradation job started (fallback path)", False, f"start st={st}")
 
@@ -542,7 +558,23 @@ def main():
     st, bad = req("POST", "/users/%s/role" % uid2, {"role": "SUPERMAN"})
     check("role: peran ngawur -> 422", st == 422, st)
 
-    print(f"\n{'='*60}\nRESULTS: {len(PASS)} passed, {len(FAIL)} failed")
+    def _nama(x):
+        if isinstance(x, dict):
+            for _k in ("name", "nama", "check", "id"):
+                if _k in x:
+                    return x[_k]
+            return None
+        if isinstance(x, (tuple, list)) and x:
+            return x[0]
+        return x
+
+    print("  DEBUG bentuk: PASS=%r FAIL=%r SKIP=%r" % (PASS[:1], FAIL[:1], SKIP[:1]))
+    _terlihat = {_nama(x) for x in list(PASS) + list(FAIL) + list(SKIP)}
+    _terlihat.discard(None)
+    _terlihat.add("semua nama check() melapor (tidak ada yang hilang)")
+    check("semua nama check() melapor (tidak ada yang hilang)",
+          not (_NAMA_STATIK - _terlihat), sorted(_NAMA_STATIK - _terlihat))
+    print(f"RESULTS: {len(PASS)} passed, {len(FAIL)} failed, {len(SKIP)} skipped")
     if FAIL:
         for name, detail in FAIL:
             print(f"  FAIL: {name} — {detail}")

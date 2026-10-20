@@ -496,7 +496,7 @@ def _begin_recovery(job_id, actor="orchestrator"):
         deadline = time.time() + timeout_sec
         while time.time() < deadline:
             snap = ctx.probe.snapshot() if (ctx and ctx.probe) else {"state": "UNKNOWN"}
-            if snap.get("state") == "HEALTHY":
+            if snap.get("state") in ("HEALTHY", "RECOVERED"):
                 healthy_streak += 1
             else:
                 healthy_streak = 0
@@ -527,7 +527,12 @@ def _begin_recovery(job_id, actor="orchestrator"):
 
     # Remote (k6) execution has no in-process probe: spawn a standalone one so
     # recovery stays verified by an INDEPENDENT probe (TD §10), not worker claims.
-    if not (ctx and ctx.probe):
+    # PENTING: probe yang sudah MATI juga wajib diganti. Saat job mencapai state
+    # terminal, ctx.probe.stop.set() dipanggil sehingga probe masih truthy tetapi
+    # is_alive() False. Tanpa cek is_alive(), cabang ini dilewati dan cek
+    # fail-closed di bawah menolak SEMUA job terminal - recovery tidak pernah
+    # bisa diverifikasi, padahal itulah kasus yang recovery ada untuk menanganinya.
+    if not (ctx and ctx.probe and ctx.probe.is_alive()):
         job2 = db.get("test_jobs", job_id)
         plan2 = db.get("test_plans", (job2 or {}).get("test_plan_id") or "")
         tgt2 = db.get("targets", (plan2 or {}).get("target_id") or "") if plan2 else None

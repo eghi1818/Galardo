@@ -105,3 +105,4 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 | 103 | koreksi status INVENTARIS dari kode+verifier (item 10/13/14 SEBAGIAN, GOAL 2 SELESAI, seksi E) + koreksi daftar SISA di SESSION_STATE/HANDOFF/PENDING + diagnosis V6 | lihat docs/HASIL-103.md |
 | 104 | V6 TUTUP: check() di cabang mati kini selalu melapor (SKIP) + penjaga "semua nama check() melapor" + INVENTARIS V2/V6 dikoreksi | lihat docs/HASIL-104.md |
 | 105 | penutupan dokumen STEP-104 (INVENTARIS V2/V6, STEPLOG 104, koreksi HASIL-104) + baca jangkar jalur recovery | lihat docs/HASIL-105.md |
+| 106 | recovery monitor: spawn probe pengganti bila ctx.probe mati (job terminal) + tes kedua rute (ABORTED/COMPLETED); INVENTARIS V7 | lihat docs/HASIL-106.md |

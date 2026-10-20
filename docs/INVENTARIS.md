@@ -9,6 +9,7 @@ Legenda: SELESAI | SEBAGIAN | PENDING | PERLU-VERIFIKASI
 | V1 | make test setelah semua hunk | SELESAI | 59 check hijau (naik dari 38) |
 | V2 | Cakupan suite active/discovery/probes/auth/routeoverride/observer | SELESAI (via tests_integration) | 83 nama check(); semuanya melapor (lulus/lewat) |
 | V6 | 3 check() tidak pernah dieksekusi | SELESAI (STEP-104) | 82 nama check() selalu melapor; dijaga check "semua nama check() melapor" |
+| V7 | Recovery monitor bisa diverifikasi untuk job terminal (ABORTED) | SELESAI (STEP-106) | orchestrator: spawn probe pengganti bila ctx.probe MATI; kedua rute diuji di tests_integration |
 | V3 | GALARDO_CF_TOKEN | SELESAI | .env + cf_check http=200 + zone active |
 | V4 | Run nyata Mode Aktif pasca perubahan | PENDING | belum ada run sejak tier1 + Fase A |
 | V5 | data/ | SELESAI | data/ dan logs/ dibuat |

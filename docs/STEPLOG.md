@@ -103,3 +103,5 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 | 101 | rekonsiliasi dokumen (KONEKSI/DEPLOY env pool, ROADMAP sisa, EMERGENCY acuan 79, gate.yml +setup-node & pola FAIL) + backfill STEPLOG 81-96 | lihat docs/HASIL-101.md |
 | 102 | segarkan dokumen handoff (SESSION_STATE, RINGKASAN-AKHIR, HANDOFF 8/8b/9, PENDING caveat P1, resume.sh) + P1 terbukti hijau di Actions | lihat docs/HASIL-102.md |
 | 103 | koreksi status INVENTARIS dari kode+verifier (item 10/13/14 SEBAGIAN, GOAL 2 SELESAI, seksi E) + koreksi daftar SISA di SESSION_STATE/HANDOFF/PENDING + diagnosis V6 | lihat docs/HASIL-103.md |
+| 104 | V6 TUTUP: check() di cabang mati kini selalu melapor (SKIP) + penjaga "semua nama check() melapor" + INVENTARIS V2/V6 dikoreksi | lihat docs/HASIL-104.md |
+| 105 | penutupan dokumen STEP-104 (INVENTARIS V2/V6, STEPLOG 104, koreksi HASIL-104) + baca jangkar jalur recovery | lihat docs/HASIL-105.md |

@@ -568,7 +568,6 @@ def main():
             return x[0]
         return x
 
-    print("  DEBUG bentuk: PASS=%r FAIL=%r SKIP=%r" % (PASS[:1], FAIL[:1], SKIP[:1]))
     _terlihat = {_nama(x) for x in list(PASS) + list(FAIL) + list(SKIP)}
     _terlihat.discard(None)
     _terlihat.add("semua nama check() melapor (tidak ada yang hilang)")

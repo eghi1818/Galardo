@@ -14,7 +14,7 @@ cuma hilang. Terdaftar 82, dilaporkan 79.
   RESULTS menyertakan angka lewat; sisa `if False else` dibersihkan.
 - Penjaga baru: suite membandingkan daftar nama check()/skip() di sumbernya sendiri dengan
   nama yang benar-benar melapor. check() baru di cabang mati -> suite GAGAL.
-- Ekstraktor nama dibuat toleran bentuk (PASS/FAIL menyimpan dict, bukan string) setelah
+- Ekstraktor nama dibuat toleran bentuk (PASS/FAIL menyimpan tuple (nama, detail), bukan string) setelah
   percobaan pertama kena TypeError: unhashable type: 'dict'.
 - docs/INVENTARIS.md: V2 dan V6 dikoreksi (ternyata 3, bukan 4).
 

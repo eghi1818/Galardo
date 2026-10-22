@@ -4,7 +4,7 @@ T3 membuat paksaan rute 404/blank **terlihat dari internet**, bukan hanya dari
 localhost. Ini tier paling kuat untuk Goal 3, karena pengunjung nyata pun akan
 menerima respons yang dipaksa.
 
-Status: **terbukti live** 2026-10-15 di zone `koler.space`.
+Status: **terbukti live** 2026-10-15 dan diulang 2026-10-22 (STEP-118, `T3_OK`) di zone `koler.space`.
 
 ---
 

@@ -28,7 +28,7 @@ make gate -> commit + docs/HASIL-<n>.md). Tidak ada klaim tanpa bukti.
 | SSDP | 239.255.255.250:1900 | UDP | internal | tidak | aktif saat probe UDP |
 | traceroute | ICMP/UDP | raw | `GALARDO_EXTTOOL_TIMEOUT` | tidak | biner lokal |
 | Target yang diuji | 80/443 | HTTP(S) | `canonical_origin` per source | ya | ditentukan Anda |
-| Cloudflare API | api.cloudflare.com:443 | HTTPS | `GALARDO_CF_TOKEN` (+zona) | tidak | kode SELESAI; kredensial BELUM diisi |
+| Cloudflare API | api.cloudflare.com:443 | HTTPS | `GALARDO_CF_TOKEN` (+zona) | tidak | kode SELESAI; kredensial SUDAH diisi + terbukti live (STEP-118, T3_OK) |
 | Provider proxy/residential | mis. api.anyip.io:443 | HTTPS | BELUM ADA | tidak | belum terhubung |
 | GitHub (repo) | github.com:22/443 | SSH/HTTPS | remote git | ya | aktif |
 | Reverse proxy (VPS) | 127.0.0.1:8090 | HTTP | `GALARDO_BIND` | untuk produksi | lihat DEPLOY-VPS.md |

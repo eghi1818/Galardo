@@ -11,7 +11,7 @@ Kredensial jangan pernah di-commit: simpan di `.env` (chmod 600) atau GitHub Sec
 | PostgreSQL (lokal/cloud) | cloud: ya | penyimpanan produksi | ada (fail-open) |
 | NATS | opsional | bus event | ada (opt-in) |
 | OTLP collector | opsional | telemetri | ada (opt-in) |
-| Provider proxy/residential | ya | IP residensial utk rung ownership | kode SELESAI (STEP-114, backend/proxy.py); kredensial belum diisi (P2 PENDING.md) |
+| Provider proxy/residential | ya | IP residensial utk rung ownership | kode SELESAI (STEP-114); kredensial pool belum diisi (P2 PENDING.md) |
 | DNS resolver | tidak | probe UDP + ownership dns_txt | ada (pakai 1.1.1.1/8.8.8.8) |
 | VPS + domain | ya | tempat berjalan | n/a (lihat DEPLOY-VPS.md) |
 
@@ -66,7 +66,7 @@ Authorization), atau Honeycomb → endpoint + header `x-honeycomb-team`.
 Set `GALARDO_OTLP_URL` (dan header bila kode mendukung — cek Lampiran A).
 Uji: `python3 tools/verify_otlp.py` hijau, lalu lihat data muncul di provider.
 
-## 6. Provider proxy/residential (AnyIP dsb) — kode SELESAI (STEP-114, backend/proxy.py); kredensial belum diisi
+## 6. Provider proxy/residential (AnyIP dsb) — kode SELESAI (STEP-114); kredensial pool belum diisi
 Pilihan populer: AnyIP, Bright Data, IPRoyal, Smartproxy.
 1. Daftar di salah satu, ambil paket terkecil dulu untuk uji.
 2. Salin: **API base URL**, **API key/token**, dan contoh format daftar proxy

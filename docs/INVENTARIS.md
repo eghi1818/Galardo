@@ -33,7 +33,7 @@ Legenda: SELESAI | SEBAGIAN | PENDING | PERLU-VERIFIKASI
 | Item 4 transport multi-lane | PENDING |
 | Item 9 botnet IoT global | PENDING |
 | Item 10 DNS manipulation | SEBAGIAN | quorum TXT /targets/*/verify/dns + lapisan dns di layer_attrib.py + probe_spoof di udp_probe; belum ada verifier khusus |
-| Item 13 UDP reflection | SEBAGIAN | backend/udp_probe.py (rasio amplifikasi, SSDP, reflection_capable) ter-wire di api.py:1378-1384; belum ada verifier khusus |
+| Item 13 UDP reflection | SELESAI | backend/udp_probe.py ter-wire di api.py; tools/verify_udp_reflection.py mengunci builder paket, rasio amplifikasi, reflection_capable, checksum spoof, wiring, dan panggilan NYATA probe_all |
 | Item 14 worm/lease | SEBAGIAN | backend/worker_daemon.py: lease fail-closed (LEASE_GRACE) + heartbeat + /workers/*/heartbeat; bagian sebar agent belum |
 | Item 6/8/11/12 | SELESAI + teruji |
 | GOAL 2 observer tersambung | SELESAI | tools/verify_goal2_wiring.py (20+ cek, hijau di make gate) |

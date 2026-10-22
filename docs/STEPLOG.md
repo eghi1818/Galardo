@@ -107,3 +107,4 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 | 105 | penutupan dokumen STEP-104 (INVENTARIS V2/V6, STEPLOG 104, koreksi HASIL-104) + baca jangkar jalur recovery | lihat docs/HASIL-105.md |
 | 106 | recovery monitor: spawn probe pengganti bila ctx.probe mati (job terminal) + tes kedua rute (ABORTED/COMPLETED); INVENTARIS V7 | lihat docs/HASIL-106.md |
 | 107 | item 13 TUTUP: perbaiki NameError deadline di rotate_source_ports + teruskan deadline (probe_dns, probe_all) + verify_udp_reflection (6 bagian, 40 cek) | lihat docs/HASIL-107.md |
+| 108 | koreksi INVENTARIS item 13 (langkah STEP-107 yang gagal) + rekam permukaan item 10 dan jalankan probe_spoof langsung | lihat docs/HASIL-108.md |

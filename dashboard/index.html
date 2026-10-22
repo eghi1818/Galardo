@@ -232,6 +232,38 @@ const PAGE_TITLES = {overview:'Overview',engagements:'Engagements',targets:'Targ
 };
 let CURRENT_PAGE = 'overview';
 let LIVE_POLL = null, GEN_POLL = null, SELECTED_JOB = localStorage.getItem('galardo.job') || '';
+
+/* ---- auth token (GALARDO_REQUIRE_AUTH) ---- */
+const TOKEN_KEY = 'galardo.token';
+function getTok(){ return localStorage.getItem(TOKEN_KEY) || ''; }
+function authHeaders(h){ h = Object.assign({}, h || {}); const t = getTok(); if(t) h['Authorization'] = 'Bearer ' + t; return h; }
+window.galardoToken = function(v){
+  if(v === undefined) return getTok();
+  if(v) localStorage.setItem(TOKEN_KEY, String(v).trim()); else localStorage.removeItem(TOKEN_KEY);
+  location.reload();
+};
+(function(){
+  function build(){
+    if(document.getElementById('tokBox')) return;
+    const b = document.createElement('div');
+    b.id = 'tokBox';
+    b.style.cssText = 'position:fixed;right:12px;top:12px;z-index:9999;background:#111;color:#ddd;border:1px solid #444;border-radius:8px;padding:8px 10px;font:12px ui-monospace,monospace;display:flex;gap:6px;align-items:center;opacity:.94';
+    b.innerHTML = '<span>token</span>' +
+      '<input id="tokIn" type="password" placeholder="GALARDO_DEV_TOKEN" style="width:200px;background:#000;color:#0f0;border:1px solid #333;border-radius:4px;padding:3px 5px;font:12px ui-monospace,monospace">' +
+      '<button id="tokSave" style="background:#1d4ed8;color:#fff;border:0;border-radius:4px;padding:3px 8px;cursor:pointer">simpan</button>' +
+      '<span id="tokState" style="color:#888"></span>';
+    document.body.appendChild(b);
+    const inp = document.getElementById('tokIn');
+    inp.value = getTok();
+    document.getElementById('tokSave').onclick = () => galardoToken(inp.value);
+    inp.addEventListener('keydown', e => { if(e.key === 'Enter') galardoToken(inp.value); });
+    const st = document.getElementById('tokState');
+    st.textContent = getTok() ? 'terisi' : 'kosong';
+    st.style.color = getTok() ? '#22c55e' : '#ef4444';
+  }
+  if(document.body) build(); else document.addEventListener('DOMContentLoaded', build);
+})();
+
 let lastOkFetch = null;
 
 /* ---------- helpers ---------- */
@@ -240,12 +272,13 @@ function toast(msg, kind){ const t=document.createElement('div'); t.className='t
 async function api(path, opts={}){
   const o = Object.assign({}, opts);
   if(o.body && typeof o.body!=='string') o.body=JSON.stringify(o.body);
-  o.headers = Object.assign({}, opts.headers||{});
+  o.headers = authHeaders(opts.headers);
   if(o.body) o.headers['Content-Type']='application/json';
   const r = await fetch(API+path, o);
   let j=null; try{ j=await r.json(); }catch(e){}
   if(!r.ok){
     let m=(j&&(j.error&&(j.error.message||j.error)))||('HTTP '+r.status);
+    if(r.status===401) m='401 Unauthorized — isi token di kotak kanan atas';
     if(!j && r.status===415) m='HTTP 415 Unsupported Media Type — respons bukan dari Galardo API (base API salah / dibuka lewat viewer). Base saat ini: '+API;
     throw new Error(typeof m==='string'?m:JSON.stringify(m));
   }
@@ -807,7 +840,7 @@ window.visValidate = async ()=>{
       </div>`;
   }catch(e){
     let errs=null; try{ errs=JSON.parse(e.message).errors; }catch(_){}
-    if(!errs){ try{ const rr=await fetch(API+'/scenarios/validate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({visual:window._visual})}); const j=await rr.json(); errs=j.errors; }catch(_2){} }
+    if(!errs){ try{ const rr=await fetch(API+'/scenarios/validate',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({visual:window._visual})}); const j=await rr.json(); errs=j.errors; }catch(_2){} }
     panel.innerHTML = errs? `<div class="err-text">✗ INVALID:</div>`+errs.map(er=>`<div class="check"><span class="r r-FAIL">${esc(er.code)}</span><span><b class="mono">${esc(er.field)}</b><span class="why">${esc(er.message)}</span></span></div>`).join('') : `<div class="err-text">✗ ${esc(e.message)}</div>`;
   }
 };
@@ -883,7 +916,7 @@ window.validateYaml = async function(){
       ${r.warnings?.length?`<div class="warn-text">${r.warnings.map(esc).join('<br>')}</div>`:''}`;
   }catch(e){
     let errs=null; try{ errs=JSON.parse(e.message).errors; }catch(_){}
-    if(!errs){ try{ const r=await fetch(API+'/scenarios/validate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({yaml:$('#yamlEd').value})}); const j=await r.json(); errs=j.errors; }catch(_2){} }
+    if(!errs){ try{ const r=await fetch(API+'/scenarios/validate',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({yaml:$('#yamlEd').value})}); const j=await r.json(); errs=j.errors; }catch(_2){} }
     panel.innerHTML = errs? `<div class="err-text">✗ INVALID (${errs.length} error):</div>`+
       errs.map(er=>`<div class="check"><span class="r r-FAIL">${esc(er.code)}</span><span><b class="mono">${esc(er.field)}</b><span class="why">${esc(er.message)}</span></span></div>`).join('')
       : `<div class="err-text">✗ ${esc(e.message)}</div>`;
@@ -960,7 +993,7 @@ RENDER.plans = async function(){
 };
 window.approvePlan = async id=>{ try{ await api(`/test-plans/${id}/approve`,{method:'POST',body:{}}); toast('Plan APPROVED','ok'); RENDER.plans(); }catch(e){ toast(e.message,'err'); } };
 window.createJob = async planId=>{
-  try{ const r=await fetch(API+'/test-jobs',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':'ui-'+Date.now()+'-'+Math.random().toString(36).slice(2)},body:JSON.stringify({test_plan_id:planId})});
+  try{ const r=await fetch(API+'/test-jobs',{method:'POST',headers:authHeaders({'Content-Type':'application/json','Idempotency-Key':'ui-'+Date.now()+'-'+Math.random().toString(36).slice(2)}),body:JSON.stringify({test_plan_id:planId})});
     const j=await r.json(); if(!r.ok) throw new Error(typeof j.error==='string'?j.error:'gagal');
     SELECTED_JOB=j.id; localStorage.setItem('galardo.job',j.id); toast('Job dibuat: '+j.id,'ok'); go('live');
   }catch(e){ toast(e.message,'err'); }

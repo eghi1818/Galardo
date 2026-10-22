@@ -16,6 +16,23 @@ import tempfile
 import threading
 import time
 
+# --- token auth: ikutkan Authorization agar suite tetap sah saat GALARDO_REQUIRE_AUTH=1 ---
+import urllib.request
+from urllib.request import Request as _BaseRequest
+
+
+class _AuthRequest(_BaseRequest):
+    def __init__(self, url, data=None, headers=None, **kw):
+        h = dict(headers or {})
+        tok = os.environ.get("GALARDO_DEV_TOKEN", "dev-token")
+        if tok:
+            h.setdefault("Authorization", "Bearer " + tok)
+        super().__init__(url, data=data, headers=h, **kw)
+
+
+Request = _AuthRequest
+urllib.request.Request = _AuthRequest   # baris req() memakai atribut modul
+
 _RUN = str(int(time.time() * 1000))
 DEGRADE_KEY = 'test-job-degrade-1-' + _RUN
 DEGRADE_KEY_B = 'test-job-degrade-1b-' + _RUN
@@ -63,6 +80,8 @@ def req(method, path, body=None, headers=None, expect_json=True, timeout=15):
     if body is not None:
         data = json.dumps(body).encode()
         h["Content-Type"] = "application/json"
+    h = dict(h or {})
+    h.setdefault("Authorization", "Bearer " + os.environ.get("GALARDO_DEV_TOKEN", "dev-token"))
     r = urllib.request.Request(API + path, data=data, method=method, headers=h)
     try:
         with urllib.request.urlopen(r, timeout=timeout) as resp:

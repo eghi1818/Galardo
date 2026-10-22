@@ -102,3 +102,8 @@ git reset --hard checkpoint/galardo-v1.1-mulai
   TIDAK BOLEH mengembalikan UNKNOWN. Pakai PASS + reason yang jujur.
 - Knee probe mengganggu baseline-probe job berikutnya (pernah -> 409).
   Mitigasi: probe ke path probe_contract target, intensitas lembut, settle 1s.
+
+## Catatan port 8090
+Port 8090 dipakai bersama app dev dan container.
+`make gate` otomatis `docker compose stop galardo` agar verifier memboot app-nya sendiri;
+jalankan `make docker-up` setelah gate. Semua port compose ter-bind ke 127.0.0.1.

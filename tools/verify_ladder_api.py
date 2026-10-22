@@ -60,8 +60,12 @@ class Site(BaseHTTPRequestHandler):
 def api(method, path, body=None):
     url = "http://127.0.0.1:%d/api/v1%s" % (PORT, path)
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(url, data=data, method=method,
-                                 headers={"Content-Type": "application/json"})
+    _h = {"Content-Type": "application/json"}
+    try:
+        _h["Authorization"] = "Bearer " + TOKEN
+    except NameError:
+        pass
+    req = urllib.request.Request(url, data=data, method=method, headers=_h)
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
             return r.status, json.loads(r.read() or b"{}")
@@ -75,7 +79,23 @@ def api(method, path, body=None):
 site = ThreadingHTTPServer(("127.0.0.1", SITE), Site)
 threading.Thread(target=site.serve_forever, daemon=True).start()
 
+def _token_dari_env():
+    t = os.environ.get("GALARDO_DEV_TOKEN")
+    if t:
+        return t
+    for d in (os.path.dirname(os.path.dirname(os.path.abspath(__file__))), os.getcwd()):
+        f = os.path.join(d, ".env")
+        if os.path.isfile(f):
+            for line in open(f):
+                if line.strip().startswith("GALARDO_DEV_TOKEN="):
+                    return line.strip().split("=", 1)[1].strip()
+    return "dev-token"
+
+
 env = dict(os.environ)
+TOKEN = _token_dari_env()
+env["GALARDO_DEV_TOKEN"] = TOKEN
+os.environ["GALARDO_DEV_TOKEN"] = TOKEN
 env["GALARDO_API_PORT"] = str(PORT)
 proc = subprocess.Popen([sys.executable, "api.py", "--port", str(PORT)],
                         cwd=BACKEND, env=env,

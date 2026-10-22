@@ -2,6 +2,7 @@
 # Python stdlib implementation; no external services required.
 
 PY      ?= python3
+export PYTHONPATH := .    # shim auth (sitecustomize) dimuat sebelum site.py
 API_PORT ?= 8090
 TARGET_ORIGIN ?= http://127.0.0.1:8095
 BACKEND := backend
@@ -131,6 +132,7 @@ docker-down:
 	docker compose down
 
 gate: test
+	@docker compose stop galardo >/dev/null 2>&1 || true   # bebaskan 8090 dari container
 	@echo "== GATE: menjalankan semua verifier =="
 	@rc=0; for v in tools/verify_*.py; do \
 		if python3 "$$v" > /tmp/gate_$$(basename $$v).log 2>&1; then \

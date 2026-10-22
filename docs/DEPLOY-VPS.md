@@ -102,18 +102,18 @@ Alternatif nginx: proxy_pass http://127.0.0.1:8090; + certbot.
     # rollback: git checkout <tag-lama> && docker compose up -d --build
 
 ## 12. Checklist keamanan produksi
-- [ ] GALARDO_DEV_TOKEN diganti (default `dev-token` = bahaya di internet)
+- [x] GALARDO_DEV_TOKEN diganti + `GALARDO_REQUIRE_AUTH=1` (STEP-119/120)
 - [ ] 8090 di-bind ke 127.0.0.1, hanya 80/443 terbuka
 - [ ] TLS aktif (Caddy/certbot)
 - [ ] GALARDO_CORS_ORIGINS = domain asli (bukan `*`)
-- [ ] CSP aktif (default sudah ada; override via GALARDO_CSP bila perlu)
+- [x] CSP aktif (default sudah ada; override via GALARDO_CSP bila perlu)
 - [ ] `data/` sebagai volume + backup harian terverifikasi
 - [ ] container `restart: unless-stopped`
 - [ ] login SSH non-root + key only
 - [ ] `make gate` dijalankan setiap habis upgrade
 
 ## 13. Yang BELUM ada (jujur)
-- Belum ada CI: `make gate` masih manual
+- CI sudah ada (.github/workflows/gate.yml, jalan tiap push) — catatan ini usang
 - Credential provider proxy/residential (AnyIP dsb) belum diintegrasikan
 - `subfinder`/`nikto` tidak ada di image; install di image bila mau dipakai produksi
 - Mode PG mengasumsikan satu proses aplikasi (file JSON = cermin)

@@ -29,8 +29,8 @@ services:
     container_name: galardo-nats
     command: ["-js", "-m", "8222"]
     ports:
-      - "4222:4222"
-      - "8222:8222"
+      - "127.0.0.1:4222:4222"
+      - "127.0.0.1:8222:8222"
     restart: unless-stopped
 
   otel:
@@ -40,7 +40,7 @@ services:
     volumes:
       - ./ops/otel-collector.yaml:/etc/otel/config.yaml:ro
     ports:
-      - "4318:4318"
+      - "127.0.0.1:4318:4318"
     restart: unless-stopped
 
   pg:
@@ -51,7 +51,7 @@ services:
       POSTGRES_PASSWORD: galardo
       POSTGRES_DB: galardo
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

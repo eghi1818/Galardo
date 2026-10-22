@@ -3,8 +3,8 @@
 - tanggal: 2026-10-22 13:44
 - harness: make demo -> tools/galardo_demo.py (Goal 2 + Goal 3, proses nyata + HTTP nyata)
 - bukti mentah: .out/STEP-115-demo.txt
-- hasil: DEMO_OK, down_verified=true, transisi=4, ttr="time_to_recover": 44.373
-- gate3: [goal3-blank] applied=['T2'] status=200 body_len=0 forced=True|[goal3-revert] reverted=['T2'] / ok|
+- hasil: DEMO_OK, down_verified=true, transisi=4, ttr=44.373 s, peak_waiting=288, served=5047, shed_503=0
+- gate3: [goal3-blank] applied=['T2'] status=200 body_len=0 forced=True | [goal3-revert] reverted=['T2'] / ok
 
 ## Yang dibuktikan
 - baseline idle, plafon worker, spike 300 VU ke /api/heavy

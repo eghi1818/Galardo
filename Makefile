@@ -145,3 +145,7 @@ gate: test
 
 lane:
 	@python3 tools/verify_lane_proxy.py
+
+ci:
+	@curl -s "https://api.github.com/repos/eghi1818/Galardo/actions/runs?per_page=3" \
+	 | python3 -c "import sys,json;d=json.load(sys.stdin);[print('  ',r['head_sha'][:7], r['status'], r['conclusion'], '|', r['name'], '|', r['created_at']) for r in d.get('workflow_runs',[])]"

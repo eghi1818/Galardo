@@ -382,7 +382,7 @@ def probe_spoof(server="1.1.1.1", qname=DEFAULT_QNAME, sport=33333, timeout=3.0)
     except Exception as e:
         return {"ok": None, "reason": str(e)[:140], "spoof_proven": False}
     try:
-        local = socket._local_ip()
+        local = _local_ip()
     except Exception:
         local = "0.0.0.0"
     try:
@@ -391,24 +391,49 @@ def probe_spoof(server="1.1.1.1", qname=DEFAULT_QNAME, sport=33333, timeout=3.0)
         pass
     payload = dns_packet(qname, "TXT")[1]
     pkt = _ip_udp(local, server, sport, 53, payload)
+    # macOS: raw socket TIDAK melihat balasan UDP (raw->raw 0 paket, raw->udp 25
+    # byte). Raw tetap dipakai untuk KIRIM (itu yang memungkinkan spoof sumber),
+    # penerimanya UDP socket terikat ke (local, sport). Ini tetap bukti spoof:
+    # balasan hanya bisa datang kalau server memakai IP sumber dari header kita.
+    rx = None
+    try:
+        rx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        rx.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        rx.bind((local, sport))
+    except OSError:
+        if rx is not None:
+            rx.close()
+        rx = None
     t0 = time.time()
     seen = []
     try:
         raw.sendto(pkt, (server, 0))
-        raw.settimeout(timeout)
         deadline = time.time() + timeout
-        while time.time() < deadline:
-            raw.settimeout(max(0.05, deadline - time.time()))
+        if rx is not None:
+            rx.settimeout(max(0.05, timeout))
             try:
-                data, addr = raw.recvfrom(4096)
+                data, addr = rx.recvfrom(4096)
+                seen.append({"bytes": len(data), "ms": round((time.time() - t0) * 1000, 2),
+                             "via": "udp", "from": addr[0]})
             except socket.timeout:
-                break
-            if addr[0] == server and len(data) >= 28:
-                # IP header (20) + UDP header (8) -> cek dport == sport
-                dport = struct.unpack("!H", data[22:24])[0]
-                if dport == sport:
-                    seen.append({"bytes": len(data), "ms": round((time.time() - t0) * 1000, 2)})
+                pass
+            finally:
+                rx.close()
+        else:
+            raw.settimeout(timeout)
+            while time.time() < deadline:
+                raw.settimeout(max(0.05, deadline - time.time()))
+                try:
+                    data, addr = raw.recvfrom(4096)
+                except socket.timeout:
                     break
+                if addr[0] == server and len(data) >= 28:
+                    # IP header (20) + UDP header (8) -> cek dport == sport
+                    dport = struct.unpack("!H", data[22:24])[0]
+                    if dport == sport:
+                        seen.append({"bytes": len(data),
+                                     "ms": round((time.time() - t0) * 1000, 2), "via": "raw"})
+                        break
     except Exception as e:
         return {"ok": False, "error": str(e)[:160], "spoof_proven": False}
     finally:

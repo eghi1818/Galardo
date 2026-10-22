@@ -137,6 +137,12 @@ check("D src/dst IP terpasang",
 check("D header UDP sport/dport/len", struct.unpack("!HHH", rp[20:26]) == (33333, 53, 12), struct.unpack("!HHH", rp[20:26]))
 check("D payload ikut", rp[28:] == b"abcd")
 
+ups = open(os.path.join(ROOT, "backend", "udp_probe.py"), encoding="utf-8").read()
+check("D probe_spoof pakai _local_ip (bukan socket._local_ip)",
+      "_local_ip()" in ups and "socket._local_ip" not in ups)
+check("D probe_spoof pakai penerima UDP terikat sport (macOS raw recv buta)",
+      "rx.bind((local, sport))" in ups)
+check("D IPLEN_ORDER dipakai di header IP", 'IPLEN_ORDER + "H"' in ups)
 sp = up.probe_spoof(timeout=1.5)
 check("D probe_spoof kembalikan ok & spoof_proven",
       isinstance(sp, dict) and "ok" in sp and "spoof_proven" in sp, sp)

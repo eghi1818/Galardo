@@ -123,10 +123,23 @@ class WormTree:
                 "roots_alive": self.alive(), "renewing": self.renewing,
                 "leases": leases}
 
+    def alive_all(self):
+        """Jumlah proses agen run ini (akar + keturunan) lewat pgrep -f run_id.
+
+        alive() hanya melacak akar; keturunan lahir dari proses agen sehingga koordinator
+        tidak memegang handle-nya. Tanpa ini, "semua mati" hanya berarti "akar mati" dan
+        proses yatim bisa lolos - lalu ditutupi oleh reap() yang membunuhnya.
+        """
+        try:
+            p = subprocess.run(["pgrep", "-f", self.run_id], capture_output=True, text=True)
+            return len([x for x in (p.stdout or "").split() if x])
+        except Exception:
+            return 0
+
     def wait_all_dead(self, timeout=30.0):
         deadline = time.time() + timeout
         while time.time() < deadline:
-            if not self.alive():
+            if self.alive_all() == 0 and not self.alive():
                 return True
             time.sleep(0.4)
         return False

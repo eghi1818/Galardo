@@ -112,4 +112,4 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 | 110 | spoof sumber terbukti jalan; penerima probe_spoof diganti UDP socket terikat sport (raw recv macOS buta) + perbaiki socket._local_ip() + 3 cek pengunci | lihat docs/HASIL-110.md |
 | 111 | item 10 TUTUP: verify_dns_ownership (30 cek offline, txt_quorum di-monkeypatch) - quorum verify, endpoint verify/dns, ranting dns layer_attrib | lihat docs/HASIL-111.md |
 | 112 | item 14 TUTUP: alive_all/wait_all_dead (hitung keturunan lewat pgrep) + verify_worm (cascade end-to-end, nol yatim sebelum reap) | lihat docs/HASIL-112.md |
-- STEP-113 — item 9 TUTUP: mark_proven jadi metode; REGISTRY global dipulihkan (regresi patch). verifier 0 lulus, gate rc=0, test .
+- STEP-113 — item 9 TUTUP: mark_proven jadi metode; REGISTRY global dipulihkan (regresi patch). verifier 39 cek lulus, gate rc=0, test RESULTS: 82 passed, 0 failed, 1 skipped.

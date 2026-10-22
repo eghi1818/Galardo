@@ -140,3 +140,6 @@ gate: test
 		fi; \
 	done; \
 	echo "== GATE selesai (rc=$$rc) =="; exit $$rc
+
+lane:
+	@python3 tools/verify_lane_proxy.py

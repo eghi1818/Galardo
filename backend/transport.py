@@ -92,7 +92,7 @@ class ConnectToIPHTTPSConnection(http.client.HTTPSConnection):
 class Response(object):
     __slots__ = ("method", "url", "status", "reason", "headers", "body",
                  "elapsed_ms", "connect_ip", "bytes_sent", "bytes_received",
-                 "error", "http_version", "started_at")
+                 "error", "http_version", "started_at", "lane")
 
     def __init__(self, method=None, url=None, status=None, reason=None,
                  headers=None, body=None, elapsed_ms=None, connect_ip=None,
@@ -109,6 +109,7 @@ class Response(object):
         self.bytes_received = bytes_received
         self.error = error
         self.http_version = http_version
+        self.lane = None  # label lane (backend/proxy.py)
         self.started_at = time.time()
 
     @property
@@ -294,6 +295,8 @@ class Transport(object):
             "requests": 0, "errors": 0, "bytes_sent": 0, "bytes_received": 0,
         }
 
+        self.lanes = None  # LaneRegistry opsional (backend/proxy.py)
+
     def set_proxy(self, proxy):
         """``proxy`` is ``(host, port)`` or None. Affects later requests only."""
         self.proxy = proxy
@@ -304,6 +307,29 @@ class Transport(object):
 
     def close(self):
         self._pool.close_all()
+
+    def _lane_endpoint(self):
+        """Endpoint proxy dari lane aktif, atau None bila lane minta jalur langsung."""
+        lanes = getattr(self, "lanes", None)
+        if lanes is None:
+            return None
+        return lanes.current().endpoint()
+
+    def _label_lane(self, response, proxy):
+        """Tempelkan label lane evidence ke respons (ROADMAP item 4)."""
+        lanes = getattr(self, "lanes", None)
+        if lanes is None:
+            return
+        lane = lanes.match(proxy)
+        if lane is None:
+            response.lane = {
+                "lane_id": None, "lane_kind": "adhoc",
+                "egress": "proxy" if proxy else "direct",
+                "proxy": ("%s:%d" % (proxy[0], int(proxy[1]))) if proxy else None,
+                "pool": None}
+            return
+        response.lane = lane.evidence()
+        lane.record(response)
 
     def request(self, method, url, headers=None, body=None, body_encoding="identity",
                 connect_ip=None, timeout=None, allow_redirects=False,
@@ -363,7 +389,8 @@ class Transport(object):
         if parsed.query:
             path = path + "?" + parsed.query
 
-        effective_proxy = proxy if proxy is not None else self.proxy
+        effective_proxy = (proxy if proxy is not None
+                           else (self._lane_endpoint() or self.proxy))
         cache_key = ConnectionPool.key(scheme, host, port, connect_ip, effective_proxy)
         sent_bytes = estimate_request_bytes(method, path, headers, len(payload or b""))
 
@@ -416,6 +443,7 @@ class Transport(object):
             if response.error and reused and attempt == 0:
                 continue
 
+            self._label_lane(response, effective_proxy)
             with self._lock:
                 self._counters["requests"] += 1
                 self._counters["bytes_sent"] += response.bytes_sent or 0

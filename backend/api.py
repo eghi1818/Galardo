@@ -16,6 +16,7 @@ from urllib.parse import urlparse, parse_qs
 import db
 import exttool
 import proxy_provider
+import proxy as proxy_lanes  # lane egress berlabel (item 2/3/4)
 import ratelimit
 import rbac
 import mfa
@@ -550,6 +551,25 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(403, {"error": why})
             fn = proxy_provider.refresh if api_path.endswith("refresh") else proxy_provider.rotate
             return self._json(200, fn())
+
+        if api_path == "/lanes" and method == "GET":
+            uid = self._auth()
+            ok, why = rbac.ensure(rbac.user_of(uid), "VIEWER")
+            if not ok:
+                return self._json(403, {"error": why})
+            return self._json(200, proxy_lanes.status())
+
+        if api_path == "/lanes/mode" and method == "POST":
+            uid = self._auth()
+            ok, why = rbac.ensure(rbac.user_of(uid), "TEST_OPERATOR")
+            if not ok:
+                return self._json(403, {"error": why})
+            body = (self._body() if hasattr(self, "_body") else {}) or {}
+            try:
+                mode = proxy_lanes.REGISTRY.set_mode(body.get("mode"))
+            except Exception as exc:
+                return self._json(422, {"error": str(exc)})
+            return self._json(200, {"mode": mode})
 
         if api_path == "/exttools" and method == "GET":
             uid = self._auth()

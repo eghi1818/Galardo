@@ -8,8 +8,7 @@ Titik aman : tag terakhir `git tag -l | tail -n 1`; branch checkpoint/galardo-v1
 ## Status
 - P1-P6 (docs/PENDING.md): SELESAI semua. P1 CI terbukti hijau di tab Actions.
 - F-1..F-24, P0.1b, P0.2, Tier 1-2: TUTUP. Rincian docs/INVENTARIS.md + docs/STEPLOG.md.
-- SISA (otoritatif docs/INVENTARIS.md): item 9 botnet IoT global, item 2/3 lane proxy,
-  item 4 transport multi-lane, V4 run nyata Mode Aktif, V6 4 check() mati.
+- SISA (otoritatif docs/INVENTARIS.md): V4 run nyata Mode Aktif, V6 4 check() mati (TUTUP STEP-104).
   Tier 1-3 SELESAI; P7 = nama lain item 9. Item 10/13/14 SEBAGIAN, GOAL 2 SELESAI.
 
 ## Konvensi

@@ -29,8 +29,8 @@ Legenda: SELESAI | SEBAGIAN | PENDING | PERLU-VERIFIKASI
 |---|---|
 | Item 1 cache-buster | SELESAI (cachebuster.py + engine + step_load, penanda __gb) |
 | Item 5 T3 edge rule | SELESAI | bukti live .out/HASIL-48.md + docs/T3-RUN.md (404 + blank via edge, revert bersih) |
-| Item 2/3 lane proxy | PENDING (proxy.py tidak ada; transport sudah punya proxy) |
-| Item 4 transport multi-lane | PENDING |
+| Item 2/3 lane proxy | SELESAI (backend/proxy.py + tools/verify_lane_proxy.py) |
+| Item 4 transport multi-lane | SELESAI (label lane di Transport._label_lane) |
 | Item 9 botnet IoT global | SELESAI |
 | Item 10 DNS manipulation | SELESAI | quorum TXT (ownership.py) + endpoint /targets/*/verify/dns + lapisan dns di layer_attrib; dikunci oleh tools/verify_dns_ownership.py (offline, txt_quorum di-monkeypatch) |
 | Item 13 UDP reflection | SELESAI | backend/udp_probe.py ter-wire di api.py; tools/verify_udp_reflection.py mengunci builder paket, rasio amplifikasi, reflection_capable, checksum spoof, wiring, dan panggilan NYATA probe_all |
@@ -98,7 +98,6 @@ T1 SELESAI (8a RBAC, 8b MFA, 8c backup, 8d Docker) | T2-T3 SELESAI (9a NATS, 9b 
 
 ## Z. Koreksi STEP-103
 Status di atas dikoreksi dari kode + verifier, bukan dari dokumen lain. Yang benar-benar
-PENDING: item 9 botnet IoT global, item 2/3 lane proxy, item 4 transport multi-lane,
-V4 run nyata Mode Aktif, V6 4 check() tidak pernah dieksekusi. Item 10/13/14 naik ke
+PENDING: V4 run nyata Mode Aktif, V6 4 check() tidak pernah dieksekusi. Item 10/13/14 naik ke
 SEBAGIAN (kode ada, verifier khusus belum); GOAL 2 observer SELESAI. Seksi E dulu
 bertentangan dengan tabel F di file ini sendiri.

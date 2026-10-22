@@ -113,3 +113,4 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 | 111 | item 10 TUTUP: verify_dns_ownership (30 cek offline, txt_quorum di-monkeypatch) - quorum verify, endpoint verify/dns, ranting dns layer_attrib | lihat docs/HASIL-111.md |
 | 112 | item 14 TUTUP: alive_all/wait_all_dead (hitung keturunan lewat pgrep) + verify_worm (cascade end-to-end, nol yatim sebelum reap) | lihat docs/HASIL-112.md |
 - STEP-113 — item 9 TUTUP: mark_proven jadi metode; REGISTRY global dipulihkan (regresi patch). verifier 39 cek lulus, gate rc=0, test RESULTS: 82 passed, 0 failed, 1 skipped.
+- STEP-114 — item 2/3 lane proxy + item 4 label multi-lane TUTUP: backend/proxy.py (direct default, rotasi opt-in, statistik per-lane terpisah), Transport._lane_endpoint + _label_lane, endpoint /lanes. verifier RESULTS: 48 passed, 0 failed, gate rc=0.

@@ -59,7 +59,7 @@ ekor backup chat, dokumen REA lanjutan, isi 14 poin list kendala per-item.
 ## 8. PENDING BERIKUTNYA (URUT PRIORITAS - jangan dilompati)
 
 STATUS STEP-102: item 1-10 di bawah SEMUA SELESAI. Backlog resmi + status + bukti ada di
-docs/PENDING.md (bagian "Status per ..."). SISA (otoritatif docs/INVENTARIS.md): V4 run nyata Mode Aktif, V6 4 check() mati (TUTUP STEP-104). Tier 1-3 SELESAI.
+docs/PENDING.md (bagian "Status per ..."). SISA (otoritatif docs/INVENTARIS.md): V4 run nyata Mode Aktif (V6 4 check() mati sudah TUTUP STEP-104). Tier 1-3 SELESAI.
 Jangan buka lebih dari satu item sekaligus (lihat 8b).
 
 RIWAYAT (jangan dikerjakan ulang):

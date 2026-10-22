@@ -162,7 +162,8 @@ def _probe_many(targets, port, payload_factory, timeout, expect, deadline=None):
 # public probes
 # ---------------------------------------------------------------------------
 def probe_dns(qname=DEFAULT_QNAME, qtype="TXT", servers=DNS_SERVERS, timeout=3.0, deadline=None):
-    return _probe_many(servers, 53, lambda: dns_packet(qname, qtype)[1], timeout, 1)
+    return _probe_many(servers, 53, lambda: dns_packet(qname, qtype)[1], timeout, 1,
+                       deadline=deadline)
 
 
 def probe_dns_best(timeout=3.0, candidates=DNS_CANDIDATES, deadline=None):
@@ -243,7 +244,8 @@ def probe_ssdp(timeout=4.0):
             "responded": any(a.get("responded") for a in attempts)}
 
 
-def rotate_source_ports(target="1.1.1.1", port=53, n=8, timeout=1.5, qname=DEFAULT_QNAME):
+def rotate_source_ports(target="1.1.1.1", port=53, n=8, timeout=1.5, qname=DEFAULT_QNAME,
+                        deadline=None):
     """Rate-limit sering per source port. Kirim dari n port berbeda, hitung yang dijawab."""
     results = []
     for i in range(n):
@@ -297,7 +299,8 @@ def probe_all(qname=DEFAULT_QNAME, qtype="TXT", timeout=3.0, ports_n=6, budget=N
     ntp6 = {"skipped": "budget"} if lewat("ntp_mode6") else probe_ntp(6, timeout=min(timeout, sisa()), deadline=deadline)
     ssdp = {"skipped": "budget"} if lewat("ssdp") else probe_ssdp(timeout=min(timeout, sisa()))
     rot = ({"skipped": "budget"} if lewat("port_rotation")
-           else rotate_source_ports(qname=qname, n=ports_n, timeout=min(1.5, timeout, sisa())))
+           else rotate_source_ports(qname=qname, n=ports_n,
+                                    timeout=min(1.5, timeout, sisa()), deadline=deadline))
 
     best = max([dns.get("best") or {}, ntp3.get("best") or {},
                 ntp6.get("best") or {}, ssdp.get("best") or {}],

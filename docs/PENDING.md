@@ -190,8 +190,7 @@ backend/scenario.py:85:                errors.append({"field": "proxy_pool", "co
 | P7 botnet | usul | lihat docs/ROADMAP.md; belum masuk tabel PENDING. |
 
 ## Sisa PRD (otoritatif: docs/INVENTARIS.md)
-- PENDING: V4 run nyata Mode Aktif, V6 4 check() tidak pernah dieksekusi.
-- SEBAGIAN (kode ada, verifier khusus belum): item 10 DNS manipulation, item 13 UDP
-  reflection, item 14 worm/lease.
+- PENDING: tidak ada. V4 SELESAI (STEP-115, make demo DEMO_OK). V6 SELESAI (STEP-104).
+- SELESAI: item 10 DNS (STEP-111), item 13 UDP reflection (STEP-107/110), item 14 worm (STEP-112).
 - SELESAI: GOAL 2 observer tersambung, Tier 1, Tier 2, Tier 3.
 

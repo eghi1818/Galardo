@@ -11,7 +11,7 @@ Legenda: SELESAI | SEBAGIAN | PENDING | PERLU-VERIFIKASI
 | V6 | 3 check() tidak pernah dieksekusi | SELESAI (STEP-104) | 82 nama check() selalu melapor; dijaga check "semua nama check() melapor" |
 | V7 | Recovery monitor bisa diverifikasi untuk job terminal (ABORTED) | SELESAI (STEP-106) | orchestrator: spawn probe pengganti bila ctx.probe MATI; kedua rute diuji di tests_integration |
 | V3 | GALARDO_CF_TOKEN | SELESAI | .env + cf_check http=200 + zone active |
-| V4 | Run nyata Mode Aktif pasca perubahan | PENDING | belum ada run sejak tier1 + Fase A |
+| V4 | Run nyata Mode Aktif pasca perubahan | SELESAI (STEP-115) | make demo DEMO_OK: 4 transisi, ttr 44.373 s, peak_waiting 288, saturated true |
 | V5 | data/ | SELESAI | data/ dan logs/ dibuat |
 
 ## B. Defect - SEMUA SELESAI (terverifikasi STEP-28, ada bukti baris kode)
@@ -98,6 +98,6 @@ T1 SELESAI (8a RBAC, 8b MFA, 8c backup, 8d Docker) | T2-T3 SELESAI (9a NATS, 9b 
 
 ## Z. Koreksi STEP-103
 Status di atas dikoreksi dari kode + verifier, bukan dari dokumen lain. Yang benar-benar
-PENDING: V4 run nyata Mode Aktif, V6 4 check() tidak pernah dieksekusi. Item 10/13/14 naik ke
-SEBAGIAN (kode ada, verifier khusus belum); GOAL 2 observer SELESAI. Seksi E dulu
+TIDAK ADA PENDING. V4 SELESAI (STEP-115, make demo DEMO_OK). V6 SELESAI (STEP-104).
+Item 10/13/14 SELESAI (STEP-111 / STEP-110 / STEP-112). GOAL 2 observer SELESAI. Seksi E dulu
 bertentangan dengan tabel F di file ini sendiri.

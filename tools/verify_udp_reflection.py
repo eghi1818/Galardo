@@ -122,7 +122,12 @@ finally:
 
 print("== D. raw packet & probe_spoof ==")
 rp = up._ip_udp("192.0.2.10", "192.0.2.20", 33333, 53, b"abcd")
-check("D total length benar", struct.unpack("!H", rp[2:4])[0] == 32, struct.unpack("!H", rp[2:4])[0])
+check("D urutan ip_len sesuai platform",
+      up.IPLEN_ORDER == ("<" if (sys.platform == "darwin" or "bsd" in sys.platform) else "!"),
+      up.IPLEN_ORDER)
+check("D total length benar (urutan sesuai platform)",
+      struct.unpack(up.IPLEN_ORDER + "H", rp[2:4])[0] == 32,
+      struct.unpack(up.IPLEN_ORDER + "H", rp[2:4])[0])
 check("D protokol 17", rp[9] == 17, rp[9])
 hdr = rp[:20]
 check("D checksum IP valid", up._csum(hdr[:10] + b"\x00\x00" + hdr[12:]) == struct.unpack("!H", hdr[10:12])[0],

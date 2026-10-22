@@ -108,3 +108,4 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 | 106 | recovery monitor: spawn probe pengganti bila ctx.probe mati (job terminal) + tes kedua rute (ABORTED/COMPLETED); INVENTARIS V7 | lihat docs/HASIL-106.md |
 | 107 | item 13 TUTUP: perbaiki NameError deadline di rotate_source_ports + teruskan deadline (probe_dns, probe_all) + verify_udp_reflection (6 bagian, 40 cek) | lihat docs/HASIL-107.md |
 | 108 | koreksi INVENTARIS item 13 (langkah STEP-107 yang gagal) + rekam permukaan item 10 dan jalankan probe_spoof langsung | lihat docs/HASIL-108.md |
+| 109 | jalur raw spoof: IPLEN_ORDER sesuai platform (host order di BSD/macOS) + _local_ip() ganti gethostbyname(gethostname()) yang mengembalikan 127.0.0.1 | lihat docs/HASIL-109.md |

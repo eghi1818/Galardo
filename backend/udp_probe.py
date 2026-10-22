@@ -334,14 +334,39 @@ def _csum(data):
     return (~s) & 0xFFFF
 
 
+# BSD/macOS mengharuskan ip_len & ip_off dalam HOST byte order saat IP_HDRINCL;
+# Linux mengharuskan NETWORK byte order. Salah urutan -> sendto() EINVAL.
+_SYSNAME = os.uname().sysname.lower() if hasattr(os, "uname") else "linux"
+IPLEN_ORDER = "<" if ("darwin" in _SYSNAME or "bsd" in _SYSNAME) else "!"
+
+
 def _ip_udp(src_ip, dst_ip, sport, dport, payload):
     udp = struct.pack("!HHHH", sport, dport, 8 + len(payload), 0) + payload
     total = 20 + len(udp)
-    ip = struct.pack("!BBHHHBBH4s4s", (4 << 4) | 5, 0, total, random.randint(0, 65535),
-                     0, 64, socket.IPPROTO_UDP, 0,
-                     socket.inet_aton(src_ip), socket.inet_aton(dst_ip))
+    ip = (struct.pack("!BB", (4 << 4) | 5, 0)
+          + struct.pack(IPLEN_ORDER + "H", total)
+          + struct.pack("!H", random.randint(0, 65535))
+          + struct.pack(IPLEN_ORDER + "H", 0)
+          + struct.pack("!BBH", 64, socket.IPPROTO_UDP, 0)
+          + socket.inet_aton(src_ip) + socket.inet_aton(dst_ip))
     ip = ip[:10] + struct.pack("!H", _csum(ip)) + ip[12:]
     return ip + udp
+
+
+def _local_ip(fallback=None):
+    """IP lokal yang benar-benar dipakai keluar (bukan 127.0.0.1).
+
+    gethostbyname(gethostname()) sering mengembalikan 127.0.0.1 di macOS,
+    sehingga balasan untuk paket bersumber palsu tidak kembali lewat en0.
+    """
+    sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sk.connect(("1.1.1.1", 53))
+        return sk.getsockname()[0]
+    except OSError:
+        return fallback or socket.gethostbyname(socket.gethostname())
+    finally:
+        sk.close()
 
 
 def probe_spoof(server="1.1.1.1", qname=DEFAULT_QNAME, sport=33333, timeout=3.0):
@@ -357,7 +382,7 @@ def probe_spoof(server="1.1.1.1", qname=DEFAULT_QNAME, sport=33333, timeout=3.0)
     except Exception as e:
         return {"ok": None, "reason": str(e)[:140], "spoof_proven": False}
     try:
-        local = socket.gethostbyname(socket.gethostname())
+        local = socket._local_ip()
     except Exception:
         local = "0.0.0.0"
     try:

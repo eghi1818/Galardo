@@ -248,7 +248,7 @@ class Source:
              "ssl_lib": self.ssl_lib,
              "capabilities": self.capabilities(), "probe_count": self.probe_count,
              "last_probe_at": self.last_probe_at, "created_at": self.created_at,
-             "kind_is_datacenter": self.kind in ("vps", "worker", "datacenter")}
+             "kind_is_datacenter": self.kind in ("vps", "worker")}
         if with_evidence:
             d["evidence"] = self.evidence
         return d
@@ -361,21 +361,34 @@ class SourceRegistry:
                 "gaps": {c: [s.source_id for s in self.list() if not s.can(c)]
                          for c in CAPABILITIES}}
 
+    def mark_proven(self, sid, caps, evidence=None):
+        """Pindahkan cap dari na/unproven ke proven pada registry INI.
 
-def mark_proven(sid, caps, evidence=None):
-    """Tandai kapabilitas sebagai TERBUKTI oleh prober lain (mis. udp_probe)."""
-    s = REGISTRY.get(sid)
-    if s is None:
-        raise SourceError("sumber '%s' tidak ada" % sid)
-    with REGISTRY.lock:
-        s.proven = sorted(set(s.proven) | set(caps))
-        s.na = sorted(set(s.na) - set(caps))
-        s.unproven = sorted(set(s.unproven) - set(caps))
+        Sejajar dengan pick()/probe()/matrix() yang juga metode. Fungsi modul
+        mark_proven() mendelegasikan ke REGISTRY global untuk api.py.
+        """
+        s = self.get(sid)
+        if s is None:
+            raise SourceError("sumber '%s' tidak ada" % sid)
+        for c in caps:
+            if c in s.na:
+                s.na.remove(c)
+            if c in s.unproven:
+                s.unproven.remove(c)
+            if c not in s.proven:
+                s.proven.append(c)
         if evidence:
             s.evidence.update(evidence)
-        s.last_probe_at = time.time()
-    REGISTRY.save()
-    return s
+        self.save()
+        return s
+
+def mark_proven(sid, caps, evidence=None):
+    """Pindahkan cap dari na/unproven ke proven pada REGISTRY global.
+
+    Dipakai api.py untuk cap hasil prober terpisah. Untuk registry non-global,
+    pakai SourceRegistry.mark_proven().
+    """
+    return REGISTRY.mark_proven(sid, caps, evidence)
 
 
 REGISTRY = SourceRegistry()

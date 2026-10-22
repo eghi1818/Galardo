@@ -31,7 +31,7 @@ Legenda: SELESAI | SEBAGIAN | PENDING | PERLU-VERIFIKASI
 | Item 5 T3 edge rule | SELESAI | bukti live .out/HASIL-48.md + docs/T3-RUN.md (404 + blank via edge, revert bersih) |
 | Item 2/3 lane proxy | PENDING (proxy.py tidak ada; transport sudah punya proxy) |
 | Item 4 transport multi-lane | PENDING |
-| Item 9 botnet IoT global | PENDING |
+| Item 9 botnet IoT global | SELESAI |
 | Item 10 DNS manipulation | SELESAI | quorum TXT (ownership.py) + endpoint /targets/*/verify/dns + lapisan dns di layer_attrib; dikunci oleh tools/verify_dns_ownership.py (offline, txt_quorum di-monkeypatch) |
 | Item 13 UDP reflection | SELESAI | backend/udp_probe.py ter-wire di api.py; tools/verify_udp_reflection.py mengunci builder paket, rasio amplifikasi, reflection_capable, checksum spoof, wiring, dan panggilan NYATA probe_all |
 | Item 14 worm/lease | SELESAI | backend/worm.py + worm_agent.py (replikasi bercabang, lease, cascade fail-closed) + worker_daemon lease/heartbeat; tools/verify_worm.py menguji cascade end-to-end dan NOL proses yatim |

@@ -254,13 +254,15 @@ window.galardoToken = function(v){
     b.id = 'tokBox';
     b.style.cssText = 'position:fixed;right:12px;top:12px;z-index:9999;background:#111;color:#ddd;border:1px solid #444;border-radius:8px;padding:8px 10px;font:12px ui-monospace,monospace;display:flex;gap:6px;align-items:center;opacity:.94';
     b.innerHTML = '<span>token</span>' +
-      '<input id="tokIn" type="password" placeholder="GALARDO_DEV_TOKEN" style="width:200px;background:#000;color:#0f0;border:1px solid #333;border-radius:4px;padding:3px 5px;font:12px ui-monospace,monospace">' +
+      '<input id="tokIn" type="password" placeholder="token operator" title="nilai dari .env GALARDO_DEV_TOKEN" style="width:200px;background:#000;color:#0f0;border:1px solid #333;border-radius:4px;padding:3px 5px;font:12px ui-monospace,monospace">' +
       '<button id="tokSave" style="background:#1d4ed8;color:#fff;border:0;border-radius:4px;padding:3px 8px;cursor:pointer">simpan</button>' +
+      '<button id="tokClear" title="lupakan token" style="background:#374151;color:#ddd;border:0;border-radius:4px;padding:3px 7px;cursor:pointer">x</button>' +
       '<span id="tokState" style="color:#888"></span>';
     document.body.appendChild(b);
     const inp = document.getElementById('tokIn');
     inp.value = getTok();
     document.getElementById('tokSave').onclick = () => galardoToken(inp.value);
+    document.getElementById('tokClear').onclick = () => galardoToken('');
     inp.addEventListener('keydown', e => { if(e.key === 'Enter') galardoToken(inp.value); });
     const st = document.getElementById('tokState');
     st.textContent = getTok() ? 'terisi' : 'kosong';
@@ -283,7 +285,7 @@ async function api(path, opts={}){
   let j=null; try{ j=await r.json(); }catch(e){}
   if(!r.ok){
     let m=(j&&(j.error&&(j.error.message||j.error)))||('HTTP '+r.status);
-    if(r.status===401) m='401 Unauthorized — isi token di kotak kanan atas';
+    if(r.status===401) m='401 Unauthorized — tempel token operator di kotak kanan atas, lalu klik simpan';
     if(!j && r.status===415) m='HTTP 415 Unsupported Media Type — respons bukan dari Galardo API (base API salah / dibuka lewat viewer). Base saat ini: '+API;
     throw new Error(typeof m==='string'?m:JSON.stringify(m));
   }

@@ -117,3 +117,4 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 - STEP-115 — V4 run nyata Mode Aktif TUTUP: make demo DEMO_OK, down_verified=true, 4 transisi, ttr "time_to_recover": 44.373. PRD tuntas.
 - STEP-120 — auth menyala tanpa mematikan UI/suite/verifier; gate 37 verifier hijau, 0 GAGAL; port ter-bind 127.0.0.1 + backup data.
 - STEP-121 — segarkan dokumen handoff (SESSION_STATE/HANDOFF/RINGKASAN-AKHIR) ke keadaan pasca-STEP-120: PRD 33/0, live, auth, bukti pihak ketiga.
+- STEP-122 — GOAL dieksekusi end-to-end via API: job ABORTED (ERROR_RATE 36,84% > 30%), evidence terverifikasi, audit 38 entri. UI: kotak token dirapikan.

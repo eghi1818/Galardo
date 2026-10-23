@@ -5,4 +5,4 @@
 - isi: PRD 33/0, gate rc=0, test 82/0/1, live container + port lokal, auth wajib,
   bukti pihak ketiga T3_OK/OWN1_OK, perintah operasional, backup, sisa opsional
 - alasan: chat sebelumnya pernah HANG; dokumen handoff harus akurat agar chat baru bisa lanjut
-- commit: (diisi setelah commit)
+- commit: 69b3ea2

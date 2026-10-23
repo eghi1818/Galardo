@@ -6,7 +6,7 @@ min_role tak dikenal -> RbacError (fail-closed, bukan diam-diam lolos).
 """
 from __future__ import annotations
 
-ROLE_RANK = {"VIEWER": 1, "TEST_OPERATOR": 2, "APPROVER": 3, "ADMIN": 4}
+ROLE_RANK = {"VIEWER": 1, "TEST_OPERATOR": 2, "APPROVER": 3, "ADMIN": 4, "SUPERADMIN": 5}
 ROLES = tuple(sorted(ROLE_RANK, key=lambda r: -ROLE_RANK[r]))
 
 

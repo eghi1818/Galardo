@@ -1824,21 +1824,21 @@ RENDER.webhooks = async function(){
       '<input id="uN" placeholder="nama" style="width:24%"> '+
       '<input id="uU" placeholder="username" style="width:20%"> '+
       '<select id="uR" style="width:20%">'+d.roles.map(function(x){return '<option>'+x+'</option>';}).join('')+'</select> '+
-      '<input id="uP" type="password" placeholder="sandi" style="width:20%"> <button id="uAdd">tambah</button>';
+      '<input id="uP" type="password" placeholder="sandi" style="width:18%"> <label style="color:#8a97a6"><input id="uA" type="checkbox"> akses API</label> <button id="uAdd">tambah</button>';
     pan.appendChild(f);
     var t=el('table','','');
     t.style.cssText='width:100%;border-collapse:collapse;margin-top:12px';
     t.innerHTML='<tr style="text-align:left;color:#8a97a6"><th>nama</th><th>username</th><th>peran</th><th>status</th><th>token</th><th>aksi</th></tr>'+
       d.users.map(function(u){return '<tr style="border-top:1px solid #1d2734"><td>'+u.name+'</td><td>'+u.username+'</td><td>'+u.role+'</td>'+
         '<td>'+(u.active?'aktif':'nonaktif')+'</td>'+
-        '<td><span style="color:#7ee787">'+String(u.token||'').slice(0,8)+'...</span> <button data-tok="'+u.id+'">putar</button></td>'+
+        '<td>'+(u.token?'<span style="color:#7ee787">'+u.token.slice(0,8)+'...</span> <button data-tok="'+u.id+'">putar</button>':'<span style="color:#8a97a6">-</span> <button data-tok="'+u.id+'">buat token</button>')+'</td>'+
         '<td><button data-pw="'+u.id+'">sandi</button> <button data-act="'+u.id+'" data-on="'+(u.active?0:1)+'">'+(u.active?'nonaktif':'aktif')+'</button> <button data-del="'+u.id+'">hapus</button></td></tr>';}).join('');
     pan.appendChild(t);
     pan.querySelectorAll('input,select').forEach(function(i){i.style.cssText+=';background:#0b1219;color:#dbe3ec;border:1px solid #26313f;border-radius:5px;padding:4px 6px';});
     kecil(pan);
     document.getElementById('uAdd').onclick=async function(){
       var b={name:document.getElementById('uN').value, username:document.getElementById('uU').value,
-             role:document.getElementById('uR').value, password:document.getElementById('uP').value};
+             role:document.getElementById('uR').value, password:document.getElementById('uP').value, api:document.getElementById('uA').checked};
       var o=await kirim('POST','/api/v1/users',b);
       if(o.st===201){ alert('pengguna dibuat.\ntoken: '+o.j.token+'\n(simpan sekarang)'); muat(); }
       else { alert('gagal: '+JSON.stringify(o.j)); }

@@ -56,6 +56,28 @@ def verify_password(pw, stored):
         return False
 
 
+def _sync_db(rec):
+    """Cerminkan pengguna ke db agar rbac.user_of() menemukannya."""
+    try:
+        import db
+    except Exception:
+        return
+    doc = {"id": rec["id"], "username": rec.get("username"), "name": rec.get("name"),
+           "email": rec.get("email") or (rec.get("username") or "") + "@lokal",
+           "role": rec.get("role"), "status": "ACTIVE" if rec.get("active", True) else "DISABLED"}
+    for fn in ("put", "set", "upsert", "save", "insert", "update"):
+        f = getattr(db, fn, None)
+        if not f:
+            continue
+        try:
+            f("users", rec["id"], doc); return
+        except Exception:
+            try:
+                f("users", doc); return
+            except Exception:
+                pass
+
+
 def _slug(s):
     out = "".join(c if c.isalnum() or c in "-_" else "-" for c in (s or "").lower()).strip("-")
     return out or "user"
@@ -65,7 +87,7 @@ def allows(role, need):
     return RANK.get(role or "", 0) >= RANK.get(need or "VIEWER", 1)
 
 
-def create(name, username, role="VIEWER", password=None):
+def create(name, username, role="VIEWER", password=None, api=False):
     if role not in ROLES:
         raise ValueError("peran tidak dikenal: %s" % role)
     with _LOCK:
@@ -80,9 +102,10 @@ def create(name, username, role="VIEWER", password=None):
         rec = {"id": uid, "name": name or uname, "username": uname, "role": role,
                "active": True, "created_at": int(time.time()),
                "password": hash_password(password) if password else "",
-               "token": secrets.token_hex(16)}
+               "token": secrets.token_hex(16) if api else "", "api_access": bool(api)}
         d[uid] = rec
         _save(d)
+        _sync_db(rec)
         return dict(rec)
 
 
@@ -96,7 +119,7 @@ def list_users():
     for u in sorted(d.values(), key=lambda x: x.get("username") or ""):
         out.append({"id": u.get("id"), "name": u.get("name"), "username": u.get("username"),
                     "role": u.get("role"), "active": u.get("active", True),
-                    "created_at": u.get("created_at"), "token": u.get("token"),
+                    "created_at": u.get("created_at"), "token": u.get("token"), "api_access": u.get("api_access", bool(u.get("token"))),
                     "punya_sandi": bool(u.get("password"))})
     return out
 
@@ -132,6 +155,7 @@ def _mut(uid, fn):
         fn(rec)
         d[uid] = rec
         _save(d)
+        _sync_db(rec)
         return dict(rec)
 
 
@@ -147,6 +171,14 @@ def set_password(uid, pw):
 
 def rotate_token(uid):
     return _mut(uid, lambda r: r.__setitem__("token", secrets.token_hex(16)))
+
+
+def set_api_access(uid, aktif):
+    """Nyalakan/matikan kunci API. Saat dimatikan, token dikosongkan."""
+    def _f(r):
+        r["api_access"] = bool(aktif)
+        r["token"] = secrets.token_hex(16) if aktif else ""
+    return _mut(uid, _f)
 
 
 def set_active(uid, aktif):

@@ -242,6 +242,11 @@ window.galardoToken = function(v){
   if(v) localStorage.setItem(TOKEN_KEY, String(v).trim()); else localStorage.removeItem(TOKEN_KEY);
   location.reload();
 };
+// token bisa dikirim lewat URL: ?token=xxx (disimpan sekali, lalu dipakai)
+(function(){
+  const m = location.search.match(/[?&]token=([^&]+)/);
+  if(m && !getTok()) galardoToken(decodeURIComponent(m[1]));
+})();
 (function(){
   function build(){
     if(document.getElementById('tokBox')) return;

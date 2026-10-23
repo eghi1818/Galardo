@@ -116,3 +116,4 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 - STEP-114 — item 2/3 lane proxy + item 4 label multi-lane TUTUP: backend/proxy.py (direct default, rotasi opt-in, statistik per-lane terpisah), Transport._lane_endpoint + _label_lane, endpoint /lanes. verifier RESULTS: 48 passed, 0 failed, gate rc=0.
 - STEP-115 — V4 run nyata Mode Aktif TUTUP: make demo DEMO_OK, down_verified=true, 4 transisi, ttr "time_to_recover": 44.373. PRD tuntas.
 - STEP-120 — auth menyala tanpa mematikan UI/suite/verifier; gate 37 verifier hijau, 0 GAGAL; port ter-bind 127.0.0.1 + backup data.
+- STEP-121 — segarkan dokumen handoff (SESSION_STATE/HANDOFF/RINGKASAN-AKHIR) ke keadaan pasca-STEP-120: PRD 33/0, live, auth, bukti pihak ketiga.

@@ -1,5 +1,19 @@
 # GALARDO — Ringkasan Akhir & Panduan Resume
 
+> **STATUS TERKINI — diperbarui STEP-121, 2026-10-23**
+>
+> - PRD: **33 item SELESAI / 0 PENDING** (rujukan: `docs/INVENTARIS.md`, `docs/PENDING.md`)
+> - gate: **rc=0** (37 verifier hijau) | test: **82 passed / 0 failed / 1 skipped**
+> - LIVE: container `galardo nats otel pg`; seluruh port ter-bind `127.0.0.1`
+> - dashboard: `http://127.0.0.1:8090/` — tempel token dari `.env` `GALARDO_DEV_TOKEN` di kotak kanan atas
+> - auth: `GALARDO_REQUIRE_AUTH=1` (401 tanpa token, 200 dengan token); UI sudah punya kotak token
+> - pihak ketiga **TERBUKTI**: `T3_OK` (Cloudflare edge) + `OWN1_OK` (ownership TXT, quorum DoH 3/3) — STEP-118
+> - operasional: `make docker-up` / `make docker-down` / `make dev-up` / `make gate` / `make ci`
+>   (catatan: `make gate` otomatis `docker compose stop galardo` karena port 8090 dipakai bersama)
+> - backup: `tar -czf .out/backup/data-$(date +%Y%m%d).tgz data`
+> - sisa **OPSIONAL**: TLS via Cloudflare Tunnel, `GALARDO_POOL_*` (lane rotate), `make capacity`, `gh` CLI
+> - bukti mentah: `.out/STEP-115..121-*.txt`, rekaman `docs/HASIL-115..121.md`
+
 Status: SELESAI. Backlog HANDOFF item 1-10 + P1-P6 tuntas. Temuan terbuka: NOL.
 
 ## Apa yang dikerjakan (item 1-10)

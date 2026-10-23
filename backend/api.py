@@ -281,6 +281,78 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
+    def _login_page(self):
+        """Halaman login: username+sandi (utama) atau token (cadangan)."""
+        html = """<!doctype html><html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Galardo - masuk</title>
+<style>
+:root{--bg:#0b0f14;--card:#121a24;--line:#243040;--fg:#dbe3ec;--dim:#8a97a6;--acc:#2563eb;--err:#f87171}
+*{box-sizing:border-box}
+body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(1200px 600px at 50% -10%,#16202c,#0b0f14 60%);color:var(--fg);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.card{width:380px;max-width:92vw;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px 26px 22px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#2563eb,#22c55e);display:grid;place-items:center;font-weight:800;color:#04121f}
+h1{font-size:16px;margin:0}small{color:var(--dim)}
+.tabs{display:flex;gap:6px;background:#0d141d;border:1px solid var(--line);border-radius:9px;padding:4px;margin:14px 0 4px}
+.tab{flex:1;text-align:center;padding:7px 0;border-radius:6px;cursor:pointer;color:var(--dim);font-weight:600;font-size:13px;user-select:none}
+.tab.on{background:#1b2735;color:#fff}
+label{display:block;font-size:12px;color:var(--dim);margin:10px 0 5px}
+input{width:100%;padding:10px 11px;background:#0b1219;border:1px solid var(--line);border-radius:8px;color:var(--fg);font:14px ui-monospace,monospace}
+input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(37,99,235,.25)}
+button{width:100%;margin-top:16px;padding:11px;border:0;border-radius:9px;background:var(--acc);color:#fff;font-weight:700;cursor:pointer}
+button:disabled{opacity:.6;cursor:default}
+.msg{margin-top:12px;min-height:18px;color:var(--err);font-size:13px}
+.hint{margin-top:14px;color:var(--dim);font-size:12px;border-top:1px solid var(--line);padding-top:12px}
+.hide{display:none}
+</style></head><body>
+<form class="card" id="f">
+  <div class="brand"><div class="logo">G</div><div><h1>Galardo</h1><small>kendali deterministik</small></div></div>
+  <div class="tabs">
+    <div class="tab on" data-m="pw">username &amp; sandi</div>
+    <div class="tab" data-m="tok">token</div>
+  </div>
+  <div id="pw">
+    <label for="u">username</label><input id="u" autocomplete="username" autofocus>
+    <label for="p">sandi</label><input id="p" type="password" autocomplete="current-password">
+  </div>
+  <div id="tok" class="hide">
+    <label for="t">token operator</label><input id="t" type="password" placeholder="dari .env GALARDO_DEV_TOKEN">
+  </div>
+  <button type="submit" id="b">masuk</button>
+  <div class="msg" id="m"></div>
+  <div class="hint">Sandi disimpan PBKDF2-SHA256. Sesi memakai cookie HttpOnly + SameSite.</div>
+</form>
+<script>
+const $=s=>document.querySelector(s);
+let mode='pw';
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); mode=t.dataset.m;
+  $('#pw').classList.toggle('hide',mode!=='pw');
+  $('#tok').classList.toggle('hide',mode!=='tok');
+  (mode==='pw'?$('#u'):$('#t')).focus();
+});
+(async()=>{ try{ const r=await fetch('/api/v1/me'); if(r.ok){ location.replace('/'); } }catch(e){} })();
+$('#f').addEventListener('submit',async e=>{
+  e.preventDefault(); $('#m').textContent=''; $('#b').disabled=true; $('#b').textContent='memeriksa...';
+  const body = mode==='pw' ? {username:$('#u').value.trim(), password:$('#p').value}
+                           : {token:$('#t').value.trim()};
+  try{
+    const r=await fetch('/api/v1/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(r.ok){ location.replace('/'); return; }
+    $('#m').textContent = r.status===401 ? 'kredensial salah' : ('gagal ('+r.status+')');
+  }catch(err){ $('#m').textContent='tidak bisa menghubungi server'; }
+  $('#b').disabled=false; $('#b').textContent='masuk';
+});
+</script></body></html>"""
+        body = html.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def _auth(self):
         # D14: header ABSENT (lab anonymous) vs header PRESENT but EMPTY (reject).
         raw = self.headers.get("Authorization")

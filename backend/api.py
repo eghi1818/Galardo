@@ -118,6 +118,9 @@ def _cors_allow(origin, mode=None):
         return None
     return origin if origin in [x.strip() for x in mode.split(",") if x.strip()] else None
 DEV_TOKEN = os.environ.get("GALARDO_DEV_TOKEN", "dev-token")  # MVP lab: seeded dev users only
+AUTH_TOKEN = os.environ.get("GALARDO_DEV_TOKEN") or DEV_TOKEN
+AUTH_REQUIRED = bool(os.environ.get("GALARDO_REQUIRE_AUTH"))
+MASTER_UID = "usr-operator"
 MAX_BODY = 262144
 
 # Goal 3: route overrides live in THIS process (the intercept shim is a local
@@ -730,59 +733,10 @@ $('#f').addEventListener('submit',async e=>{
             except Exception as exc:
                 return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
 
-        if api_path == "/users" and method == "GET":
-            uid = self._auth()
-            ok, why = rbac.ensure(rbac.user_of(uid), "VIEWER")
-            if not ok:
-                return self._json(403, {"error": why})
-            return self._json(200, [rbac.public(u) for u in db.list("users")])
-
-        if api_path == "/users" and method == "POST":
-            uid = self._auth()
-            try:
-                ok, why = rbac.ensure(rbac.user_of(uid), "TEST_OPERATOR")
-                if not ok:
-                    return self._json(403, {"error": why})
-                body = self._body() if hasattr(self, "_body") else {}
-                role = (body.get("role") or "VIEWER").upper()
-                if role not in rbac.ROLE_RANK:
-                    return self._json(422, {"error": "peran tak dikenal", "roles": list(rbac.ROLES)})
-                email = (body.get("email") or "").strip()
-                if not email:
-                    return self._json(422, {"error": "email wajib"})
-                slug = re.sub(r"[^a-z0-9]+", "-", email.split("@")[0].lower()).strip("-")[:24] or "user"
-                _id = "usr-" + slug
-                if db.get("users", _id):
-                    _id = _id + "-" + str(len(db.list("users")))
-                _doc = {"id": _id, "email": email, "role": role, "status": "ACTIVE",
-                        "org_id": body.get("org_id")}
-                u = db.insert("users", _doc, actor=uid, action="user.created")
-                return self._json(201, rbac.public(u if isinstance(u, dict) else (db.get("users", _id) or _doc)))
-            except Exception as exc:
-                return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
-
-        _m = _match(api_path, "/users/*/role")
-        if _m and method == "POST":
-            uid = self._auth()
-            ok, why = rbac.ensure(rbac.user_of(uid), "TEST_OPERATOR")
-            if not ok:
-                return self._json(403, {"error": why})
-            if not db.get("users", _g1(_m)):
-                return self._json(404, {"error": "user tidak ada"})
-            role = ((self._body() if hasattr(self, "_body") else {}).get("role") or "").upper()
-            if role not in rbac.ROLE_RANK:
-                return self._json(422, {"error": "peran tak dikenal", "roles": list(rbac.ROLES)})
-            try:
-                u = db.update("users", _g1(_m), lambda d: d.update({"role": role}),
-                              actor=uid, action="user.role_changed")
-            except Exception as exc:
-                return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
-            return self._json(200, rbac.public(u if isinstance(u, dict) else db.get("users", _g1(_m))))
-
-        if api_path == "/login" and method == "GET":
+        if api_path in ("/login", "/api/v1/login") and method == "GET":
             return self._login_page()
 
-        if api_path == "/login" and method == "POST":
+        if api_path in ("/login", "/api/v1/login") and method == "POST":
             _b = (self._body() if hasattr(self, "_body") else {}) or {}
             _t = str(_b.get("token") or "").strip()
             _u = str(_b.get("username") or "").strip()
@@ -801,7 +755,7 @@ $('#f').addEventListener('submit',async e=>{
             return self._json(200, {"ok": True, "user": rec["id"], "role": rec.get("role")},
                               headers={"Set-Cookie": "galardo_session=%s; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800" % (rec.get("token") or _t)})
 
-        if api_path == "/logout" and method == "POST":
+        if api_path in ("/logout", "/api/v1/logout") and method == "POST":
             return self._json(200, {"ok": True},
                               headers={"Set-Cookie": "galardo_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"})
 

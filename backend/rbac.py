@@ -24,7 +24,7 @@ def has_role(role, min_role):
     return rank(role) >= ROLE_RANK[min_role]
 
 
-def user_of(uid):
+def _user_of_db(uid):
     """Ambil dokumen user dari db, toleran terhadap nama fungsi db yang berbeda."""
     if not uid:
         return None
@@ -71,3 +71,24 @@ def public(user_doc):
             "role": user_doc.get("role"), "status": user_doc.get("status"),
             "org_id": user_doc.get("org_id"),
             "mfa_enabled": bool(user_doc.get("mfa_enabled"))}
+
+
+def user_of(uid):
+    """Cari pengguna di db, lalu jatuh ke penyimpanan kredensial."""
+    rec = None
+    try:
+        rec = _user_of_db(uid)
+    except Exception:
+        rec = None
+    if rec:
+        return rec
+    try:
+        import users as _us
+        u = _us.get(uid)
+        if u:
+            return {"id": uid, "username": u.get("username"), "name": u.get("name"),
+                    "role": u.get("role"),
+                    "status": "ACTIVE" if u.get("active", True) else "DISABLED"}
+    except Exception:
+        pass
+    return None

@@ -7,8 +7,9 @@ import secrets
 import threading
 import time
 
-ROLES = ("VIEWER", "OPERATOR", "ADMIN", "SUPERADMIN")
-RANK = {"VIEWER": 1, "OPERATOR": 2, "ADMIN": 3, "SUPERADMIN": 4}
+ROLES = ("VIEWER", "TEST_OPERATOR", "APPROVER", "ADMIN", "SUPERADMIN")
+RANK = {"VIEWER": 1, "OPERATOR": 2, "TEST_OPERATOR": 2, "APPROVER": 3,
+        "ADMIN": 4, "SUPERADMIN": 5}
 ITER = 200000
 _LOCK = threading.Lock()
 
@@ -78,6 +79,11 @@ def _sync_db(rec):
                 pass
 
 
+def _norm(role):
+    """Nama peran mengikuti rbac: VIEWER, TEST_OPERATOR, APPROVER, ADMIN, SUPERADMIN."""
+    return (role or "").upper()
+
+
 def _slug(s):
     out = "".join(c if c.isalnum() or c in "-_" else "-" for c in (s or "").lower()).strip("-")
     return out or "user"
@@ -87,7 +93,8 @@ def allows(role, need):
     return RANK.get(role or "", 0) >= RANK.get(need or "VIEWER", 1)
 
 
-def create(name, username, role="VIEWER", password=None, api=False):
+def create(name, username, role="VIEWER", password=None, api=True, email=None):
+    role = _norm(role)
     if role not in ROLES:
         raise ValueError("peran tidak dikenal: %s" % role)
     with _LOCK:
@@ -100,6 +107,7 @@ def create(name, username, role="VIEWER", password=None, api=False):
             n += 1
             uid = "usr-%s-%d" % (_slug(uname), n)
         rec = {"id": uid, "name": name or uname, "username": uname, "role": role,
+               "email": email or (uname + "@lokal"), "status": "ACTIVE",
                "active": True, "created_at": int(time.time()),
                "password": hash_password(password) if password else "",
                "token": secrets.token_hex(16) if api else "", "api_access": bool(api)}
@@ -107,6 +115,33 @@ def create(name, username, role="VIEWER", password=None, api=False):
         _save(d)
         _sync_db(rec)
         return dict(rec)
+
+
+def upsert(name, username, role="VIEWER", password=None, api=True, email=None):
+    """Buat bila belum ada; bila username sudah dipakai, perbarui saja."""
+    role = _norm(role)
+    if role not in ROLES:
+        raise ValueError("peran tidak dikenal: %s" % role)
+    rec = by_username(username or _slug(name))
+    if not rec:
+        return create(name, username, role, password, api=api, email=email)
+
+    def _f(r):
+        if name:
+            r["name"] = name
+        if role:
+            r["role"] = _norm(role)
+        if password:
+            r["password"] = hash_password(password)
+        if api:
+            r["api_access"] = True
+            if not r.get("token"):
+                r["token"] = secrets.token_hex(16)
+        else:
+            r["api_access"] = False
+            r["token"] = ""
+        r["status"] = "ACTIVE" if r.get("active", True) else "DISABLED"
+    return _mut(rec["id"], _f)
 
 
 def get(uid):
@@ -118,7 +153,9 @@ def list_users():
     out = []
     for u in sorted(d.values(), key=lambda x: x.get("username") or ""):
         out.append({"id": u.get("id"), "name": u.get("name"), "username": u.get("username"),
-                    "role": u.get("role"), "active": u.get("active", True),
+                    "email": u.get("email") or (u.get("username") or "") + "@lokal",
+                    "role": u.get("role"), "status": "ACTIVE" if u.get("active", True) else "DISABLED",
+                    "active": u.get("active", True),
                     "created_at": u.get("created_at"), "token": u.get("token"), "api_access": u.get("api_access", bool(u.get("token"))),
                     "punya_sandi": bool(u.get("password"))})
     return out
@@ -160,6 +197,7 @@ def _mut(uid, fn):
 
 
 def set_role(uid, role):
+    role = _norm(role)
     if role not in ROLES:
         raise ValueError("peran tidak dikenal: %s" % role)
     return _mut(uid, lambda r: r.__setitem__("role", role))

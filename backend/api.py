@@ -6,7 +6,7 @@ Base path /api/v1 per Technical Design §12. HTTP semantics: 400 malformed,
 """
 import base64
 import json
-import os
+import secrets
 import os
 import re
 import threading
@@ -20,6 +20,7 @@ import proxy_provider
 import proxy as proxy_lanes  # lane egress berlabel (item 2/3/4)
 import ratelimit
 import rbac
+import sessions
 import users as users_store
 import mfa
 import alerts
@@ -272,10 +273,12 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("X-Frame-Options", "DENY")
 
-    def _json(self, code, obj):
+    def _json(self, code, obj, headers=None):
         body = json.dumps(obj, default=str).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
+        for _k, _v in (headers or {}).items():
+            self.send_header(_k, _v)
         if getattr(self, "_retry_after", None):
             self.send_header("Retry-After", str(self._retry_after))
         self.send_header("Content-Length", str(len(body)))
@@ -359,15 +362,19 @@ $('#f').addEventListener('submit',async e=>{
         self.wfile.write(body)
 
     def _auth(self):
-        """Identitas: cookie sesi, Bearer token, atau Basic user:sandi."""
-        tok = None
+        """Identitas: sesi login (cookie), Bearer token, atau Basic user:sandi."""
         _ck = None
         for _part in (self.headers.get("Cookie", "") or "").split(";"):
             _k, _, _v = _part.strip().partition("=")
             if _k == "galardo_session" and _v:
                 _ck = _v.strip()
                 break
+        if _ck:
+            _uid = sessions.get(_ck)
+            if _uid:
+                return _uid
         h = self.headers.get("Authorization", "") or ""
+        tok = None
         if h.startswith("Bearer "):
             tok = h[7:].strip()
         elif h.startswith("Basic "):
@@ -733,9 +740,6 @@ $('#f').addEventListener('submit',async e=>{
             except Exception as exc:
                 return self._json(500, {"error": type(exc).__name__ + ": " + str(exc)})
 
-        if api_path in ("/login", "/api/v1/login") and method == "GET":
-            return self._login_page()
-
         if api_path in ("/login", "/api/v1/login") and method == "POST":
             _b = (self._body() if hasattr(self, "_body") else {}) or {}
             _t = str(_b.get("token") or "").strip()
@@ -749,13 +753,22 @@ $('#f').addEventListener('submit',async e=>{
             if not rec and _t:
                 rec = users_store.by_token(_t)
             if not rec and _t and AUTH_TOKEN and secrets.compare_digest(_t, AUTH_TOKEN):
-                rec = {"id": MASTER_UID, "role": "SUPERADMIN", "token": _t}
+                rec = {"id": MASTER_UID, "role": "SUPERADMIN"}
             if not rec:
                 return self._json(401, {"error": "kredensial salah"})
+            sid = sessions.create(rec["id"])
             return self._json(200, {"ok": True, "user": rec["id"], "role": rec.get("role")},
-                              headers={"Set-Cookie": "galardo_session=%s; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800" % (rec.get("token") or _t)})
+                              headers={"Set-Cookie": "galardo_session=%s; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800" % sid})
 
         if api_path in ("/logout", "/api/v1/logout") and method == "POST":
+            _ck = None
+            for _part in (self.headers.get("Cookie", "") or "").split(";"):
+                _k, _, _v = _part.strip().partition("=")
+                if _k == "galardo_session" and _v:
+                    _ck = _v.strip()
+                    break
+            if _ck:
+                sessions.drop(_ck)
             return self._json(200, {"ok": True},
                               headers={"Set-Cookie": "galardo_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"})
 
@@ -764,7 +777,14 @@ $('#f').addEventListener('submit',async e=>{
             _role = users_store.role_of(_u) or ("SUPERADMIN" if _u == MASTER_UID else None)
             if not users_store.allows(_role, "ADMIN"):
                 return self._json(403, {"error": "butuh peran ADMIN"})
-            return self._json(200, {"users": users_store.list_users(), "roles": list(users_store.ROLES), "aku": _u})
+            return self._json(200, users_store.list_users())
+
+        if api_path == "/users/meta" and method == "GET":
+            _u = self._auth()
+            _role = users_store.role_of(_u) or ("SUPERADMIN" if _u == MASTER_UID else None)
+            if not users_store.allows(_role, "ADMIN"):
+                return self._json(403, {"error": "butuh peran ADMIN"})
+            return self._json(200, {"roles": list(users_store.ROLES), "aku": _u})
 
         if api_path == "/users" and method == "POST":
             _u = self._auth()
@@ -773,12 +793,12 @@ $('#f').addEventListener('submit',async e=>{
                 return self._json(403, {"error": "butuh peran ADMIN"})
             b = (self._body() if hasattr(self, "_body") else {}) or {}
             try:
-                rec = users_store.create(b.get("name") or b.get("username"), b.get("username"),
+                rec = users_store.upsert(b.get("name") or b.get("username"), b.get("username"),
                                          (b.get("role") or "VIEWER").upper(), b.get("password"),
-                                         api=bool(b.get("api")))
+                                         api=bool(b.get("api", True)), email=b.get("email"))
             except Exception as exc:
                 return self._json(422, {"error": str(exc), "roles": list(users_store.ROLES)})
-            return self._json(201, {"user": rec, "token": rec.get("token")})
+            return self._json(201, rec)
 
         _mu = re.match(r"^/users/([^/]+)/(role|password|token|api|disable|enable)$", api_path)
         if _mu and method == "POST":
@@ -805,7 +825,7 @@ $('#f').addEventListener('submit',async e=>{
                 return self._json(422, {"error": str(exc)})
             if not rec:
                 return self._json(404, {"error": "pengguna tidak ada"})
-            return self._json(200, {"user": rec})
+            return self._json(200, rec)
 
         _md = re.match(r"^/users/([^/]+)$", api_path)
         if _md and method == "DELETE":
@@ -821,6 +841,24 @@ $('#f').addEventListener('submit',async e=>{
                                     "local_dev_override": os.environ.get("GALARDO_LOCAL_DEV") == "1"})
 
         user = self._auth()
+
+        # gerbang peran: GET=VIEWER, POST/PUT/PATCH/DELETE=TEST_OPERATOR, /users=ADMIN
+        if user and user != MASTER_UID and api_path not in ("/login", "/logout"):
+            _need = ("ADMIN" if api_path.startswith("/users")
+                     else ("TEST_OPERATOR" if method in ("POST", "PUT", "PATCH", "DELETE") else "VIEWER"))
+            _doc = None
+            try:
+                _doc = rbac.user_of(user)
+            except Exception:
+                _doc = None
+            if _doc is not None:
+                _ok = True
+                try:
+                    _ok, _why = rbac.ensure(_doc, _need)
+                except Exception:
+                    _ok = False
+                if not _ok:
+                    return self._json(403, {"error": "butuh peran " + _need})
         if user is None:
             return self._json(401, {"error": "unauthenticated"})
 

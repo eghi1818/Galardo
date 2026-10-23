@@ -235,6 +235,8 @@ let LIVE_POLL = null, GEN_POLL = null, SELECTED_JOB = localStorage.getItem('gala
 
 /* ---- auth token (GALARDO_REQUIRE_AUTH) ---- */
 const TOKEN_KEY = 'galardo.token';
+/* redirect-login: paksa ke halaman masuk bila belum ada sesi */
+(async()=>{try{const r=await fetch('/api/v1/me');if(r.status===401)location.replace('/login');}catch(e){}})();
 function getTok(){ return localStorage.getItem(TOKEN_KEY) || ''; }
 function authHeaders(h){ h = Object.assign({}, h || {}); const t = getTok(); if(t) h['Authorization'] = 'Bearer ' + t; return h; }
 window.galardoToken = function(v){
@@ -262,7 +264,10 @@ window.galardoToken = function(v){
     const inp = document.getElementById('tokIn');
     inp.value = getTok();
     document.getElementById('tokSave').onclick = () => galardoToken(inp.value);
-    document.getElementById('tokClear').onclick = () => galardoToken('');
+    document.getElementById('tokClear').onclick = () => {
+  fetch('/api/v1/logout',{method:'POST'}).catch(()=>{});
+  localStorage.removeItem(TOKEN_KEY); location.replace('/login');
+};
     inp.addEventListener('keydown', e => { if(e.key === 'Enter') galardoToken(inp.value); });
     const st = document.getElementById('tokState');
     st.textContent = getTok() ? 'terisi' : 'kosong';
@@ -1794,6 +1799,64 @@ RENDER.webhooks = async function(){
     + '<pre id="whOut" class="card">hasil aksi akan muncul di sini</pre>';
 };
 
+
+/* ---- panel Pengguna (manajemen user) ---- */
+(function(){
+  function el(t,c,h){var e=document.createElement(t); if(c)e.className=c; if(h!==undefined)e.innerHTML=h; return e;}
+  var btn=el('button','','pengguna'); btn.id='usrBtn';
+  btn.style.cssText='position:fixed;right:12px;top:56px;z-index:9998;background:#111823;color:#dbe3ec;border:1px solid #26313f;border-radius:8px;padding:6px 10px;font:12px ui-monospace,monospace;cursor:pointer';
+  var pan=el('div','',''); pan.id='usrPan';
+  pan.style.cssText='position:fixed;right:12px;top:94px;width:660px;max-width:95vw;max-height:78vh;overflow:auto;background:#0f1620;border:1px solid #26313f;border-radius:10px;padding:14px;z-index:9998;display:none;font:12px ui-monospace,monospace;color:#dbe3ec';
+  document.body.appendChild(btn); document.body.appendChild(pan);
+  function kecil(root){ root.querySelectorAll('button').forEach(function(b){b.style.cssText='background:#1d4ed8;color:#fff;border:0;border-radius:5px;padding:3px 7px;cursor:pointer;font-size:11px';}); }
+  async function kirim(m,u,b){ var o={method:m,headers:{'Content-Type':'application/json'}}; if(b)o.body=JSON.stringify(b);
+    var r=await fetch(u,o); var j={}; try{j=await r.json();}catch(e){}
+    if(r.status===401){ location.replace('/login'); }
+    return {st:r.status,j:j}; }
+  async function muat(){
+    pan.innerHTML='<b>Pengguna</b> <span id="usrMsg" style="color:#8a97a6"></span>';
+    var r=await fetch('/api/v1/users');
+    if(r.status===401){ location.replace('/login'); return; }
+    if(!r.ok){ pan.innerHTML+='<div style="color:#f87171;margin-top:8px">butuh peran ADMIN (HTTP '+r.status+')</div>'; return; }
+    var d=await r.json();
+    var f=el('div','','');
+    f.innerHTML='<div style="margin:10px 0 6px;color:#8a97a6">tambah pengguna</div>'+
+      '<input id="uN" placeholder="nama" style="width:24%"> '+
+      '<input id="uU" placeholder="username" style="width:20%"> '+
+      '<select id="uR" style="width:20%">'+d.roles.map(function(x){return '<option>'+x+'</option>';}).join('')+'</select> '+
+      '<input id="uP" type="password" placeholder="sandi" style="width:20%"> <button id="uAdd">tambah</button>';
+    pan.appendChild(f);
+    var t=el('table','','');
+    t.style.cssText='width:100%;border-collapse:collapse;margin-top:12px';
+    t.innerHTML='<tr style="text-align:left;color:#8a97a6"><th>nama</th><th>username</th><th>peran</th><th>status</th><th>token</th><th>aksi</th></tr>'+
+      d.users.map(function(u){return '<tr style="border-top:1px solid #1d2734"><td>'+u.name+'</td><td>'+u.username+'</td><td>'+u.role+'</td>'+
+        '<td>'+(u.active?'aktif':'nonaktif')+'</td>'+
+        '<td><span style="color:#7ee787">'+String(u.token||'').slice(0,8)+'...</span> <button data-tok="'+u.id+'">putar</button></td>'+
+        '<td><button data-pw="'+u.id+'">sandi</button> <button data-act="'+u.id+'" data-on="'+(u.active?0:1)+'">'+(u.active?'nonaktif':'aktif')+'</button> <button data-del="'+u.id+'">hapus</button></td></tr>';}).join('');
+    pan.appendChild(t);
+    pan.querySelectorAll('input,select').forEach(function(i){i.style.cssText+=';background:#0b1219;color:#dbe3ec;border:1px solid #26313f;border-radius:5px;padding:4px 6px';});
+    kecil(pan);
+    document.getElementById('uAdd').onclick=async function(){
+      var b={name:document.getElementById('uN').value, username:document.getElementById('uU').value,
+             role:document.getElementById('uR').value, password:document.getElementById('uP').value};
+      var o=await kirim('POST','/api/v1/users',b);
+      if(o.st===201){ alert('pengguna dibuat.\ntoken: '+o.j.token+'\n(simpan sekarang)'); muat(); }
+      else { alert('gagal: '+JSON.stringify(o.j)); }
+    };
+    pan.querySelectorAll('[data-tok]').forEach(function(b){b.onclick=async function(){
+      var o=await kirim('POST','/api/v1/users/'+b.dataset.tok+'/token',{});
+      if(o.j.user){ alert('token baru: '+o.j.user.token); muat(); } };});
+    pan.querySelectorAll('[data-pw]').forEach(function(b){b.onclick=async function(){
+      var pw=prompt('sandi baru untuk '+b.dataset.pw); if(!pw)return;
+      await kirim('POST','/api/v1/users/'+b.dataset.pw+'/password',{password:pw}); muat(); };});
+    pan.querySelectorAll('[data-act]').forEach(function(b){b.onclick=async function(){
+      await kirim('POST','/api/v1/users/'+b.dataset.act+'/'+(b.dataset.on==='1'?'enable':'disable'),{}); muat(); };});
+    pan.querySelectorAll('[data-del]').forEach(function(b){b.onclick=async function(){
+      if(!confirm('hapus '+b.dataset.del+'?'))return;
+      await fetch('/api/v1/users/'+b.dataset.del,{method:'DELETE'}); muat(); };});
+  }
+  btn.onclick=function(){ pan.style.display = pan.style.display==='none' ? 'block' : 'none'; if(pan.style.display==='block') muat(); };
+})();
 </script>
 </body>
 </html>

@@ -52,3 +52,4 @@
 3. lane/multi-lane, botnet/IoT, check-host per-negara, make capacity
 4. Cloudflare Tunnel (pihak ketiga) + refresh SESSION_STATE/HANDOFF
 5. bukti rotasi egress nyata (setelah kredensial anyip.io)
+- STEP-153 (2026-10-24 20:38): backend/intel.py + tools/verify_intel.py (intel=hipotesis vs pengukuran, divergensi dicatat). Endpoint + halaman Override menyusul STEP-154.

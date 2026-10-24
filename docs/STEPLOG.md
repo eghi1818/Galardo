@@ -123,3 +123,4 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 - STEP-128 — koreksi klaim HASIL-127 (verifier doktrin merah) + baris penamaan diri + verifier doktrin diperbaiki + verify_auth_users versi resolver + rujukan onboarding. doktrin rc=0, auth rc=1, test rc=0, gate rc=2.
 - STEP-132 — pembungkus exception + seed uid master + verifier cetak log saat 0/5xx + STATUS-SEKARANG. auth rc=1, test rc=0, gate rc=2.
 - STEP-133 — koreksi akar masalah: bug probe() di verifier (bukan server) + seed api.py diperbaiki + verifier pakai port sendiri. auth rc=1, test rc=0, gate rc=2.
+- STEP-134 — verify_auth_users v6 (identitas yang lolos + port sendiri + status ketat). auth rc=1, test rc=0, gate rc=2.

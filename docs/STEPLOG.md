@@ -133,3 +133,4 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 - STEP-141 — pondasi Mode B: backend/gateway.py + tools/verify_gateway.py (21 cek) + endpoint /gateway/status (wiring=revert). gateway rc=0, egress rc=0, test rc=0, gate rc=0.
 - STEP-142 — wiring /gateway/status digabung ke cabang proxy/status (bukan cabang baru). endpoint=200, gateway rc=0, test rc=2, gate rc=2.
 - STEP-143 — req() diberi retry untuk tes DNS yang intermiten; wiring gateway diverifikasi (endpoint 200, proxy/status 200). test rc=0/0, gate rc=0.
+- STEP-144 — gateway didaftarkan ke proxypool saat start (GALARDO_GATEWAY_BOOT); blok dibuat zsh-safe. gateway rc=0, egress rc=0, test rc=0, gate rc=2.

@@ -134,6 +134,7 @@ try:
     _apisrc = open(os.path.join(ROOT, 'backend', 'api.py'), encoding='utf-8').read()
     ok('/gateway/status' in _apisrc, 'api.py memuat route /gateway/status')
     ok('import gateway' in _apisrc, 'api.py mengimpor gateway')
+    ok('GALARDO_GATEWAY_BOOT' in _apisrc, 'api.py mendaftarkan gateway saat start')
 
 finally:
     bersih()

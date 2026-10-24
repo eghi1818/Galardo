@@ -2000,6 +2000,16 @@ try:
 except Exception as _e:
     print('master seed dilewati:', _e)
 
+# GALARDO_GATEWAY_BOOT - daftarkan gateway Mode B ke proxypool saat start (kalau diisi)
+try:
+    if gateway.enabled():
+        _gp = gateway.register()
+        print('gateway Mode B aktif: pool=%s sticky=%s (%s)' % (_gp, gateway.sticky(), gateway.masked()))
+    else:
+        print('gateway Mode B: belum dikonfigurasi (GALARDO_GATEWAY_URL kosong)')
+except Exception as _e:
+    print('gateway Mode B gagal didaftarkan:', _e)
+
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()

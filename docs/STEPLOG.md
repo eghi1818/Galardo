@@ -136,3 +136,4 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 - STEP-144 — gateway didaftarkan ke proxypool saat start (GALARDO_GATEWAY_BOOT); blok dibuat zsh-safe. gateway rc=0, egress rc=0, test rc=0, gate rc=2.
 - STEP-145 — boot gateway cetak ke stderr + set GALARDO_PROXY_POOL ke pool gateway. dash rc=0, gateway rc=0, test rc=0, gate rc=0.
 - STEP-146 — backend/origins.py + tools/verify_origins.py + endpoint /origins/<domain>. origins rc=1, test rc=0, gate rc=2.
+- STEP-147 — betulkan URL crt.sh (%%25) + ekspektasi tes origins. origins rc=0, netssl rc=1, test rc=0, gate rc=2.

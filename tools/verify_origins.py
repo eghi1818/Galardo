@@ -57,8 +57,8 @@ try:
     ok(origins.parse_crt(b'[{"name_value":"c.example.com"}]', domain='example.com') == {'c.example.com'},
        'parse: bentuk bytes')
     ok(origins.parse_crt(fixture) == {'example.com', 'www.example.com', 'api.example.com',
-                                     'lain.example.net', 'e1.a.akamaiedge.net'},
-       'parse: tanpa filter domain = semua host sah')
+                                     'lain.example.net', 'e1.a.akamaiedge.net', 'jelek'},
+       'parse: tanpa filter domain = semua host sah (jelek.. -> jelek)')
 
     try:
         origins.parse_crt('{bukan json', domain='x.com')

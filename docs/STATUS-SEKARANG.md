@@ -1,13 +1,14 @@
-# STATUS SEKARANG — Galardo (otomatis STEP-146)
+# STATUS SEKARANG — Galardo (otomatis STEP-147)
 
-- waktu  : 2026-10-24 12:28
-- HEAD   : 7f06d0d docs(STATUS): boot stderr + pool gateway
+- waktu  : 2026-10-24 12:36
+- HEAD   : 1b5fb86 docs(STATUS): origins terkunci
 - branch : main | origin/main...HEAD: 0	0
 - doktrin: docs/GOAL-GALARDO.md (MENGIKAT, seksi 9 MODE B)
 
-## Pondasi yang SUDAH terkunci
+## Pondasi terkunci
 - doktrin GOAL; mesin pengguna (20 cek); gateway Mode B (28 cek) + boot + pool engine; origins (27 cek) + endpoint
-- angka: origins rc=1 | test rc=0 | gate rc=2
+- angka: origins rc=0 | netssl rc=1 | test rc=0 | gate rc=2 | endpoint origins=200
+- bila gate masih merah: periksa .out/STEP-147-netssl.txt (verify_netssl_wired)
 
 ## Cara jalankan / hentikan app
 - jalankan: nohup sh -c 'cd backend && exec python3 -u run_local.py' > .out/galardo-live.log 2>&1 &
@@ -26,17 +27,17 @@
 5. sesi hidup di MEMORI -> dua proses app = sesi saling menimpa
 6. anchor patch bisa MISS tanpa error; verifikasi dengan grep
 7. cek verifier atas TEKS SUMBER rapuh terhadap rename -> pakai regex
-8. guard penyisipan harus diuji (jangan pakai split yang sudah memuat penanda)
-9. hipotesis bukan fakta (gate merah karena docker / pkill dua-duanya SALAH)
-10. Mode B: rotasi per KONEKSI/WORKER, bukan per request; penentu WAF = keragaman ASN
-11. jangan sisipkan cabang tepat setelah kepala if; gabungkan ke kondisi yang ada
-12. jangan tebak nama variabel; baca dari baris anchor (api_path)
+8. guard penyisipan harus diuji
+9. hipotesis bukan fakta (docker/pkill dua-duanya SALAH)
+10. Mode B: rotasi per KONEKSI/WORKER; penentu WAF = keragaman ASN
+11. jangan sisipkan cabang tepat setelah kepala if; gabungkan atau sisipkan sebelum if lengkap
+12. jangan tebak nama variabel; baca dari baris anchor
 13. langkah STATUS yang git add -A ikut meng-commit perubahan lain
-14. tes yang menyentuh jaringan WAJIB punya retry / jalur SKIP
+14. tes yang menyentuh jaringan WAJIB punya jalur SKIP/retry
 15. nohup = app hidup walau terminal ditutup; matikan dgn pkill -f run_local.py
 16. zsh mengekspansi tanda seru walau di kutip ganda -> setopt no_bang_hist
-17. kode yang jalan saat IMPORT jangan menulis ke stdout -> pakai stderr
-18. sisipkan pernyataan baru SEBELUM 'if' lengkap (bukan di tengah blok) -> aman terhadap if/elif
+17. kode saat IMPORT jangan menulis ke stdout -> pakai stderr
+18. JANGAN pakai format % pada URL yang memuat persen -> '%%25' bikin ValueError; pakai konkatenasi
 
 ## Urutan berikutnya
 1. hubungkan gateway ke transport worker + catat IP egress per worker

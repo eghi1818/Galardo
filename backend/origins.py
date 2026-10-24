@@ -11,7 +11,8 @@ import re
 import socket
 import urllib.request
 
-CRT = 'https://crt.sh/?q=%25.%s&output=json'
+CRT_PREFIX = 'https://crt.sh/?q=%25.'
+CRT_SUFFIX = '&output=json'
 UA = 'galardo-origins/1'
 
 EDGE_PAT = (
@@ -81,7 +82,7 @@ def parse_crt(payload, domain=None):
 
 
 def fetch_crt(domain, timeout=25):
-    url = CRT % _bersih(domain)
+    url = CRT_PREFIX + _bersih(domain) + CRT_SUFFIX
     req = urllib.request.Request(url, headers={'User-Agent': UA})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return parse_crt(r.read(), domain=domain)

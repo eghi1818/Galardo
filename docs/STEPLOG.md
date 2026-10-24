@@ -130,3 +130,4 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 - STEP-138 — eksperimen pembungkus do_* vs preflight OPTIONS. headers rc=1 -> 1, auth rc=0, test rc=0, gate rc=2.
 - STEP-139 — penyebab gate merah = cek teks-sumber rapuh di verify_headers; dijadikan regex toleran (_hasdef). headers rc=1, auth rc=0, test rc=0, gate rc=2.
 - STEP-140 — sisipkan helper _hasdef (penyebab NameError di STEP-139). headers rc=0, auth rc=0, test rc=0, gate rc=0.
+- STEP-141 — pondasi Mode B: backend/gateway.py + tools/verify_gateway.py (21 cek) + endpoint /gateway/status (wiring=revert). gateway rc=0, egress rc=0, test rc=0, gate rc=0.

@@ -152,7 +152,7 @@ details{margin-top:8px}summary{cursor:pointer;font-size:12px;color:var(--cyan)}
 <aside>
   <div class="logo"><h1>GALARDO</h1><div class="sub">AUTHORIZED RESILIENCE TESTING</div></div>
   <nav id="nav">
-    <a data-p="overview" class="active"><span class="ico">◉</span> Overview</a>
+    <a data-p="overview" class="active"><span class="ico">◉</span> Overview</a><a data-p="override"><span class="ico">◉</span>Override</a>
     <a data-p="engagements"><span class="ico">▤</span> Engagements</a>
     <a data-p="targets"><span class="ico">◎</span> Targets</a>
     <a data-p="scenarios"><span class="ico">≡</span> Scenarios</a>
@@ -225,7 +225,8 @@ async function discoverApi(){
 }
 
 const $ = s => document.querySelector(s);
-const PAGE_TITLES = {overview:'Overview',engagements:'Engagements',targets:'Targets',scenarios:'Scenarios',
+const PAGE_TITLES = {
+override:'Override',overview:'Overview',engagements:'Engagements',targets:'Targets',scenarios:'Scenarios',
   plans:'Test Plans',live:'Live Execution',workers:'Workers',evidence:'Reports & Evidence',audit:'Audit Log',policy:'Safety Policy (restricted)',
   ownership: 'Ownership', sources: 'Sources', overrides: 'Overrides', webhooks: 'Webhooks',
   tools: 'Tools',
@@ -368,6 +369,46 @@ function lineChart(canvas, series, opts={}){
 
 /* ================= PAGES ================= */
 const RENDER = {};
+RENDER.override = async function(){
+  var out = document.getElementById('ov-out');
+  function tok(){
+    try { var ks = ['galardo_token','token','devtoken','galardo_dev_token']; for (var i = 0; i < ks.length; i++) { var v = localStorage.getItem(ks[i]); if (v) return v; } } catch (e) {}
+    var el = document.querySelector('#token,#devToken,#dev-token,input[id*="token" i]');
+    return el && el.value ? el.value : '';
+  }
+  function req(path, opts){
+    opts = opts || {};
+    var h = {'Accept':'application/json'};
+    var t = tok(); if (t) h['Authorization'] = 'Bearer ' + t;
+    if (opts.body) h['Content-Type'] = 'application/json';
+    return fetch('/api/v1' + path, {method: opts.method || 'GET', headers: h, credentials: 'same-origin', body: opts.body})
+      .then(function(r){ return r.text().then(function(txt){ var d; try { d = JSON.parse(txt); } catch (e) { d = {raw: txt}; } return {status: r.status, data: d}; }); });
+  }
+  function show(x){ if (out) out.textContent = JSON.stringify(x, null, 2); }
+  function dom(){ var el = document.getElementById('ov-domain'); return (el && el.value ? el.value : '').trim(); }
+  setTimeout(function(){
+    var b1 = document.getElementById('ov-origins');
+    var b2 = document.getElementById('ov-egress');
+    var b3 = document.getElementById('ov-preflight');
+    if (b1) b1.onclick = function(){ if (!dom()) { show({error:'isi domain dulu'}); return; } show({memuat:true}); req('/origins/' + encodeURIComponent(dom())).then(show); };
+    if (b2) b2.onclick = function(){ show({memuat:true}); req('/egress/status?probe=1').then(show); };
+    if (b3) b3.onclick = function(){ var ta = document.getElementById('ov-intel'); var payload = (ta && ta.value ? ta.value : ''); if (!payload.trim()) { show({error:'isi klaim intel dulu'}); return; } show({memuat:true}); req('/intel/preflight', {method:'POST', body: JSON.stringify(payload)}).then(show); };
+  }, 0);
+  return '<div class="panel">' +
+    '<h2>Override (Goal 3)</h2>' +
+    '<p class="muted">Kandidat origin, status egress, dan pre-flight intel (klaim = hipotesis vs pengukuran).</p>' +
+    '<div class="row">' +
+    '<input id="ov-domain" placeholder="domain, mis. portalyogya.com" style="min-width:260px" />' +
+    '<button id="ov-origins" class="btn">Cari kandidat origin</button>' +
+    '<button id="ov-egress" class="btn">Status egress</button>' +
+    '</div>' +
+    '<h3>Pre-flight intel (REA = hipotesis)</h3>' +
+    '<textarea id="ov-intel" rows="6" style="width:100%" placeholder="domain: contoh.com&#10;origin: 1.2.3.4&#10;sumber: rea"></textarea>' +
+    '<div class="row"><button id="ov-preflight" class="btn">Bandingkan dengan pengukuran</button></div>' +
+    '<pre id="ov-out" style="white-space:pre-wrap"></pre>' +
+    '</div>';
+};
+
 
 /* form-state preservation: polling re-render tidak boleh menghapus isian user.
    Snapshot semua input/select/textarea sebelum replace, restore setelahnya. */

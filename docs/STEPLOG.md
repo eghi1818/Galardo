@@ -144,3 +144,5 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 - STEP-152: 2026-10-24 18:12 cek transport jadi AST+behavioral; wired rc=0 record rc=0 test rc=0 gate rc=0
 - STEP-153: 2026-10-24 20:38 intel rc=0 test rc=0 gate rc=0
 - STEP-154: 2026-10-24 20:51 intel rc=0 wired rc=0 test rc=0 gate rc=0
+- STEP-155: 2026-10-24 20:57 pages rc=1 intel rc=0 wired rc=0 test rc=0 gate rc=0
+- STEP-156: 2026-10-24 21:05 pages rc=0 intel rc=0 wired rc=0 live rc=0 test rc=0 gate rc=0

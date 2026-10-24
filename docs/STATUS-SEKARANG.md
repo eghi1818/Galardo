@@ -54,3 +54,5 @@
 5. bukti rotasi egress nyata (setelah kredensial anyip.io)
 - STEP-153 (2026-10-24 20:38): backend/intel.py + tools/verify_intel.py (intel=hipotesis vs pengukuran, divergensi dicatat). Endpoint + halaman Override menyusul STEP-154.
 - STEP-154 (2026-10-24 20:51): wiring POST /api/v1/intel/preflight + tools/verify_intel_wired.py (AST+behavioral). Halaman Override menyusul STEP-155.
+- STEP-155 (2026-10-24 20:57): halaman Override (Goal 3) di dashboard - kandidat origin + status egress + pre-flight intel. Verifier HTTP nyata menyusul STEP-156.
+- STEP-156 (2026-10-24 21:05): RENDER.override dibetulkan (pola ^RENDER.x =) + tools/verify_intel_live.py (HTTP nyata). Endpoint /intel/preflight kini teruji lewat port app.

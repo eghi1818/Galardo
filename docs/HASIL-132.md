@@ -9,3 +9,7 @@
 
 ## Angka jujur
 - auth rc=1 | test rc=0 | gate rc=2
+
+## Koreksi (STEP-133)
+TEMUAN di atas SALAH. POST /users TIDAK memutus koneksi (server balas 201).
+Akar sebenarnya: bug tanda tangan probe() di verifier (body dikirim sebagai cookie) + 's < 400' menganggap status 0 sebagai sukses.

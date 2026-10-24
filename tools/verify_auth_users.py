@@ -75,7 +75,7 @@ def tail_log(n=30):
         pass
 
 
-def probe(method, path, cookie=None, body=None, headers=None, retries=1):
+def probe(method, path, body=None, cookie=None, headers=None, retries=1):
     try:
         return req(method, path, body=body, cookie=cookie, headers=headers, retries=retries)
     except Exception:
@@ -165,7 +165,7 @@ def login(user, pw, quiet=False):
         if s == 429:
             time.sleep(1.2)
             s, h, _ = probe('POST', '/api/v1/login', body=body)
-        if s < 400 and session_of(h):
+        if 200 <= s < 400 and session_of(h):
             if not quiet:
                 print('  (kredensial) login OK: user=%s bentuk=%s' % (user, variant))
             return session_of(h)
@@ -176,7 +176,7 @@ def set_password(uid, pw, tok):
     for ep in PW_EPS:
         for (key,) in PW_BODIES:
             s, _, _ = probe('POST', (ep % uid), {key: pw}, headers=bearer(tok))
-            if s < 400:
+            if 200 <= s < 400:
                 return '%s [%s]' % (ep % uid, key)
     return None
 
@@ -188,10 +188,14 @@ def ensure_identity(tok):
         print('  (identitas) %s sudah ada dan bisa login' % VFY_USER)
         return ck, pw
     print('  (identitas) menyiapkan %s lewat master token' % VFY_USER)
-    s, _, raw = probe('POST', '/api/v1/users', {'username': VFY_USER, 'name': 'Verifier Admin',
-                                                'email': VFY_USER + '@verifier.local',
-                                                'role': 'SUPERADMIN', 'password': pw}, headers=bearer(tok))
-    print('  (identitas) upsert %s -> %s' % (VFY_USER, s))
+    s = 0
+    for role in ('SUPERADMIN', 'ADMIN'):
+        s, _, raw = probe('POST', '/api/v1/users', {'username': VFY_USER, 'name': 'Verifier Admin',
+                                                    'email': VFY_USER + '@verifier.local',
+                                                    'role': role, 'password': pw}, headers=bearer(tok))
+        print('  (identitas) upsert %s role=%s -> %s' % (VFY_USER, role, s))
+        if 200 <= s < 400:
+            break
     if s == 0 or s >= 500:
         tail_log()
     ck = login(VFY_USER, pw, quiet=True)
@@ -211,8 +215,11 @@ def ensure_identity(tok):
 
 
 def reconcile_admin(tok):
+    arr = [u for u in as_list(jbody(probe('GET', '/api/v1/users', headers=bearer(tok))[2]))
+           if (u.get('username') or '') != VFY_USER]
+    arr.sort(key=lambda u: -RANK.get(str(u.get('role', '')).upper(), 0))
     users = [u for u in [ENVF.get('GALARDO_ADMIN_USER')] if u]
-    users += [u.get('username') for u in as_list(jbody(probe('GET', '/api/v1/users', headers=bearer(tok))[2]))]
+    users += [u.get('username') for u in arr]
     users = [u for u in users if u] or ['eghi']
     pws = candidate_passwords()
     for u in users[:3]:
@@ -337,7 +344,7 @@ def run_checks(r):
 
     s, h, _ = req('POST', r['login'], raw='username=%s&password=lihat123' % uname,
                   ctype='application/x-www-form-urlencoded')
-    ok(s < 400 and bool(session_of(h)), 'login body form-encoded diterima (api._body toleran)', s)
+    ok(200 <= s < 400 and bool(session_of(h)), 'login body form-encoded diterima (api._body toleran)', s)
 
     s, _, _ = req('GET', r['overview'], cookie=ck_v)
     ok(s == 200, 'VIEWER GET /overview -> 200', s)

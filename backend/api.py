@@ -1976,21 +1976,24 @@ try:
     if not _have:
         _pw = os.environ.get('GALARDO_ADMIN_PASSWORD') or 'operator123'
         _doc = {'username': 'operator', 'name': 'Master Operator', 'email': 'operator@galardo.local',
-                'role': 'SUPERADMIN', 'password': _pw, 'api_access': True}
+                'role': 'SUPERADMIN', 'password': _pw}
         _f = None
         for _nm in ('upsert', 'put', 'save', 'set'):
             _f = getattr(users_store, _nm, None)
             if callable(_f):
                 break
         if _f:
+            _ok = False
             try:
-                _f(dict(_doc, uid=MASTER_UID))
+                _f(**_doc)
+                _ok = True
             except Exception:
                 try:
-                    _f(**_doc)
+                    _f(dict(_doc, uid=MASTER_UID))
+                    _ok = True
                 except Exception as _e3:
                     print('master seed gagal:', _e3)
-            print('master seed: uid %s disiapkan' % MASTER_UID)
+            print('master seed: uid %s %s' % (MASTER_UID, 'disiapkan' if _ok else 'GAGAL'))
 except Exception as _e:
     print('master seed dilewati:', _e)
 

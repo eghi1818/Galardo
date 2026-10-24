@@ -53,3 +53,4 @@
 4. Cloudflare Tunnel (pihak ketiga) + refresh SESSION_STATE/HANDOFF
 5. bukti rotasi egress nyata (setelah kredensial anyip.io)
 - STEP-153 (2026-10-24 20:38): backend/intel.py + tools/verify_intel.py (intel=hipotesis vs pengukuran, divergensi dicatat). Endpoint + halaman Override menyusul STEP-154.
+- STEP-154 (2026-10-24 20:51): wiring POST /api/v1/intel/preflight + tools/verify_intel_wired.py (AST+behavioral). Halaman Override menyusul STEP-155.

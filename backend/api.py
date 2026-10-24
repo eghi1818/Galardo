@@ -21,6 +21,7 @@ import proxy_provider
 import gateway
 import egress
 import origins
+import intel
 import proxy as proxy_lanes  # lane egress berlabel (item 2/3/4)
 import ratelimit
 import rbac
@@ -754,6 +755,19 @@ $('#f').addEventListener('submit',async e=>{
             return self._json(200, _es)
         if api_path.startswith('/origins/') and method == 'GET':
             return self._json(200, origins.candidates(api_path.split('/origins/', 1)[1], resolve_hosts=False))
+        if api_path == "/intel/preflight" and method == "POST":
+            _payload = {}
+            try:
+                _payload = self._body()
+            except Exception:
+                _payload = {}
+            if isinstance(_payload, tuple) and len(_payload) == 2:
+                _payload = _payload[1]
+            try:
+                return self._json(200, intel.preflight(_payload))
+            except Exception as exc:
+                return self._json(422, {"error": "%s" % exc})
+
         if api_path in ("/proxy/status", "/gateway/status") and method == "GET":
             if api_path == "/gateway/status":
                 return self._json(200, gateway.describe())

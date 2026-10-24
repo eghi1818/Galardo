@@ -5,3 +5,7 @@
 - eksperimen: pembungkus do_* dilepas -> verify_headers rc=1 (dengan pembungkus rc=1)
 - auth rc=0 | test rc=0 | gate rc=2
 - bukti: .out/STEP-138-h1.txt (dengan pembungkus), .out/STEP-138-h2.txt (tanpa pembungkus)
+
+## Koreksi (STEP-139)
+Kesimpulan di atas tidak sahih: eksperimennya rusak (SyntaxError 'retun:').
+Penyebab sebenarnya = cek teks-sumber rapuh di verify_headers, bukan pembungkus.

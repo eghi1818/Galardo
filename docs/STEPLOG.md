@@ -128,3 +128,4 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 - STEP-136 — bongkar gate rc=2 + isolasi data verifier. auth rc=0, test rc=0, gate rc=2.
 - STEP-137 — koreksi: gate merah = verify_headers.py bukan docker; pkill verifier dimatikan (default 0). headers rc=1, auth rc=0, test rc=0, gate rc=2.
 - STEP-138 — eksperimen pembungkus do_* vs preflight OPTIONS. headers rc=1 -> 1, auth rc=0, test rc=0, gate rc=2.
+- STEP-139 — penyebab gate merah = cek teks-sumber rapuh di verify_headers; dijadikan regex toleran (_hasdef). headers rc=1, auth rc=0, test rc=0, gate rc=2.

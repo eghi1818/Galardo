@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+echo "== BACA WAJIB: docs/GOAL-GALARDO.md (tujuan: target MATI | Layer 7 | multi-IP | #102) =="
 # GALARDO - resume ringkas untuk sesi chat baru. Output sengaja dipangkas.
 cd "$(dirname "$0")/.." || exit 1
 echo "== GALARDO RESUME $(date -u +%Y-%m-%dT%H:%M:%SZ) =="

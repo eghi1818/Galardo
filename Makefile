@@ -112,6 +112,7 @@ own1:
 	python3 tests/test_ownership_rung1.py
 own1-live:
 	python3 tools/verify_ownership_rung1.py --live
+	python3 tools/verify_auth_users.py --live
 
 # --- GALARDO item 8c: backup otomatis ---
 .PHONY: backup backup-verify

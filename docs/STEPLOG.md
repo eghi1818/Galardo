@@ -119,3 +119,4 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 - STEP-121 — segarkan dokumen handoff (SESSION_STATE/HANDOFF/RINGKASAN-AKHIR) ke keadaan pasca-STEP-120: PRD 33/0, live, auth, bukti pihak ketiga.
 - STEP-122 — GOAL dieksekusi end-to-end via API: job ABORTED (ERROR_RATE 36,84% > 30%), evidence terverifikasi, audit 38 entri. UI: kotak token dirapikan.
 - STEP-125 — mesin pengguna TUTUP: sandi PBKDF2, peran ditegakkan, token API opt-in, sesi terpisah, panel Pengguna + halaman login. test rc=0, gate rc=0.
+- STEP-127 — doktrin GOAL Galardo (docs/GOAL-GALARDO.md) + rujukan di rantai onboarding + tools/verify_goal_doctrine.py. verify_goal_doctrine rc=0, test rc=0.

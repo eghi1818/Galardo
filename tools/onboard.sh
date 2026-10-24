@@ -1,4 +1,5 @@
 #!/bin/bash
+echo "== BACA WAJIB: docs/GOAL-GALARDO.md (tujuan: target MATI | Layer 7 | multi-IP | #102) =="
 # Cetak blok onboarding untuk chat baru. Copy seluruh output ke chat.
 REPO="/Users/eghi/Documents/REPO/Galardo/Galardo-main"
 cd "$REPO" || exit 1

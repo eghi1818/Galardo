@@ -274,6 +274,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Frame-Options", "DENY")
 
     def _json(self, code, obj, headers=None):
+        if getattr(self, 'command', '') == 'POST' and self.path.split('?')[0].rstrip('/').endswith('/login') and code != 429:
+            _gal_login_rate_record(_gal_ip(self), code >= 400)  # GALARDO_LOGIN_RATE hook
+        if isinstance(headers, dict) and 'Set-Cookie' in headers and 'galardo_session=' in str(headers.get('Set-Cookie')) and _gal_cookie_secure(self):
+            headers = dict(headers)
+            headers['Set-Cookie'] = str(headers['Set-Cookie']) + '; Secure'  # GALARDO_COOKIE_SECURE hook
         body = json.dumps(obj, default=str).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
@@ -290,6 +295,11 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
     def _login_page(self):
+        # GALARDO_LOGIN_RATE handler
+        if getattr(self, 'command', '') == 'POST' and self.path.split('?')[0].rstrip('/').endswith('/login'):
+            _ok_rl2, _ra_rl2 = _gal_login_rate_check(_gal_ip(self))
+            if not _ok_rl2:
+                return self._json(429, {'error': 'rate_limited', 'retry_after': _ra_rl2}, headers={'Retry-After': str(_ra_rl2)})
         """Halaman login: username+sandi (utama) atau token (cadangan)."""
         html = """<!doctype html><html lang="id"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -564,6 +574,11 @@ $('#f').addEventListener('submit',async e=>{
 
     # ---- router --------------------------------------------------------
     def _dispatch(self, method):
+        # GALARDO_LOGIN_RATE gate
+        if str(method).upper() == 'POST' and self.path.split('?')[0].rstrip('/').endswith('/login'):
+            _ok_rl, _ra_rl = _gal_login_rate_check(_gal_ip(self))
+            if not _ok_rl:
+                return self._json(429, {'error': 'rate_limited', 'retry_after': _ra_rl}, headers={'Retry-After': str(_ra_rl)})
         _rl = ratelimit.cek(self)
         if _rl:
             self._retry_after = _rl
@@ -1818,6 +1833,55 @@ def serve(host=_bind_host(), port=None):
     print(f"[galardo-api] listening on http://{host}:{port}  (dashboard: http://{host}:{port}/)")
     httpd.serve_forever()
 
+
+# === GALARDO_LOGIN_RATE (126) ===
+import time as _time
+from collections import deque as _deque
+
+_GAL_LOGIN_FAIL = {}
+_GAL_LOGIN_MAX = int(os.environ.get('GALARDO_LOGIN_MAX', '10'))
+_GAL_LOGIN_WINDOW = float(os.environ.get('GALARDO_LOGIN_WINDOW', '60'))
+_GAL_LOGIN_RETRY = int(os.environ.get('GALARDO_LOGIN_RETRY_AFTER', '30'))
+
+
+def _gal_ip(handler):
+    fwd = handler.headers.get('X-Forwarded-For', '')
+    if fwd:
+        return fwd.split(',')[0].strip()
+    try:
+        return handler.client_address[0]
+    except Exception:
+        return '?'
+
+
+def _gal_login_rate_check(ip):
+    dq = _GAL_LOGIN_FAIL.get(ip)
+    if not dq:
+        return True, 0
+    now = _time.time()
+    while dq and now - dq[0] > _GAL_LOGIN_WINDOW:
+        dq.popleft()
+    if len(dq) >= _GAL_LOGIN_MAX:
+        return False, _GAL_LOGIN_RETRY
+    return True, 0
+
+
+def _gal_login_rate_record(ip, failed):
+    dq = _GAL_LOGIN_FAIL.setdefault(ip, _deque())
+    if failed:
+        dq.append(_time.time())
+    else:
+        dq.clear()
+
+
+def _gal_cookie_secure(handler):
+    flag = os.environ.get('GALARDO_COOKIE_SECURE')
+    if flag == '1':
+        return True
+    if flag == '0':
+        return False
+    return handler.headers.get('X-Forwarded-Proto', '').lower() == 'https'
+# === GALARDO_LOGIN_RATE (126) ===
 
 if __name__ == "__main__":
     import argparse

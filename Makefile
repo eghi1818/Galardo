@@ -154,3 +154,6 @@ ci:
 # --- Galardo capacity cepat: pengukur independen stdlib (cross-check angka knee) ---
 capacity-fast:
 	python3 tools/capacity.py --url http://127.0.0.1:8090 --steps 1,2,4,8,16 --detik 3
+
+checkhost:
+	python3 tools/checkhost.py --url example.com --max-nodes 5

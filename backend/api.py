@@ -20,6 +20,7 @@ import exttool
 import proxy_provider
 import gateway
 import egress
+import checkhost
 import origins
 import intel
 import proxy as proxy_lanes  # lane egress berlabel (item 2/3/4)
@@ -765,6 +766,31 @@ $('#f').addEventListener('submit',async e=>{
                 _payload = _payload[1]
             try:
                 return self._json(200, intel.preflight(_payload))
+            except Exception as exc:
+                return self._json(422, {"error": "%s" % exc})
+
+        if api_path == "/checkhost" and method == "POST":
+            _p = {}
+            try:
+                _p = self._body()
+            except Exception:
+                _p = {}
+            if isinstance(_p, tuple) and len(_p) == 2:
+                _p = _p[1]
+            _url = None
+            _mn = 5
+            if isinstance(_p, dict):
+                _url = _p.get("url") or _p.get("host")
+                try:
+                    _mn = int(_p.get("max_nodes") or 5)
+                except Exception:
+                    _mn = 5
+            elif isinstance(_p, str):
+                _url = _p.strip()
+            if not _url:
+                return self._json(422, {"error": "url wajib"})
+            try:
+                return self._json(200, checkhost.probe(_url, max_nodes=_mn))
             except Exception as exc:
                 return self._json(422, {"error": "%s" % exc})
 

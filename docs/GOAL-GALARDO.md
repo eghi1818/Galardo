@@ -1,5 +1,8 @@
 # DOKTRIN GOAL GALARDO — WAJIB DIBACA SETIAP CHAT
 
+Berkas ini: `docs/GOAL-GALARDO.md` — kanonik dan mengikat. Rujukannya ditanam di
+rantai onboarding dan dijaga oleh `tools/verify_goal_doctrine.py`.
+
 Status: dokumen ini MENGIKAT. Kalau dokumen ini berbenturan dengan file lain
 (CONTEXT/HANDOFF/INVENTARIS/PENDING/ROADMAP/SESSION_STATE) soal **TUJUAN**, dokumen ini
 yang menang. Untuk soal **STATUS kode**, yang menang tetap docs/INVENTARIS.md.

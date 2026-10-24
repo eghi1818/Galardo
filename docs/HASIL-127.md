@@ -18,3 +18,7 @@
 ## Sisa
 - verifier auth masih merah (base /api/v1) -> blok 126c
 - lapisan multi-IP belum ditembakkan dengan provider nyata -> butuh kredensial anyip.io (mode A/B)
+
+## Koreksi (STEP-128)
+Klaim 'verify_goal_doctrine rc=0' di atas SALAH: cek 'doktrin menamai dirinya sendiri' gagal 1.
+Blok 127 juga commit hanya atas dasar make test, bukan rc verifier. Diperbaiki di STEP-128.

@@ -61,3 +61,6 @@
 - STEP-159 (2026-10-24 21:24): mesin kapasitas/knee + make capacity + verifier behavioral. Angka knee & TTR kini bisa diukur.
 - STEP-161 (2026-10-24 21:50): fix flaky live (direktif ukur:0) + tetapkan kanonik kapasitas (galardo_capacity) & make capacity-fast sebagai pembanding independen.
 - STEP-163 (2026-10-24 22:00): check-host per-negara (backend/checkhost.py + verifier offline + endpoint POST /checkhost + make checkhost).
+- STEP-165 (2026-10-24 22:09): multi-lane di engine (transport per-lane per-VU, aditif) + verifier behavioral. Wiring api.py menyusul.
+- STEP-166 (2026-10-24 22:14): fix transport lane dinyalakan (_start_lane meniru transport utama) -> verify_multilane hijau.
+- STEP-168 (2026-10-24 22:25): verify_multilane hijau (window penuh + cek via log _do_request); _vu_aman/vu_errors dipertahankan.

@@ -244,11 +244,17 @@ class LoadEngine:
     """Runs a bounded scenario against a single resolved origin."""
 
     def __init__(self, job_id, run_id, origin, normalized, effective, telemetry, abort_check,
-                 on_event=None, connect_ip=None, verify_tls=True):
+                 on_event=None, connect_ip=None, verify_tls=True, lanes=None):
         self.job_id = job_id
         self.run_id = run_id
         self.origin = origin  # "http://host:port"
         self.connect_ip = connect_ip
+        self.verify_tls = verify_tls
+        self.lanes = list(lanes) if lanes else []
+        self.lane_hits = {}
+        self.lane_lock = threading.Lock()
+        self.vu_transports = {}
+        self.vu_errors = []
         self.keep_alive = normalized.get("keep_alive", True)
         self.transport = transport_mod.Transport(verify_tls=verify_tls)
         self.piercer = cachebuster_mod.Piercer(
@@ -280,7 +286,7 @@ class LoadEngine:
                 return r
         return reqs[-1]
 
-    def _do_request(self, req):
+    def _do_request(self, req, tr=None):
         url = self.origin + urllib.parse.quote(req["path"], safe="/?&=%")
         q = req.get("query") or {}
         if q:
@@ -297,7 +303,7 @@ class LoadEngine:
                 headers.setdefault(_hk, _hv)
         timeout = req.get("timeout_ms", 1000) / 1000.0
         t0 = time.time()
-        resp = self.transport.request(
+        resp = (tr or self.transport).request(
             req["method"], url, headers=headers,
             body=req.get("body"), body_encoding=req.get("body_encoding") or "identity",
             connect_ip=self.connect_ip, timeout=timeout)
@@ -331,10 +337,118 @@ class LoadEngine:
                                   assert_hard=hard, assert_soft=soft, payload=is_payload)
         return resp
 
+    # ---- multi-lane ------------------------------------------------------
+    def _lane_for(self, vu_id):
+        if not self.lanes:
+            return None
+        return self.lanes[vu_id % len(self.lanes)]
+
+    @staticmethod
+    def _lane_id(item, fallback="lane"):
+        for attr in ("lane_id", "id", "name"):
+            v = getattr(item, attr, None)
+            if v:
+                return str(v)
+        if isinstance(item, dict) and item.get("lane_id"):
+            return str(item["lane_id"])
+        return fallback
+
+    @staticmethod
+    def _lane_endpoint(item):
+        """(host, port) dari objek lane apa pun; None = jalur langsung."""
+        if item is None:
+            return None
+        fn = getattr(item, "endpoint", None)
+        if callable(fn):
+            try:
+                ep = fn()
+            except Exception:
+                ep = None
+            if isinstance(ep, dict) and ep.get("host") and ep.get("port"):
+                return (ep["host"], int(ep["port"]))
+            if isinstance(ep, (list, tuple)) and len(ep) >= 2 and ep[0] and ep[1]:
+                return (ep[0], int(ep[1]))
+        if isinstance(item, dict):
+            if item.get("host") and item.get("port"):
+                return (item["host"], int(item["port"]))
+            pr = item.get("proxy")
+            if isinstance(pr, (list, tuple)) and len(pr) >= 2:
+                return (pr[0], int(pr[1]))
+        if isinstance(item, (list, tuple)) and len(item) >= 2 and item[0] and item[1]:
+            return (item[0], int(item[1]))
+        return None
+
+    def _vu_transport(self, lane):
+        """Transport per lane - tiap VU memakai transportnya sendiri (hindari balapan proxy)."""
+        if lane is None:
+            return self.transport
+        lane_id = self._lane_id(lane)
+        tr = self.vu_transports.get(lane_id)
+        if tr is not None:
+            return tr
+        with self.lane_lock:
+            tr = self.vu_transports.get(lane_id)
+            if tr is not None:
+                return tr
+            tr = transport_mod.Transport(verify_tls=self.verify_tls)
+            ep = self._lane_endpoint(lane)
+            setter = getattr(tr, "set_proxy", None)
+            if ep and callable(setter):
+                try:
+                    setter(ep[0], ep[1])
+                except TypeError:
+                    try:
+                        setter(ep)
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+            if not ep:
+                self._start_lane(tr)
+            self.vu_transports[lane_id] = tr
+            self.lane_hits.setdefault(lane_id, 0)
+            return tr
+
+    def _start_lane(self, tr):
+        """Nyalakan transport lane dengan CARA YANG SAMA seperti transport utama.
+
+        Nama metode dicari dari transport utama (bukan ditebak), jadi kalau engine
+        memakai start()/open()/warmup(), transport lane ikut memakai yang sama.
+        """
+        for nama in ("start", "open", "warmup", "connect"):
+            utama = getattr(self.transport, nama, None)
+            milik = getattr(tr, nama, None)
+            if callable(utama) and callable(milik):
+                try:
+                    milik()
+                except Exception:
+                    pass
+                return nama
+        return None
+
+    def _catat_lane(self, lane):
+        if lane is None:
+            return
+        lid = self._lane_id(lane)
+        with self.lane_lock:
+            self.lane_hits[lid] = self.lane_hits.get(lid, 0) + 1
+
+    def _vu_aman(self, vu_id, deadline):
+        """Pembungkus VU: exception apa pun dicatat, TIDAK mati sunyi."""
+        try:
+            self._vu_loop(vu_id, deadline)
+        except BaseException as exc:
+            with self.lane_lock:
+                if len(self.vu_errors) < 50:
+                    self.vu_errors.append("vu%d: %r" % (vu_id, exc))
+
     # ---- worker loop -----------------------------------------------------
     def _vu_loop(self, vu_id, deadline):
         """VU loop: global token bucket enforces max_rps across all VUs;
         think time shapes per-VU concurrency; abort checked every iteration."""
+        lane = self._lane_for(vu_id)
+        tr = self._vu_transport(lane)
+        self._catat_lane(lane)
         think_min = self.norm.get("think_time_ms", {}).get("min", 0) / 1000.0
         think_max = self.norm.get("think_time_ms", {}).get("max", 0) / 1000.0
         while not self.stop.is_set() and time.time() < deadline:
@@ -348,7 +462,7 @@ class LoadEngine:
                 if self.stop.is_set():
                     break
                 continue  # token timeout; re-check abort/deadline
-            self._do_request(self._pick_request())
+            self._do_request(self._pick_request(), tr)
             if think_max:
                 self.stop.wait(random.uniform(think_min, think_max))
 
@@ -379,7 +493,7 @@ class LoadEngine:
                 if not active[k].is_alive():
                     del active[k]
             while len(active) < min(want, cap_vus) and not self.stop.is_set():
-                th = threading.Thread(target=self._vu_loop,
+                th = threading.Thread(target=self._vu_aman,
                                       args=(next(tid), deadline), daemon=True)
                 active[th.name] = th
                 th.start()
@@ -408,8 +522,15 @@ class LoadEngine:
             self.transport.close()
         except Exception:
             pass
+        for _tr in list(self.vu_transports.values()):
+            try:
+                _tr.close()
+            except Exception:
+                pass
         return {"started_at": now_iso(), "duration_actual": round(self.ended_at - self.started_at, 2),
                 "abort_reason": self.abort_reason,
                 "assert_hard_fail": self.assert_fail_hard,
                 "assert_soft_fail": self.assert_fail_soft,
-                "cache": self.piercer.stats()}
+                "cache": self.piercer.stats(),
+                "lanes": ({"jumlah": len(self.lanes), "hits": dict(self.lane_hits)} if self.lanes else None),
+                "vu_errors": list(self.vu_errors)[:5]}

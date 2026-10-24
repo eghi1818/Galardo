@@ -56,3 +56,5 @@
 - STEP-154 (2026-10-24 20:51): wiring POST /api/v1/intel/preflight + tools/verify_intel_wired.py (AST+behavioral). Halaman Override menyusul STEP-155.
 - STEP-155 (2026-10-24 20:57): halaman Override (Goal 3) di dashboard - kandidat origin + status egress + pre-flight intel. Verifier HTTP nyata menyusul STEP-156.
 - STEP-156 (2026-10-24 21:05): RENDER.override dibetulkan (pola ^RENDER.x =) + tools/verify_intel_live.py (HTTP nyata). Endpoint /intel/preflight kini teruji lewat port app.
+- STEP-157 (2026-10-24 21:12): verify_intel_live non-skip (booter multi-strategi + log permanen). Endpoint /intel/preflight teruji lewat port app nyata.
+- STEP-158 (2026-10-24 21:19): verify_intel_live non-skip (boot -u + log per-percobaan). Endpoint /intel/preflight teruji lewat port app nyata.

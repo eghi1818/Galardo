@@ -1,24 +1,31 @@
 #!/usr/bin/env python3
 """Verifier HTTP NYATA untuk POST /api/v1/intel/preflight.
 
-Boot app sendiri pada port bebas (run_local.py), tunggu /health, tembak endpoint,
-lalu matikan. Kalau app tak bisa di-boot -> cetak [skip] dan tetap rc=0 (gate aman).
+Boot app sendiri dengan pola yang sudah terbukti di verify_auth_users.py:
+  sh -c 'cd backend && exec python3 -u run_local.py'
+plus varian python3 -u langsung. WAJIB -u / PYTHONUNBUFFERED, kalau tidak baris
+'listening on http://127.0.0.1:PORT' tidak ter-flush ke file dan deteksi buta.
+Log disimpan PER-PERCOBAAN (.out/intel-live-app-<n>.log) supaya bukti tidak saling menimpa.
 """
 import json
 import os
 import re
+import shutil
+import signal
 import socket
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.error
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT = os.path.join(ROOT, ".out")
 sys.path.insert(0, os.path.join(ROOT, "backend"))
 
 import intel as I  # noqa: E402
+
+RE_LISTEN = re.compile(r"listening on https?://(?:127\.0\.0\.1|localhost):(\d+)")
 
 PASS = 0
 FAIL = 0
@@ -41,22 +48,6 @@ def skip(nama, alasan=""):
     print("  [skip] %s  %s" % (nama, alasan))
 
 
-def port_bebas():
-    s = socket.socket()
-    s.bind(("127.0.0.1", 0))
-    p = s.getsockname()[1]
-    s.close()
-    return p
-
-
-def cari_run_local():
-    for c in ("run_local.py", "tools/run_local.py", "backend/run_local.py", "scripts/run_local.py"):
-        p = os.path.join(ROOT, c)
-        if os.path.exists(p):
-            return p
-    return None
-
-
 def http(base, path, method="GET", payload=None, timeout=8):
     data = None
     headers = {"Accept": "application/json"}
@@ -73,53 +64,100 @@ def http(base, path, method="GET", payload=None, timeout=8):
         return 0, repr(e)
 
 
-def tunggu_siap(proc, log_path, port, batas=25.0):
+def sehat(port, timeout=1):
+    return http("http://127.0.0.1:%d" % port, "/api/v1/health", timeout=timeout)[0] == 200
+
+
+def tail_of(path, n=12):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            baris = fh.read().splitlines()
+    except Exception:
+        return "      (log kosong)"
+    return "\n".join("      | " + b for b in baris[-n:]) or "      (log kosong)"
+
+
+def tunggu_siap(proc, logpath, batas=45.0):
     t0 = time.time()
     while time.time() - t0 < batas:
         if proc.poll() is not None:
             return None
         try:
-            with open(log_path, encoding="utf-8", errors="replace") as fh:
+            with open(logpath, encoding="utf-8", errors="replace") as fh:
                 isi = fh.read()
         except Exception:
             isi = ""
-        m = re.search(r"listening on http://127\.0\.0\.1:(\d+)", isi)
+        m = RE_LISTEN.search(isi)
         if m:
-            return int(m.group(1))
-        s, _ = http("http://127.0.0.1:%d" % port, "/api/v1/health", timeout=1)
-        if s == 200:
-            return port
-        time.sleep(0.3)
+            p = int(m.group(1))
+            for _ in range(24):
+                if sehat(p):
+                    return p
+                time.sleep(0.25)
+            return p
+        time.sleep(0.25)
     return None
+
+
+def matikan(proc):
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        proc.wait(timeout=6)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+
+def kandidat_boot():
+    py = sys.executable
+    rl = os.path.join(ROOT, "backend", "run_local.py")
+    out = []
+    if os.path.exists(rl):
+        out.append((["sh", "-c", "cd backend && exec python3 -u run_local.py"], ROOT))
+        out.append(([py, "-u", rl], ROOT))
+        out.append(([py, "-u", "run_local.py"], os.path.join(ROOT, "backend")))
+    return out
+
+
+def boot():
+    env = dict(os.environ)
+    env["PYTHONUNBUFFERED"] = "1"
+    env.setdefault("GALARDO_REQUIRE_AUTH", "0")
+    env.setdefault("GALARDO_AUTH_LOCALHOST_EXEMPT", "1")
+    logs = []
+    for i, (cmd, cwd) in enumerate(kandidat_boot(), 1):
+        lp = os.path.join(OUT, "intel-live-app-%d.log" % i)
+        logs.append(lp)
+        print("    coba %d: %s   (cwd=%s)" % (i, " ".join(cmd), cwd))
+        log = open(lp, "w")
+        proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=log,
+                                stderr=subprocess.STDOUT, start_new_session=True)
+        siap = tunggu_siap(proc, lp)
+        log.close()
+        if siap:
+            print("    -> SIAP di port %d (log: %s)" % (siap, lp))
+            return proc, siap, cmd, lp
+        print("      gagal; tail log:")
+        print(tail_of(lp, 10))
+        matikan(proc)
+        time.sleep(0.4)
+    return None, None, None, logs
 
 
 def main():
     print("== verify_intel_live (HTTP nyata) ==")
-    rl = cari_run_local()
-    if not rl:
-        skip("boot app", "run_local.py tidak ditemukan")
-        print("\n  [ok]   verify_intel_live: %d hijau, %d skip" % (PASS, SKIP))
+    if not os.path.isdir(OUT):
+        os.makedirs(OUT, exist_ok=True)
+    proc, siap, cmd, lp = boot()
+    if not siap:
+        skip("boot app", "semua strategi gagal")
+        print("\n  [skip] verify_intel_live: %d hijau, %d skip (BELUM teruji HTTP)" % (PASS, SKIP))
         return 0
 
-    port = port_bebas()
-    tmp = tempfile.mkdtemp(prefix="galardo-live-")
-    log_path = os.path.join(tmp, "app.log")
-    env = dict(os.environ)
-    env["GALARDO_PORT"] = str(port)
-    env.setdefault("GALARDO_REQUIRE_AUTH", "0")
-    env.setdefault("GALARDO_AUTH_LOCALHOST_EXEMPT", "1")
-
-    log = open(log_path, "w")
-    proc = subprocess.Popen([sys.executable, rl], cwd=ROOT, env=env,
-                            stdout=log, stderr=subprocess.STDOUT)
+    base = "http://127.0.0.1:%d" % siap
     try:
-        siap = tunggu_siap(proc, log_path, port)
-        if not siap:
-            skip("boot app", "app tidak siap; lihat %s" % log_path)
-            print("\n  [ok]   verify_intel_live: %d hijau, %d skip" % (PASS, SKIP))
-            return 0
-
-        base = "http://127.0.0.1:%d" % siap
         cek("app hidup: GET /api/v1/health -> 200", http(base, "/api/v1/health")[0] == 200)
 
         st, body = http(base, "/api/v1/intel/preflight", method="POST", payload="")
@@ -142,29 +180,25 @@ def main():
             j2 = {}
         cek("payload teks: domain terurai", j2.get("domain") == "contoh.invalid", repr(j2.get("domain")))
 
-        st3, body3 = http(base, "/api/v1/intel/preflight", method="POST",
-                          payload={"domain": "contoh.invalid", "origin": "9.9.9.9"})
+        st3, _ = http(base, "/api/v1/intel/preflight", method="POST",
+                      payload={"domain": "contoh.invalid", "origin": "9.9.9.9"})
         cek("POST payload objek -> 200", st3 == 200, "status=%s" % st3)
 
         st4, _ = http(base, "/api/v1/intel/preflight", method="GET")
         cek("GET /intel/preflight bukan 200 (terikat POST)", st4 != 200, "status=%s" % st4)
 
         try:
-            with open(log_path, encoding="utf-8", errors="replace") as fh:
+            with open(lp, encoding="utf-8", errors="replace") as fh:
                 isi = fh.read()
         except Exception:
             isi = ""
         cek("log app tanpa Traceback", "Traceback" not in isi, isi[-200:].replace("\n", " | "))
     finally:
+        matikan(proc)
         try:
-            proc.terminate()
-            proc.wait(timeout=8)
+            shutil.copyfile(lp, os.path.join(OUT, "intel-live-app.log"))
         except Exception:
-            try:
-                proc.kill()
-            except Exception:
-                pass
-        log.close()
+            pass
 
     print()
     if FAIL:

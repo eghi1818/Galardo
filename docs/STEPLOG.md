@@ -146,3 +146,5 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 - STEP-154: 2026-10-24 20:51 intel rc=0 wired rc=0 test rc=0 gate rc=0
 - STEP-155: 2026-10-24 20:57 pages rc=1 intel rc=0 wired rc=0 test rc=0 gate rc=0
 - STEP-156: 2026-10-24 21:05 pages rc=0 intel rc=0 wired rc=0 live rc=0 test rc=0 gate rc=0
+- STEP-157: 2026-10-24 21:12 pages rc=0 intel rc=0 wired rc=0 live rc=0 skip=1 test rc=0 gate rc=0
+- STEP-158: 2026-10-24 21:19 pages rc=0 intel rc=0 wired rc=0 live rc=0 skip=0 test rc=0 gate rc=0

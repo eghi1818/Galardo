@@ -172,7 +172,7 @@ def main():
         cek("balasan punya ringkasan.total", isinstance((j.get("ringkasan") or {}).get("total"), int))
 
         st2, body2 = http(base, "/api/v1/intel/preflight", method="POST",
-                          payload="domain: contoh.invalid\norigin: 1.2.3.4\nsumber: rea")
+                          payload="domain: contoh.invalid\norigin: 1.2.3.4\nsumber: rea\nukur: 0")
         cek("POST payload teks -> 200", st2 == 200, "status=%s" % st2)
         try:
             j2 = json.loads(body2)
@@ -181,8 +181,12 @@ def main():
         cek("payload teks: domain terurai", j2.get("domain") == "contoh.invalid", repr(j2.get("domain")))
 
         st3, _ = http(base, "/api/v1/intel/preflight", method="POST",
-                      payload={"domain": "contoh.invalid", "origin": "9.9.9.9"})
+                      payload={"domain": "contoh.invalid", "origin": "9.9.9.9", "ukur": 0})
         cek("POST payload objek -> 200", st3 == 200, "status=%s" % st3)
+
+        st5, _ = http(base, "/api/v1/intel/preflight", method="POST",
+                      payload="domain: contoh.invalid\norigin: 1.2.3.4\nukur: 1", timeout=30)
+        cek("POST jalur ukur nyata (ukur:1, crt.sh/DNS) -> 200", st5 == 200, "status=%s" % st5)
 
         st4, _ = http(base, "/api/v1/intel/preflight", method="GET")
         cek("GET /intel/preflight bukan 200 (terikat POST)", st4 != 200, "status=%s" % st4)

@@ -60,6 +60,8 @@ FIELD_ALIASES = {
 
 FIELDS_DIBANDING = ("origins", "edge", "waf", "asn", "egress")
 
+OPS_ALIASES = {"ukur": ("ukur", "measure", "probe", "hitung")}
+
 VERDICT_COCOK = "cocok"
 VERDICT_BEDA = "beda"
 VERDICT_TAK_DIKLAIM = "tidak diklaim"
@@ -165,6 +167,18 @@ def _canon_key(key):
     return k
 
 
+def _ops_dari(raw):
+    """Direktif operasional dari payload. ukur:0 = jangan sentuh jaringan (deterministik)."""
+    ops = {}
+    for k, v in (raw or {}).items():
+        kk = str(k).strip().lower()
+        for nama, alias in OPS_ALIASES.items():
+            if kk == nama or kk in alias:
+                teks = str(v).strip().lower()
+                ops[nama] = teks not in ("0", "false", "off", "no", "tidak", "")
+    return ops
+
+
 def parse(payload):
     """dict | JSON string | teks 'key: value' per baris -> intel ternormalisasi."""
     raw = {}
@@ -212,6 +226,7 @@ def parse(payload):
             merged.setdefault(ck, [])
             merged[ck].extend(_as_list(v))
 
+    ops = _ops_dari(raw)
     return {
         "domain": normalize_host(merged.get("domain")),
         "origins": merged.get("origins") or [],
@@ -223,6 +238,7 @@ def parse(payload):
         "notes": merged.get("notes"),
         "source": merged.get("source") or "intel",
         "raw": raw,
+        "ops": ops,
     }
 
 
@@ -324,8 +340,10 @@ def ringkasan(rows):
     return counts
 
 
-def preflight(payload, measured=None, probe=False, ukur=True):
+def preflight(payload, measured=None, probe=False, ukur=None):
     intel = parse(payload)
+    if ukur is None:
+        ukur = bool(intel.get("ops", {}).get("ukur", True))
     if measured is None:
         measured = measured_from(intel.get("domain"), probe=probe) if ukur else {}
     rows = divergences(intel, measured)
@@ -346,4 +364,5 @@ def describe():
         "verdict": [VERDICT_COCOK, VERDICT_BEDA, VERDICT_TAK_DIKLAIM, VERDICT_TAK_TERUKUR],
         "alias": {k: list(v) for k, v in FIELD_ALIASES.items()},
         "prinsip": "intel = hipotesis, pengukuran = Galardo, divergensi dicatat",
+        "ops": list(OPS_ALIASES.keys()),
     }

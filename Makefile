@@ -150,3 +150,7 @@ lane:
 ci:
 	@curl -s "https://api.github.com/repos/eghi1818/Galardo/actions/runs?per_page=3" \
 	 | python3 -c "import sys,json;d=json.load(sys.stdin);[print('  ',r['head_sha'][:7], r['status'], r['conclusion'], '|', r['name'], '|', r['created_at']) for r in d.get('workflow_runs',[])]"
+
+# --- Galardo capacity cepat: pengukur independen stdlib (cross-check angka knee) ---
+capacity-fast:
+	python3 tools/capacity.py --url http://127.0.0.1:8090 --steps 1,2,4,8,16 --detik 3

@@ -155,6 +155,21 @@ def t_describe():
         repr(d)[:160])
 
 
+def t_ops_direktif():
+    it = I.parse("domain: x.example\norigin: 1.2.3.4\nukur: 0")
+    cek("ops: direktif ukur:0 terbaca dari teks", it["ops"].get("ukur") is False, repr(it.get("ops")))
+    it2 = I.parse({"domain": "x.example", "ukur": 0})
+    cek("ops: direktif ukur:0 terbaca dari dict", it2["ops"].get("ukur") is False, repr(it2.get("ops")))
+    it3 = I.parse({"domain": "x.example"})
+    cek("ops: tanpa direktif -> kosong (default ukur=1)", it3["ops"] == {}, repr(it3.get("ops")))
+
+
+def t_preflight_hormati_ops():
+    pf = I.preflight("domain: x.example\norigin: 1.2.3.4\nukur: 0")
+    cek("preflight menghormati ukur:0 (tanpa jaringan)", pf["pengukuran"] == {}, repr(pf["pengukuran"])[:100])
+    cek("preflight ukur:0 tetap penuh divergensi", len(pf["divergensi"]) == len(I.FIELDS_DIBANDING))
+
+
 def main():
     print("== verify_intel (behavioral) ==")
     t_import_bersih()
@@ -174,6 +189,8 @@ def main():
     t_preflight_tanpa_ukur()
     t_preflight_ukur_nyata()
     t_errors()
+    t_ops_direktif()
+    t_preflight_hormati_ops()
     t_describe()
     print()
     if FAIL:

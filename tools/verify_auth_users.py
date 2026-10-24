@@ -307,7 +307,7 @@ def start_app():
     env['GALARDO_LOGIN_MAX'] = LOGIN_MAX
     env.setdefault('GALARDO_REQUIRE_AUTH', '1')
     env.setdefault('GALARDO_AUTH_LOCALHOST_EXEMPT', '0')
-    if os.environ.get('GALARDO_VERIFY_KILL_OTHERS', '1') != '0':
+    if os.environ.get('GALARDO_VERIFY_KILL_OTHERS', '0') != '0':
         try:
             subprocess.run(['pkill', '-f', 'run_local.py'], timeout=5)
         except Exception:

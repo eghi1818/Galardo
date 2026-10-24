@@ -31,6 +31,15 @@ ENV_RESIDENTIAL_POOL = "GALARDO_LANE_RESIDENTIAL_POOL"
 STAT_KEYS = ("requests", "errors", "bytes_sent", "bytes_received", "elapsed_ms")
 
 
+def _default_pool():
+    """Nama pool default dari env; dipakai bila lane TIDAK diberi pool."""
+    try:
+        import os as _os
+        return _os.environ.get("GALARDO_PROXY_POOL") or None
+    except Exception:
+        return None
+
+
 class LaneError(ValueError):
     """Operasi lane tidak sah."""
 
@@ -47,7 +56,7 @@ class Lane(object):
             raise LaneError("kind lane tidak dikenal: %r" % (kind,))
         self.id = lane_id
         self.kind = kind
-        self.pool = pool
+        self.pool = pool if pool is not None else _default_pool()
         self.proxy = _pair(proxy)
         self._lock = threading.Lock()
         self._c = dict((k, 0) for k in STAT_KEYS)

@@ -1,15 +1,15 @@
-# STATUS SEKARANG — Galardo (otomatis STEP-150)
+# STATUS SEKARANG - Galardo
 
-- waktu  : 2026-10-24 15:32
-- HEAD   : 6cd7793 docs(STATUS): egress recorder tercatat
-- branch : main | origin/main...HEAD: 0	0
+- HEAD: 7f83fdf (sebelum STEP-152 commit)
+- STEP terakhir: 152
+- angka jujur: wired rc=0 | record rc=0 | test rc=0 | gate rc=0
 - doktrin: docs/GOAL-GALARDO.md (MENGIKAT, seksi 9 MODE B)
 
 ## Pondasi terkunci
-- doktrin GOAL; mesin pengguna (20 cek); gateway Mode B (28 cek); origins (29 cek); egress recorder (12 cek); rantai pool->transport terbukti (verify_egress_wired)
+- doktrin GOAL; mesin pengguna (20 cek); gateway Mode B (28 cek); origins (29 cek); egress recorder (12 cek); egress_wired (11 cek)
+- pool engine: proxy.py membaca env GALARDO_PROXY_POOL via _default_pool(); lane tanpa pool memakai env, pool="" tetap paksa langsung; boot menyetel ke 'gateway'
+- transport.set_proxy adalah METHOD di dalam class transport.py (bukan fungsi level modul)
 - endpoint hidup: /gateway/status, /origins/<domain>, /egress/status(+?probe=1)
-- JALUR SUDAH OTOMATIS: proxy.py resolve pool dari GALARDO_PROXY_POOL, boot set ke 'gateway', transport.set_proxy
-- angka: wired rc=1 | record rc=0 | test rc=0 | gate rc=2
 
 ## Cara jalankan / hentikan app
 - jalankan: nohup sh -c 'cd backend && exec python3 -u run_local.py' > .out/galardo-live.log 2>&1 &
@@ -27,7 +27,7 @@
 4. verifier pakai port app sendiri; jangan pkill app verifier lain
 5. sesi hidup di MEMORI -> dua proses app = sesi saling menimpa
 6. anchor patch bisa MISS tanpa error; verifikasi dengan grep
-7. cek verifier atas TEKS SUMBER rapuh terhadap rename -> pakai regex
+7. cek verifier atas TEKS SUMBER rapuh -> pakai regex atau AST
 8. guard penyisipan harus diuji
 9. hipotesis bukan fakta (docker/pkill dua-duanya SALAH)
 10. Mode B: rotasi per KONEKSI/WORKER; penentu WAF = keragaman ASN
@@ -40,7 +40,11 @@
 17. kode saat IMPORT jangan menulis ke stdout -> pakai stderr
 18. jangan pakai format % pada URL yang memuat persen -> pakai konkatenasi
 19. SEMUA fetch HTTPS di backend wajib pakai context dari netssl
-20. pool engine dibaca dari GALARDO_PROXY_POOL oleh proxy.py; boot menyetelnya ke 'gateway'
+20. pool engine dibaca dari env GALARDO_PROXY_POOL oleh proxy.py (_default_pool)
+21. klaim "terbukti/otomatis" WAJIB lulus verifier-nya; verifier merah = klaim belum sah
+22. verifier rapuh -> BEHAVIORAL (panggil fungsi, cek efek). Jangan hasattr di level modul kalau
+    targetnya METHOD: pakai AST, dan cek atribut objeknya, bukan nama modulnya
+23. tulis angka rc apa adanya di STATUS; jangan commit label "terbukti" sebelum gate hijau
 
 ## Urutan berikutnya
 1. ingest intel REA + pre-flight validasi

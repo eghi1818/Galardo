@@ -140,3 +140,5 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 - STEP-148 — patuhi netssl (context pada urlopen di origins.py + HTTPSHandler di gateway.py). netssl rc=0, origins rc=0, test rc=0, gate rc=0.
 - STEP-149 — backend/egress.py (catat IP egress per worker) + verifier 13 cek + endpoint /egress/status. egress_record rc=0, test rc=0, gate rc=0.
 - STEP-150 — bukti rantai pool->transport (verify_egress_wired) + probe egress on demand. wired rc=1, record rc=0, test rc=0, gate rc=2.
+- STEP-151: 2026-10-24 17:57 pool default dari env (proxy.py) + verifier behavioral; wired rc=1 record rc=0 test rc=0 gate rc=2
+- STEP-152: 2026-10-24 18:12 cek transport jadi AST+behavioral; wired rc=0 record rc=0 test rc=0 gate rc=0

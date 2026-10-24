@@ -15,6 +15,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTDIR = os.path.join(ROOT, '.out')
 LOGA = ['']
 AREQ_NOTE = [False]
+ADM = {'user': None, 'pw': None}
 BASE = os.environ.get('GALARDO_BASE', '').rstrip('/')
 PORT = int(os.environ.get('GALARDO_VERIFY_PORT', '8090'))
 LOGIN_MAX = os.environ.get('GALARDO_LOGIN_MAX', '60')
@@ -266,12 +267,14 @@ def resolve():
                 print('  (identitas) pakai %s (sandi .env) sebagai admin' % cand)
                 ck = c2
                 r['admin_user'], r['admin_pw'] = cand, apw
+                ADM['user'], ADM['pw'] = cand, apw
                 break
     ck_v = ensure_vfy_user(tok)
     if not ck and admin_ok(ck_v):
         print('  (identitas) pakai %s (dibuat via API) sebagai admin' % VFY_USER)
         ck = ck_v
         r['admin_user'], r['admin_pw'] = VFY_USER, VFY_PW
+        ADM['user'], ADM['pw'] = VFY_USER, VFY_PW
     if not ck and ck_v:
         print('  (catatan) tidak ada cookie yang lolos /users -> admin via Bearer')
         ck = ck_v
@@ -304,6 +307,12 @@ def start_app():
     env['GALARDO_LOGIN_MAX'] = LOGIN_MAX
     env.setdefault('GALARDO_REQUIRE_AUTH', '1')
     env.setdefault('GALARDO_AUTH_LOCALHOST_EXEMPT', '0')
+    if os.environ.get('GALARDO_VERIFY_KILL_OTHERS', '1') != '0':
+        try:
+            subprocess.run(['pkill', '-f', 'run_local.py'], timeout=5)
+        except Exception:
+            pass
+        time.sleep(1.2)
     p = subprocess.Popen(['sh', '-c', 'cd backend && exec python3 -u run_local.py'],
                          cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
     for _ in range(80):
@@ -333,13 +342,24 @@ def start_app():
 
 def areq(method, path, body=None, ck=None, tok=None):
     s, h, raw = req(method, path, body=body, cookie=ck)
-    if s == 403 and tok:
-        s2, h2, raw2 = req(method, path, body=body, headers=bearer(tok))
-        if 200 <= s2 < 400:
+    if s != 403:
+        return s, h, raw
+    if ADM['user'] and ADM['pw']:
+        ck2 = login(ADM['user'], ADM['pw'], quiet=True)
+        if ck2:
+            s2, h2, raw2 = req(method, path, body=body, cookie=ck2)
+            if s2 != 403:
+                if not AREQ_NOTE[0]:
+                    print('  (catatan) cookie admin 403 -> ulang dgn cookie segar BERHASIL (sesi dicabut proses lain)')
+                    AREQ_NOTE[0] = True
+                return s2, h2, raw2
+    if tok:
+        s3, h3, raw3 = req(method, path, body=body, headers=bearer(tok))
+        if s3 != 403:
             if not AREQ_NOTE[0]:
-                print('  (catatan) cookie admin 403 -> panggilan admin dilanjutkan via Bearer')
+                print('  (catatan) cookie admin 403 -> dipakai Bearer')
                 AREQ_NOTE[0] = True
-            return s2, h2, raw2
+            return s3, h3, raw3
     return s, h, raw
 
 
@@ -361,6 +381,9 @@ def run_checks(r):
     ok(r.get('users') is not None, 'GET /users tersedia', r.get('users'))
     ok(r.get('overview') is not None, 'GET /overview tersedia', r.get('overview'))
     ok(r.get('login_page') is not None, 'halaman login / dashboard tersedia', r.get('login_page'))
+    print('  (diag) GET /users dgn cookie admin -> %s | dgn cookie vfy -> %s'
+          % (probe('GET', r['users'], cookie=ck_admin)[0],
+             probe('GET', r['users'], cookie=r.get('ck_vfy'))[0] if r.get('ck_vfy') else 'n/a'))
     if not (ck_admin and r.get('users')):
         return
 

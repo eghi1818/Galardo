@@ -19,6 +19,7 @@ import db
 import exttool
 import proxy_provider
 import gateway
+import origins
 import proxy as proxy_lanes  # lane egress berlabel (item 2/3/4)
 import ratelimit
 import rbac
@@ -744,6 +745,8 @@ $('#f').addEventListener('submit',async e=>{
                 return self._json(403, {"error": why})
             return self._json(200, ratelimit.status())
 
+        if api_path.startswith('/origins/') and method == 'GET':
+            return self._json(200, origins.candidates(api_path.split('/origins/', 1)[1], resolve_hosts=False))
         if api_path in ("/proxy/status", "/gateway/status") and method == "GET":
             if api_path == "/gateway/status":
                 return self._json(200, gateway.describe())

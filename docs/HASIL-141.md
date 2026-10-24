@@ -6,3 +6,7 @@
 - wiring endpoint /api/v1/gateway/status: hasil=revert
 - gateway rc=0 | egress rc=0 (SKIP bila GALARDO_GATEWAY_URL kosong) | test rc=0 | gate rc=0
 - koreksi teknis yang dikunci: rotasi per KONEKSI/WORKER; keragaman ASN yang menentukan, bukan jumlah IP; REA=hipotesis, Galardo=pengukuran
+
+## Koreksi (STEP-142)
+Dua bug di skrip wiring STEP-141: sisipan mendarat di tengah blok if (IndentationError) dan nama variabel ditebak 'path' padahal 'api_path'.
+Jumlah cek verify_gateway sebenarnya 25, bukan 21.

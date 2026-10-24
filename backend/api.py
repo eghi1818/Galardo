@@ -17,6 +17,7 @@ from urllib.parse import urlparse, parse_qs
 import db
 import exttool
 import proxy_provider
+import gateway
 import proxy as proxy_lanes  # lane egress berlabel (item 2/3/4)
 import ratelimit
 import rbac
@@ -742,7 +743,9 @@ $('#f').addEventListener('submit',async e=>{
                 return self._json(403, {"error": why})
             return self._json(200, ratelimit.status())
 
-        if api_path == "/proxy/status" and method == "GET":
+        if api_path in ("/proxy/status", "/gateway/status") and method == "GET":
+            if api_path == "/gateway/status":
+                return self._json(200, gateway.describe())
             uid = self._auth()
             ok, why = rbac.ensure(rbac.user_of(uid), "VIEWER")
             if not ok:

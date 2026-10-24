@@ -130,6 +130,11 @@ try:
     except Exception as e:
         ok(False, 'pendaftaran ke proxypool', '%s: %s' % (type(e).__name__, e))
 
+    # --- wiring di api.py (dikunci supaya tidak hilang diam-diam) ---
+    _apisrc = open(os.path.join(ROOT, 'backend', 'api.py'), encoding='utf-8').read()
+    ok('/gateway/status' in _apisrc, 'api.py memuat route /gateway/status')
+    ok('import gateway' in _apisrc, 'api.py mengimpor gateway')
+
 finally:
     bersih()
     for k, v in SIMPAN.items():

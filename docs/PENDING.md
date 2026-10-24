@@ -194,3 +194,10 @@ backend/scenario.py:85:                errors.append({"field": "proxy_pool", "co
 - SELESAI: item 10 DNS (STEP-111), item 13 UDP reflection (STEP-107/110), item 14 worm (STEP-112).
 - SELESAI: GOAL 2 observer tersambung, Tier 1, Tier 2, Tier 3.
 
+
+## Checklist STEP-171 (2026-10-24)
+- [x] intel + pre-flight (modul, endpoint, halaman Override, verifier live)
+- [x] check-host per-negara (modul + endpoint + verifier offline)
+- [x] kapasitas/knee (kanonik + pembanding) & multi-lane engine + wiring
+- [x] tunnel pihak ketiga (tools/tunnel.sh + make tunnel)
+- [ ] BUKTI rotasi egress nyata (kredensial anyip.io) -> tools/verify_egress_rotation.py (IP unik >= 2)

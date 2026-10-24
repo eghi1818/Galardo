@@ -157,3 +157,6 @@ capacity-fast:
 
 checkhost:
 	python3 tools/checkhost.py --url example.com --max-nodes 5
+
+tunnel:
+	bash tools/tunnel.sh

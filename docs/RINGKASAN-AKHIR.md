@@ -83,3 +83,20 @@ plus verifier baru verify_pg_multiproc 8/0. Semua dijalankan lewat `make gate` -
 lagi yang "dijalankan manual".
 
 > STATUS SEKARANG (kondisi terkini + blocker): `docs/STATUS-SEKARANG.md`
+
+## STATUS TERKINI (STEP-171, 2026-10-24)
+- HEAD saat blok ini ditulis: 655e992 feat(multilane): wiring orchestrator->engine gated GALARDO_MULTILANE + verifier AST/behavioral
+- PONDASI SELESAI & TERVERIFIKASI (masing-masing punya verifier sendiri; gate menjalankan semuanya):
+  doktrin GOAL + rantai onboarding; mesin pengguna & auth; netssl; headers; Mode B (gateway +
+  proxypool + egress recorder, rantai pool->transport terbukti); origins (putus rantai edge->origin);
+  intel + pre-flight (halaman Override + verifier HTTP live non-skip); check-host per-negara
+  (+ endpoint POST /api/v1/checkhost); kapasitas/knee (kanonik tools/galardo_capacity.py, pembanding
+  independen make capacity-fast); multi-lane di engine + wiring orchestrator (gated GALARDO_MULTILANE=1).
+- BELUM (butuh Anda): (1) kredensial anyip.io -> set GALARDO_GATEWAY_URL lalu jalankan
+  `python3 tools/verify_egress_rotation.py`; harus mencetak IP unik >= 2 (bukti rotasi egress nyata);
+  (2) pihak ketiga live: `make tunnel` (mode cepat tanpa token, atau named tunnel bila
+  GALARDO_CF_TUNNEL_TOKEN diisi).
+- CARA LANJUT DI CHAT BARU: baca docs/GOAL-GALARDO.md (MENGIKAT) lalu docs/STATUS-SEKARANG.md;
+  jalankan `make gate` (SEMUA tools/verify_*.py) dan `make test` sebelum menyentuh apa pun.
+- ATURAN KERJA: bukti mentah dulu sebelum menambal; cek struktur via AST/behavioral (bukan teks);
+  angka rc ditulis apa adanya; patch idempoten; commit + push tiap langkah hijau.

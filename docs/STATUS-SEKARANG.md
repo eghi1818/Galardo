@@ -66,3 +66,4 @@
 - STEP-168 (2026-10-24 22:25): verify_multilane hijau (window penuh + cek via log _do_request); _vu_aman/vu_errors dipertahankan.
 - STEP-169 (2026-10-24 22:29): wiring multi-lane ke orchestrator (gated GALARDO_MULTILANE) + verifier AST/behavioral.
 - STEP-170 (2026-10-24 22:33): wiring multi-lane dibetulkan (anchor abort_check) + verifier AST/behavioral hijau; GALARDO_MULTILANE=1 di .env.
+- STEP-171 (2026-10-24 22:38): tunnel pihak ketiga (make tunnel) + refresh SESSION_STATE/HANDOFF/RINGKASAN-AKHIR/PENDING. Pondasi tuntas; sisa bukti rotasi egress.

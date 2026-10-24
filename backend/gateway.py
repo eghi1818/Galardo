@@ -15,6 +15,14 @@ import os
 import re
 import urllib.request
 
+try:
+    from . import netssl as _ns
+except Exception:
+    try:
+        import netssl as _ns
+    except Exception:
+        _ns = None
+
 ENV_URL = 'GALARDO_GATEWAY_URL'
 ENV_STICKY = 'GALARDO_GATEWAY_STICKY'
 ENV_POOL = 'GALARDO_GATEWAY_POOL'
@@ -145,7 +153,13 @@ def egress_ip(timeout=15, echo=None):
     """IP egress yang terlihat target, lewat gateway."""
     url = echo or os.environ.get(ENV_ECHO) or 'https://api.ipify.org?format=json'
     px = proxy_url()
-    op = urllib.request.build_opener(urllib.request.ProxyHandler({'http': px, 'https': px}))
+    _handlers = [urllib.request.ProxyHandler({'http': px, 'https': px})]
+    if _ns:
+        try:
+            _handlers.append(urllib.request.HTTPSHandler(context=_ns.context()))
+        except Exception:
+            pass
+    op = urllib.request.build_opener(*_handlers)
     raw = op.open(url, timeout=timeout).read().decode('utf-8', 'replace')
     m = re.search(r'(\d{1,3}(?:\.\d{1,3}){3})', raw)
     return m.group(1) if m else raw.strip()[:64]

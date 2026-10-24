@@ -15,6 +15,15 @@ CRT_PREFIX = 'https://crt.sh/?q=%25.'
 CRT_SUFFIX = '&output=json'
 UA = 'galardo-origins/1'
 
+try:
+    from . import netssl as _ns
+except Exception:
+    try:
+        import netssl as _ns
+    except Exception:
+        _ns = None
+
+
 EDGE_PAT = (
     r'akamaiedge\.net', r'edgekey\.net', r'edgesuite\.net', r'akamai\.net', r'akamaitechnologies',
     r'cloudflare\.net', r'cloudflare\.com', r'cloudflarestream', r'fastly\.net', r'fastlylb\.net',
@@ -84,7 +93,8 @@ def parse_crt(payload, domain=None):
 def fetch_crt(domain, timeout=25):
     url = CRT_PREFIX + _bersih(domain) + CRT_SUFFIX
     req = urllib.request.Request(url, headers={'User-Agent': UA})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    _ctx = _ns.context() if _ns else None
+    with urllib.request.urlopen(req, timeout=timeout, context=_ctx) as r:
         return parse_crt(r.read(), domain=domain)
 
 

@@ -747,7 +747,11 @@ $('#f').addEventListener('submit',async e=>{
             return self._json(200, ratelimit.status())
 
         if api_path == '/egress/status' and method == 'GET':
-            return self._json(200, egress.snapshot())
+            _es = egress.snapshot()
+            if 'probe=1' in (self.path or ''):
+                _es['probe'] = egress.note('manual')
+                _es.update(egress.snapshot())
+            return self._json(200, _es)
         if api_path.startswith('/origins/') and method == 'GET':
             return self._json(200, origins.candidates(api_path.split('/origins/', 1)[1], resolve_hosts=False))
         if api_path in ("/proxy/status", "/gateway/status") and method == "GET":

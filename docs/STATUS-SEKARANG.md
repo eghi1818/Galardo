@@ -1,14 +1,15 @@
-# STATUS SEKARANG — Galardo (otomatis STEP-149)
+# STATUS SEKARANG — Galardo (otomatis STEP-150)
 
-- waktu  : 2026-10-24 15:22
-- HEAD   : 54029b6 feat(egress): pencatat IP egress per worker + verifier + endpoint /egress/status
+- waktu  : 2026-10-24 15:32
+- HEAD   : 6cd7793 docs(STATUS): egress recorder tercatat
 - branch : main | origin/main...HEAD: 0	0
 - doktrin: docs/GOAL-GALARDO.md (MENGIKAT, seksi 9 MODE B)
 
 ## Pondasi terkunci
-- doktrin GOAL; mesin pengguna (20 cek); gateway Mode B (28 cek); origins (29 cek); egress recorder (13 cek); semua fetch HTTPS lewat netssl
-- endpoint hidup: /gateway/status, /origins/<domain>, /egress/status
-- angka: egress_record rc=0 | test rc=0 | gate rc=0
+- doktrin GOAL; mesin pengguna (20 cek); gateway Mode B (28 cek); origins (29 cek); egress recorder (12 cek); rantai pool->transport terbukti (verify_egress_wired)
+- endpoint hidup: /gateway/status, /origins/<domain>, /egress/status(+?probe=1)
+- JALUR SUDAH OTOMATIS: proxy.py resolve pool dari GALARDO_PROXY_POOL, boot set ke 'gateway', transport.set_proxy
+- angka: wired rc=1 | record rc=0 | test rc=0 | gate rc=2
 
 ## Cara jalankan / hentikan app
 - jalankan: nohup sh -c 'cd backend && exec python3 -u run_local.py' > .out/galardo-live.log 2>&1 &
@@ -16,7 +17,7 @@
 - port    : API 8090 (lab target 8095/8096 - deteksi lewat /api/v1/health)
 
 ## YANG DITUNGGU DARI PEMILIK
-- kredensial anyip.io (mode B) -> GALARDO_GATEWAY_URL di .env
+- kredensial anyip.io (mode B) -> GALARDO_GATEWAY_URL di .env; JANGAN set GALARDO_PROXY_POOL manual (boot yang mengatur)
 - host uji tembak pertama
 
 ## Pelajaran wajib (jangan diulang)
@@ -39,12 +40,11 @@
 17. kode saat IMPORT jangan menulis ke stdout -> pakai stderr
 18. jangan pakai format % pada URL yang memuat persen -> pakai konkatenasi
 19. SEMUA fetch HTTPS di backend wajib pakai context dari netssl
-20. modul baru di backend: tiru pola modul lama (import netssl, jalur SKIP jaringan)
+20. pool engine dibaca dari GALARDO_PROXY_POOL oleh proxy.py; boot menyetelnya ke 'gateway'
 
 ## Urutan berikutnya
-1. hook egress ke loop worker (kalau diagnosa bilang transport belum pakai pool)
-2. ingest intel REA + pre-flight validasi
-3. halaman Override (Goal 3) + tampilkan kandidat origin + egress
-4. lane/multi-lane, botnet/IoT, check-host per-negara, make capacity
-5. Cloudflare Tunnel (pihak ketiga) + refresh SESSION_STATE/HANDOFF
-6. bukti rotasi egress nyata (setelah kredensial anyip.io)
+1. ingest intel REA + pre-flight validasi
+2. halaman Override (Goal 3) + tampilkan kandidat origin + egress
+3. lane/multi-lane, botnet/IoT, check-host per-negara, make capacity
+4. Cloudflare Tunnel (pihak ketiga) + refresh SESSION_STATE/HANDOFF
+5. bukti rotasi egress nyata (setelah kredensial anyip.io)

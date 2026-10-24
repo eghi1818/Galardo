@@ -1,13 +1,14 @@
-# STATUS SEKARANG — Galardo (otomatis STEP-148)
+# STATUS SEKARANG — Galardo (otomatis STEP-149)
 
-- waktu  : 2026-10-24 12:49
-- HEAD   : 4e9e3c2 fix(origins,gateway): pakai SSL context netssl pada semua fetch HTTPS
+- waktu  : 2026-10-24 15:22
+- HEAD   : 54029b6 feat(egress): pencatat IP egress per worker + verifier + endpoint /egress/status
 - branch : main | origin/main...HEAD: 0	0
 - doktrin: docs/GOAL-GALARDO.md (MENGIKAT, seksi 9 MODE B)
 
 ## Pondasi terkunci
-- doktrin GOAL; mesin pengguna (20 cek); gateway Mode B (28 cek); origins (29 cek) + endpoint; semua fetch HTTPS lewat netssl
-- angka: netssl rc=0 | origins rc=0 | gateway rc=0 | test rc=0 | gate rc=0
+- doktrin GOAL; mesin pengguna (20 cek); gateway Mode B (28 cek); origins (29 cek); egress recorder (13 cek); semua fetch HTTPS lewat netssl
+- endpoint hidup: /gateway/status, /origins/<domain>, /egress/status
+- angka: egress_record rc=0 | test rc=0 | gate rc=0
 
 ## Cara jalankan / hentikan app
 - jalankan: nohup sh -c 'cd backend && exec python3 -u run_local.py' > .out/galardo-live.log 2>&1 &
@@ -29,7 +30,7 @@
 8. guard penyisipan harus diuji
 9. hipotesis bukan fakta (docker/pkill dua-duanya SALAH)
 10. Mode B: rotasi per KONEKSI/WORKER; penentu WAF = keragaman ASN
-11. jangan sisipkan cabang tepat setelah kepala if; gabungkan atau sisipkan sebelum if lengkap
+11. jangan sisipkan cabang tepat setelah kepala if; sisipkan sebelum if lengkap
 12. jangan tebak nama variabel; baca dari baris anchor
 13. langkah STATUS yang git add -A ikut meng-commit perubahan lain
 14. tes yang menyentuh jaringan WAJIB punya jalur SKIP/retry
@@ -37,13 +38,13 @@
 16. zsh mengekspansi tanda seru walau di kutip ganda -> setopt no_bang_hist
 17. kode saat IMPORT jangan menulis ke stdout -> pakai stderr
 18. jangan pakai format % pada URL yang memuat persen -> pakai konkatenasi
-19. SEMUA fetch HTTPS di backend wajib pakai context dari netssl (verify_netssl_wired menjaganya)
-20. modul baru di backend: tiru pola modul lama (import netssl, jalur SKIP jaringan, tulis ke stderr)
+19. SEMUA fetch HTTPS di backend wajib pakai context dari netssl
+20. modul baru di backend: tiru pola modul lama (import netssl, jalur SKIP jaringan)
 
 ## Urutan berikutnya
-1. hubungkan gateway ke transport worker + catat IP egress per worker
+1. hook egress ke loop worker (kalau diagnosa bilang transport belum pakai pool)
 2. ingest intel REA + pre-flight validasi
-3. halaman Override (Goal 3) + tampilkan kandidat origin
+3. halaman Override (Goal 3) + tampilkan kandidat origin + egress
 4. lane/multi-lane, botnet/IoT, check-host per-negara, make capacity
 5. Cloudflare Tunnel (pihak ketiga) + refresh SESSION_STATE/HANDOFF
 6. bukti rotasi egress nyata (setelah kredensial anyip.io)

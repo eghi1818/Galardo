@@ -1,19 +1,20 @@
-# STATUS SEKARANG — Galardo (otomatis STEP-142)
+# STATUS SEKARANG — Galardo (otomatis STEP-143)
 
-- waktu  : 2026-10-24 11:41
-- HEAD   : 27a14bf docs(STATUS): pondasi Mode B tercatat
+- waktu  : 2026-10-24 11:53
+- HEAD   : a6bb885 test(integration): req() tahan timeout DNS (3 percobaan) - gate hijau; verifikasi wiring gateway
 - branch : main | origin/main...HEAD: 0	0
 - doktrin: docs/GOAL-GALARDO.md (MENGIKAT, seksi 9 MODE B)
 
-## Pondasi
-- SELESAI & terkunci: doktrin GOAL; mesin pengguna (auth 20 cek); gateway Mode B (verify_gateway 27 cek)
-- endpoint /api/v1/gateway/status: 200 (200 = hidup)
-- angka terakhir: gateway rc=0 | egress rc=0 (SKIP tanpa kredensial) | test rc=2 | gate rc=2
+## Pondasi (SELESAI & terkunci)
+- doktrin GOAL (verify_goal_doctrine); mesin pengguna (verify_auth_users 20 cek); gateway Mode B (verify_gateway 27 cek)
+- endpoint /api/v1/gateway/status HIDUP (200) dan /api/v1/proxy/status tidak rusak
+- angka terakhir: test rc=0/0 | gate rc=0 | gateway rc=0 | egress rc=0 (SKIP tanpa kredensial)
 
 ## Cara jalankan / hentikan app
 - jalankan: nohup sh -c 'cd backend && exec python3 -u run_local.py' > .out/galardo-live.log 2>&1 &
 - matikan : pkill -f run_local.py
 - port    : API 8090 (lab target 8095/8096 - deteksi lewat /api/v1/health)
+- token   : GALARDO_DEV_TOKEN (.env, Bearer)
 
 ## Pelajaran wajib (jangan diulang)
 1. status 0 dari probe = exception, BUKAN sukses -> '200 <= s < 400'
@@ -26,8 +27,10 @@
 8. guard penyisipan harus diuji (jangan pakai split yang sudah memuat penanda)
 9. hipotesis bukan fakta ('gate merah karena docker'/'pkill' dua-duanya SALAH)
 10. Mode B: rotasi per KONEKSI/WORKER, bukan per request; penentu WAF = keragaman ASN
-11. JANGAN sisipkan cabang tepat setelah kepala 'if' (tubuh if terpotong). Gabungkan ke kondisi yang ada, atau cari akhir blok dulu
-12. jangan tebak nama variabel: baca dari baris anchor (di sini 'api_path', bukan 'path')
+11. jangan sisipkan cabang tepat setelah kepala 'if'; gabungkan ke kondisi yang ada
+12. jangan tebak nama variabel; baca dari baris anchor (di sini 'api_path')
+13. langkah STATUS yang selalu 'git add -A' ikut meng-commit perubahan lain -> periksa pesan commit
+14. tes yang menyentuh jaringan (TXT DNS koler.space) WAJIB punya retry
 
 ## Urutan berikutnya
 1. hubungkan gateway ke transport worker + catat IP egress per worker

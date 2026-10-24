@@ -8,6 +8,7 @@ import base64
 import json
 import secrets
 import os
+import sys
 import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -2004,11 +2005,14 @@ except Exception as _e:
 try:
     if gateway.enabled():
         _gp = gateway.register()
-        print('gateway Mode B aktif: pool=%s sticky=%s (%s)' % (_gp, gateway.sticky(), gateway.masked()))
+        if not os.environ.get('GALARDO_PROXY_POOL'):
+            os.environ['GALARDO_PROXY_POOL'] = _gp
+        print('gateway Mode B aktif: pool=%s sticky=%s (%s)' % (_gp, gateway.sticky(), gateway.masked()),
+              file=sys.stderr)
     else:
-        print('gateway Mode B: belum dikonfigurasi (GALARDO_GATEWAY_URL kosong)')
+        print('gateway Mode B: belum dikonfigurasi (GALARDO_GATEWAY_URL kosong)', file=sys.stderr)
 except Exception as _e:
-    print('gateway Mode B gagal didaftarkan:', _e)
+    print('gateway Mode B gagal didaftarkan:', _e, file=sys.stderr)
 
 if __name__ == "__main__":
     import argparse

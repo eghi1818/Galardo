@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+def _hasdef(_src, nama):
+    import re as _re
+    return _re.search(r"def\s+" + nama + r"\w*\s*\(\s*self", _src) is not None
+
+
 """Verifier F-3/F-4: header keamanan + CORS terkonfigurasi (offline + boot nyata)."""
 import os
 import subprocess

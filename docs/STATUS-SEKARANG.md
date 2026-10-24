@@ -1,25 +1,21 @@
-# STATUS SEKARANG — Galardo (otomatis STEP-144)
+# STATUS SEKARANG — Galardo (otomatis STEP-145)
 
-- waktu  : 2026-10-24 12:12
-- HEAD   : d128c9a docs(STATUS): wiring terverifikasi + 2 pelajaran baru
+- waktu  : 2026-10-24 12:20
+- HEAD   : d4a7a79 fix(gateway): boot cetak ke stderr + arahkan GALARDO_PROXY_POOL ke pool gateway
 - branch : main | origin/main...HEAD: 0	0
 - doktrin: docs/GOAL-GALARDO.md (MENGIKAT, seksi 9 MODE B)
 
-## Pondasi (SELESAI dan terkunci)
-- doktrin GOAL; mesin pengguna (20 cek); gateway Mode B (28 cek) + boot pendaftaran ke proxypool
-- endpoint /api/v1/gateway/status hidup; proxy/status tidak rusak
-- angka: gateway rc=0 | egress rc=0 (SKIP tanpa kredensial) | test rc=0 | gate rc=2
+## Pondasi
+- SELESAI: doktrin GOAL; mesin pengguna (20 cek); gateway Mode B (28 cek) + boot pendaftaran + pool engine diarahkan ke gateway
+- angka: dash rc=0 | gateway rc=0 | test rc=0 | gate rc=0
 
 ## Cara jalankan / hentikan app
 - jalankan: nohup sh -c 'cd backend && exec python3 -u run_local.py' > .out/galardo-live.log 2>&1 &
-- nohup = app tetap hidup walau jendela terminal ditutup (disengaja: Galardo Aktif)
-- matikan : pkill -f run_local.py   (atau kill %1)
+- matikan : pkill -f run_local.py
 - port    : API 8090 (lab target 8095/8096 - deteksi lewat /api/v1/health)
-- token   : GALARDO_DEV_TOKEN (.env, Bearer)
 
 ## YANG DITUNGGU DARI PEMILIK
 - kredensial anyip.io (mode B) -> isi GALARDO_GATEWAY_URL di .env
-  bentuk: host:port | user:pass@host:port | scheme://host:port
   setelah diisi: python3 tools/verify_egress_rotation.py harus mencetak IP unik 2 atau lebih
 - host uji tembak pertama
 
@@ -39,7 +35,8 @@
 13. langkah STATUS yang git add -A ikut meng-commit perubahan lain -> periksa pesan commit
 14. tes yang menyentuh jaringan (TXT DNS) WAJIB punya retry
 15. nohup = app hidup walau terminal ditutup; matikan dgn pkill -f run_local.py
-16. zsh mengekspansi tanda seru walau di dalam kutip ganda -> jalankan setopt no_bang_hist
+16. zsh mengekspansi tanda seru walau di dalam kutip ganda -> setopt no_bang_hist
+17. kode yang jalan saat IMPORT jangan menulis ke stdout kalau ada verifier yang mem-parsing stdout -> pakai stderr
 
 ## Urutan berikutnya
 1. bukti rotasi egress nyata (butuh GALARDO_GATEWAY_URL)

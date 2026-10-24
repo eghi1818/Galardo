@@ -1,14 +1,13 @@
-# STATUS SEKARANG — Galardo (otomatis STEP-147)
+# STATUS SEKARANG — Galardo (otomatis STEP-148)
 
-- waktu  : 2026-10-24 12:36
-- HEAD   : 1b5fb86 docs(STATUS): origins terkunci
+- waktu  : 2026-10-24 12:49
+- HEAD   : 4e9e3c2 fix(origins,gateway): pakai SSL context netssl pada semua fetch HTTPS
 - branch : main | origin/main...HEAD: 0	0
 - doktrin: docs/GOAL-GALARDO.md (MENGIKAT, seksi 9 MODE B)
 
 ## Pondasi terkunci
-- doktrin GOAL; mesin pengguna (20 cek); gateway Mode B (28 cek) + boot + pool engine; origins (27 cek) + endpoint
-- angka: origins rc=0 | netssl rc=1 | test rc=0 | gate rc=2 | endpoint origins=200
-- bila gate masih merah: periksa .out/STEP-147-netssl.txt (verify_netssl_wired)
+- doktrin GOAL; mesin pengguna (20 cek); gateway Mode B (28 cek); origins (29 cek) + endpoint; semua fetch HTTPS lewat netssl
+- angka: netssl rc=0 | origins rc=0 | gateway rc=0 | test rc=0 | gate rc=0
 
 ## Cara jalankan / hentikan app
 - jalankan: nohup sh -c 'cd backend && exec python3 -u run_local.py' > .out/galardo-live.log 2>&1 &
@@ -37,7 +36,9 @@
 15. nohup = app hidup walau terminal ditutup; matikan dgn pkill -f run_local.py
 16. zsh mengekspansi tanda seru walau di kutip ganda -> setopt no_bang_hist
 17. kode saat IMPORT jangan menulis ke stdout -> pakai stderr
-18. JANGAN pakai format % pada URL yang memuat persen -> '%%25' bikin ValueError; pakai konkatenasi
+18. jangan pakai format % pada URL yang memuat persen -> pakai konkatenasi
+19. SEMUA fetch HTTPS di backend wajib pakai context dari netssl (verify_netssl_wired menjaganya)
+20. modul baru di backend: tiru pola modul lama (import netssl, jalur SKIP jaringan, tulis ke stderr)
 
 ## Urutan berikutnya
 1. hubungkan gateway ke transport worker + catat IP egress per worker

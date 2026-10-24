@@ -31,6 +31,30 @@ ENV_RESIDENTIAL_POOL = "GALARDO_LANE_RESIDENTIAL_POOL"
 STAT_KEYS = ("requests", "errors", "bytes_sent", "bytes_received", "elapsed_ms")
 
 
+def lanes_aktif(registry=None):
+    """Daftar lane aktif untuk dipakai engine (multi-lane). Defensif: registry boleh None.
+
+    Mencari registry di level modul dengan beberapa nama lazim, supaya tidak bergantung
+    pada satu nama variabel. Mengembalikan [] bila tidak ada lane.
+    """
+    if registry is not None:
+        try:
+            return list(registry.lanes())
+        except Exception:
+            return []
+    for nama in ("_REGISTRY", "_registry", "REGISTRY", "_REG", "_reg", "_LANES"):
+        reg = globals().get(nama)
+        if reg is None:
+            continue
+        fn = getattr(reg, "lanes", None)
+        if callable(fn):
+            try:
+                return list(fn())
+            except Exception:
+                continue
+    return []
+
+
 def _default_pool():
     """Nama pool default dari env; dipakai bila lane TIDAK diberi pool."""
     try:

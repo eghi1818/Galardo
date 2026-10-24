@@ -154,3 +154,5 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 - STEP-165: 2026-10-24 22:09 ml rc=1 knee rc=0 live rc=0 ch rc=0 pages rc=0 test rc=0 gate rc=0
 - STEP-166: 2026-10-24 22:14 ml rc=1 knee rc=0 live rc=0 ch rc=0 pages rc=0 test rc=0 gate rc=0
 - STEP-168: 2026-10-24 22:25 ml rc=0 knee rc=0 live rc=0 ch rc=0 pages rc=0 test rc=0 gate rc=0
+- STEP-169: 2026-10-24 22:29 mlw rc=1 ml rc=0 knee rc=0 live rc=0 ch rc=0 pages rc=0 test rc=0 gate rc=0
+- STEP-170: 2026-10-24 22:33 mlw rc=0 ml rc=0 knee rc=0 live rc=0 ch rc=0 pages rc=0 test rc=0 gate rc=0

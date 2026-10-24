@@ -64,3 +64,5 @@
 - STEP-165 (2026-10-24 22:09): multi-lane di engine (transport per-lane per-VU, aditif) + verifier behavioral. Wiring api.py menyusul.
 - STEP-166 (2026-10-24 22:14): fix transport lane dinyalakan (_start_lane meniru transport utama) -> verify_multilane hijau.
 - STEP-168 (2026-10-24 22:25): verify_multilane hijau (window penuh + cek via log _do_request); _vu_aman/vu_errors dipertahankan.
+- STEP-169 (2026-10-24 22:29): wiring multi-lane ke orchestrator (gated GALARDO_MULTILANE) + verifier AST/behavioral.
+- STEP-170 (2026-10-24 22:33): wiring multi-lane dibetulkan (anchor abort_check) + verifier AST/behavioral hijau; GALARDO_MULTILANE=1 di .env.

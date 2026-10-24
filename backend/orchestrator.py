@@ -73,6 +73,20 @@ class RuntimeCtx:
         self.observer = None
 
 
+def _lanes_aktif():
+    """Lane untuk engine. Aktif HANYA bila GALARDO_MULTILANE=1 dan ada lane terdaftar.
+
+    Tanpa ini engine berperilaku persis seperti sebelumnya (lanes=None).
+    """
+    if os.environ.get("GALARDO_MULTILANE", "0") not in ("1", "true", "on", "ya", "True"):
+        return None
+    try:
+        import proxy as proxy_lanes
+        return proxy_lanes.lanes_aktif() or None
+    except Exception:
+        return None
+
+
 def _set_state(job_id, new_state, actor="orchestrator", action=None, reason="", correlation_id=None):
     """Guarded state transition. Returns True if applied."""
     old = db.get("test_jobs", job_id)
@@ -687,7 +701,8 @@ def _execute(job_id):
 
         ctx.engine = LoadEngine(job_id, f"run-{job_id}", target["canonical_origin"], norm,
                                 eff, ctx.telemetry,
-                                abort_check=lambda: (ctx.abort_requested, ctx.abort_reason_code))
+                                abort_check=lambda: (ctx.abort_requested, ctx.abort_reason_code),
+                                lanes=_lanes_aktif())
         run_id = gen_id("run")
         run_doc = {
             "id": run_id, "job_id": job_id, "attempt_no": 1,

@@ -74,7 +74,22 @@ def check(name, ok, detail=""):
     print(f"  [{'PASS' if ok else 'FAIL'}] {name}" + (f" — {detail}" if detail and not ok else ""))
 
 
-def req(method, path, body=None, headers=None, expect_json=True, timeout=15):
+def req(*a, **kw):
+    import socket as _sock, time as _t
+    for _i in range(3):
+        try:
+            return req_impl(*a, **kw)
+        except _sock.timeout:
+            if _i == 2:
+                raise
+            _t.sleep(2)
+        except OSError as _e:
+            if _i == 2 or 'timed out' not in str(_e):
+                raise
+            _t.sleep(2)  # GALARDO_REQ_RETRY
+
+
+def req_impl(method, path, body=None, headers=None, expect_json=True, timeout=15):
     h = dict(headers or {})
     data = None
     if body is not None:

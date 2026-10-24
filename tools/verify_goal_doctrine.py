@@ -8,7 +8,7 @@ DOC = os.path.join(ROOT, 'docs', 'GOAL-GALARDO.md')
 WAJIB_ISI = [
     '# DOKTRIN GOAL GALARDO', 'Berkas ini', 'TUJUAN (satu kalimat)', 'DEFINISI SUKSES',
     'Reference #102', 'LIMA PILAR', 'multi-IP', 'asimetri', 'REA', 'ANTI-POLA',
-    'Sumbernya satu', 'ATURAN KERJA',
+    'Sumbernya satu', 'ATURAN KERJA', 'MODE B', 'GALARDO_GATEWAY_URL', 'KERAGAMAN ASN',
 ]
 
 RANTAI_WAJIB = ['docs/SESSION_STATE.md', 'docs/CONTEXT.md', 'docs/HANDOFF.md',

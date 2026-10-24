@@ -81,3 +81,5 @@ Angka pada daftar gate di atas berasal dari STEP-79. Angka terkini: make gate me
 36 verifier; verify_headers 23/0, verify_dashboard_pages 16/0, verify_proxypool 27/0,
 plus verifier baru verify_pg_multiproc 8/0. Semua dijalankan lewat `make gate` - tidak ada
 lagi yang "dijalankan manual".
+
+> STATUS SEKARANG (kondisi terkini + blocker): `docs/STATUS-SEKARANG.md`

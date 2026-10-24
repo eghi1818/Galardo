@@ -122,3 +122,5 @@ CEK DULU sebelum mengerjakan apa pun, supaya tidak overlap.
 ## 9. DONE RINGKAS (jangan dikerjakan ulang)
 STEP 01-101 selesai (termasuk F-1..F-24, P0.1b, P1-P6). Rincian: docs/STEPLOG.md.
 Langkah terakhir: STEP-102 (dokumen handoff ini).
+
+> STATUS SEKARANG (kondisi terkini + blocker): `docs/STATUS-SEKARANG.md`

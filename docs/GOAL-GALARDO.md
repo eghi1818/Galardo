@@ -105,3 +105,25 @@ engine = proses Galardo (boleh satu) - egress = IP keluar (wajib banyak) - edge 
 (Akamai/Cloudflare) - origin = server asli target - #102 = kegagalan edge->origin -
 circuit breaker = origin memutus arus sendiri - asimetri = biaya kirim jauh lebih kecil dari
 biaya layan - REA = proyek pemasok intel (repo terpisah).
+
+## 9. KEPUTUSAN ARSITEKTUR: MODE B (gateway tunggal, rotasi di sisi penyedia)
+
+Diputuskan: distribusi IP memakai SATU entrypoint gateway (mis. anyip.io) yang memutar IP
+egress di sisi penyedia. Env kanonik: `GALARDO_GATEWAY_URL` (host:port atau user:pass@host:port).
+Bukti wajib: `tools/verify_egress_rotation.py` — IP egress harus BENAR berbeda antar sampel.
+
+KOREKSI TEKNIS YANG MENGIKAT (jangan diabaikan):
+1. Gateway = titik tunggal: bisa jadi BOTTLENECK sekaligus SPOF. Latensi yang kita ukur bisa
+   latensi gateway, bukan target. Siapkan jalur Mode A (IP langsung) sebagai pembanding.
+2. Rotasi PER KONEKSI/WORKER (sticky), BUKAN per request, kalau alurnya bersesi
+   (VA -> callback -> cek status). Rotasi per-request memutus sesi.
+3. "Ribuan IP" adalah KLAIM sampai dibuktikan. Wajib verifikasi IP egress nyata per sampel.
+   Kalau unik = 1, klaim itu bohong.
+4. Yang melumpuhkan rate-limit adalah KERAGAMAN ASN, bukan jumlah IP. IP se-subnet tetap bisa
+   diblok per-ASN. Ukur org/ASN, bukan cuma jumlah IP.
+5. KPI distribusi = IP unik per detik, bukan ukuran pool.
+6. REA = HIPOTESIS; Galardo = PENGUKURAN. Intel REA wajib divalidasi ulang saat runtime
+   (pre-flight) dan divergensinya dicatat. Ambang asli datang dari pengukuran knee Galardo.
+
+Catatan jujur: distribusi adalah SYARAT PERLU, bukan syarat cukup untuk outage. Outage terjadi
+kalau beban benar-benar melebihi kapasitas origin; distribusi hanya membuat pintu masuk tak diblok.

@@ -68,3 +68,5 @@ HASIL-xx.md hanya dilampirkan kalau STEP terakhir GAGAL.
 - SESSION_STATE.md diperbarui: Tes (angka nyata), STEP terakhir, Item berikutnya, Eksekusi
 - STEPLOG.md bertambah satu baris + acuan tes disamakan
 - tidak ada temuan yang sudah ditutup masih dicantumkan sebagai terbuka
+
+> STATUS SEKARANG (kondisi terkini + blocker): `docs/STATUS-SEKARANG.md`

@@ -114,3 +114,5 @@ git reset --hard checkpoint/galardo-v1.1-mulai
 Port 8090 dipakai bersama app dev dan container.
 `make gate` otomatis `docker compose stop galardo` agar verifier memboot app-nya sendiri;
 jalankan `make docker-up` setelah gate. Semua port compose ter-bind ke 127.0.0.1.
+
+> STATUS SEKARANG (kondisi terkini + blocker): `docs/STATUS-SEKARANG.md`

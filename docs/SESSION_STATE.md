@@ -48,3 +48,5 @@ Titik aman : tag terakhir `git tag -l | tail -n 1`; branch checkpoint/galardo-v1
 ## Langkah berikut
 Baca docs/PENDING.md (bagian Status) dan docs/HANDOFF.md bagian 8.
 Jangan buka lebih dari satu item sekaligus.
+
+> STATUS SEKARANG (kondisi terkini + blocker): `docs/STATUS-SEKARANG.md`

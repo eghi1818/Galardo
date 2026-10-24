@@ -121,3 +121,4 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 - STEP-125 — mesin pengguna TUTUP: sandi PBKDF2, peran ditegakkan, token API opt-in, sesi terpisah, panel Pengguna + halaman login. test rc=0, gate rc=0.
 - STEP-127 — doktrin GOAL Galardo (docs/GOAL-GALARDO.md) + rujukan di rantai onboarding + tools/verify_goal_doctrine.py. verify_goal_doctrine rc=0, test rc=0.
 - STEP-128 — koreksi klaim HASIL-127 (verifier doktrin merah) + baris penamaan diri + verifier doktrin diperbaiki + verify_auth_users versi resolver + rujukan onboarding. doktrin rc=0, auth rc=1, test rc=0, gate rc=2.
+- STEP-132 — pembungkus exception + seed uid master + verifier cetak log saat 0/5xx + STATUS-SEKARANG. auth rc=1, test rc=0, gate rc=2.

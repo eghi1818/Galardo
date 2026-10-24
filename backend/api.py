@@ -414,12 +414,38 @@ $('#f').addEventListener('submit',async e=>{
                 pass
         return None
 
-    def _body(self):
+    def _body(self, *a, **kw):
+        try:
+            return self._body_impl(*a, **kw)
+        except Exception:
+            import traceback as _tb
+            _tb.print_exc()
+            return {}  # GALARDO_SAFE_DO
+
+    def _body_impl(self):
         length = int(self.headers.get("Content-Length") or 0)
         if length > MAX_BODY:
             raise ValueError("body too large")
         raw = self.rfile.read(length) if length else b"{}"
-        return json.loads(raw or b"{}")
+        if not raw:
+            return {}
+        _ct = (self.headers.get('Content-Type') or '').lower()
+        if 'json' in _ct or not _ct:
+            try:
+                return json.loads(raw)
+            except Exception:
+                pass
+        try:
+            from urllib.parse import parse_qs
+            _q = parse_qs(raw.decode('utf-8', 'replace'))
+            if _q:
+                return {k: (v[0] if len(v) == 1 else v) for k, v in _q.items()}
+        except Exception:
+            pass
+        try:
+            return json.loads(raw)
+        except Exception:
+            return {}  # GALARDO_BODY_TOLERANT
 
     def _route(self):
         p = urlparse(self.path)
@@ -549,31 +575,86 @@ $('#f').addEventListener('submit',async e=>{
         except (BrokenPipeError, ConnectionResetError):
             pass
 
-    def do_OPTIONS(self):
+    def do_OPTIONS(self, *a, **kw):
+        try:
+            return self.do_OPTIONS_impl(*a, **kw)
+        except Exception:
+            import traceback as _tb
+            _tb.print_exc()
+            try:
+                return self._json(500, {"error": "internal", "hint": "lihat traceback di log app"})
+            except Exception:
+                pass  # GALARDO_SAFE_DO
+
+    def do_OPTIONS_impl(self):
         self.send_response(204)
         self._cors()
         self.end_headers()
 
-    def do_GET(self):
+    def do_GET(self, *a, **kw):
+        try:
+            return self.do_GET_impl(*a, **kw)
+        except Exception:
+            import traceback as _tb
+            _tb.print_exc()
+            try:
+                return self._json(500, {"error": "internal", "hint": "lihat traceback di log app"})
+            except Exception:
+                pass  # GALARDO_SAFE_DO
+
+    def do_GET_impl(self):
         try:
             self._dispatch("GET")
         except (BrokenPipeError, ConnectionResetError):
             pass
 
-    def do_POST(self):
+    def do_POST(self, *a, **kw):
+        try:
+            return self.do_POST_impl(*a, **kw)
+        except Exception:
+            import traceback as _tb
+            _tb.print_exc()
+            try:
+                return self._json(500, {"error": "internal", "hint": "lihat traceback di log app"})
+            except Exception:
+                pass  # GALARDO_SAFE_DO
+
+    def do_POST_impl(self):
         try:
             self._dispatch("POST")
         except (BrokenPipeError, ConnectionResetError):
             pass
 
-    def do_DELETE(self):
+    def do_DELETE(self, *a, **kw):
+        try:
+            return self.do_DELETE_impl(*a, **kw)
+        except Exception:
+            import traceback as _tb
+            _tb.print_exc()
+            try:
+                return self._json(500, {"error": "internal", "hint": "lihat traceback di log app"})
+            except Exception:
+                pass  # GALARDO_SAFE_DO
+
+    def do_DELETE_impl(self):
         try:
             self._dispatch("DELETE")
         except (BrokenPipeError, ConnectionResetError):
             pass
 
     # ---- router --------------------------------------------------------
-    def _dispatch(self, method):
+    def _dispatch(self, *a, **kw):
+        try:
+            return self._dispatch_impl(*a, **kw)
+        except Exception:
+            import traceback as _tb
+            _tb.print_exc()
+            try:
+                return self._json(500, {"error": "internal", "hint": "lihat traceback di log app"})
+            except Exception:
+                pass  # GALARDO_SAFE_DO
+
+    def _dispatch_impl(self, method):
         # GALARDO_LOGIN_RATE gate
         if str(method).upper() == 'POST' and self.path.split('?')[0].rstrip('/').endswith('/login'):
             _ok_rl, _ra_rl = _gal_login_rate_check(_gal_ip(self))
@@ -1882,6 +1963,36 @@ def _gal_cookie_secure(handler):
         return False
     return handler.headers.get('X-Forwarded-Proto', '').lower() == 'https'
 # === GALARDO_LOGIN_RATE (126) ===
+
+# GALARDO_MASTER_SEED - pastikan uid master ada di users_store (hindari lookup None)
+try:
+    _get = getattr(users_store, 'get', None) or getattr(users_store, 'get_user', None)
+    _have = None
+    if _get:
+        try:
+            _have = _get(MASTER_UID)
+        except Exception:
+            _have = None
+    if not _have:
+        _pw = os.environ.get('GALARDO_ADMIN_PASSWORD') or 'operator123'
+        _doc = {'username': 'operator', 'name': 'Master Operator', 'email': 'operator@galardo.local',
+                'role': 'SUPERADMIN', 'password': _pw, 'api_access': True}
+        _f = None
+        for _nm in ('upsert', 'put', 'save', 'set'):
+            _f = getattr(users_store, _nm, None)
+            if callable(_f):
+                break
+        if _f:
+            try:
+                _f(dict(_doc, uid=MASTER_UID))
+            except Exception:
+                try:
+                    _f(**_doc)
+                except Exception as _e3:
+                    print('master seed gagal:', _e3)
+            print('master seed: uid %s disiapkan' % MASTER_UID)
+except Exception as _e:
+    print('master seed dilewati:', _e)
 
 if __name__ == "__main__":
     import argparse

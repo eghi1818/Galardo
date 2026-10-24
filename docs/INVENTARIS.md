@@ -108,3 +108,5 @@ Status di atas dikoreksi dari kode + verifier, bukan dari dokumen lain. Yang ben
 TIDAK ADA PENDING. V4 SELESAI (STEP-115, make demo DEMO_OK). V6 SELESAI (STEP-104).
 Item 10/13/14 SELESAI (STEP-111 / STEP-110 / STEP-112). GOAL 2 observer SELESAI. Seksi E dulu
 bertentangan dengan tabel F di file ini sendiri.
+
+> STATUS SEKARANG (kondisi terkini + blocker): `docs/STATUS-SEKARANG.md`

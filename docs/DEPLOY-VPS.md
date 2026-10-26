@@ -246,3 +246,15 @@ CMD ["python3", "backend/run_local.py"]
 - VPS: `make gate` lalu `make test` HARUS hijau sebelum menjalankan uji nyata.
 - Port 8090 hanya lokal; akses luar lewat `make tunnel` (butuh cloudflared).
 - Bukti: .out/ + docs/bukti/ledger.jsonl (hash chain) ikut disalin, jangan diubah.
+
+## PROSEDUR PINDAH (V1.4) - dari Mac ke VPS
+1. Di Mac (repo bersih dulu: `git status -sb` harus kosong):
+   rsync -av --exclude '.git' --exclude '.out' ~/Documents/REPO/Galardo/Galardo-main/ user@VPS:~/galardo/
+2. Salin juga .env (berisi kredensial; JANGAN lewat git bila rahasia):
+   scp ~/Documents/REPO/Galardo/Galardo-main/.env user@VPS:~/galardo/.env
+3. Di VPS:
+   cd ~/galardo && bash tools/deploy_vps.sh      # atau: make deploy-vps
+   -> wajib: gate rc=0 dan test rc=0 DI VPS, bukan hanya di Mac.
+4. Jalankan app + tunnel:
+   (cd backend && nohup python3 run_local.py > ../.out/app.log 2>&1 &) ; make tunnel
+5. Bukti: python3 tools/verify_egress_rotation.py (IP unik >= 2) lalu ikuti docs/TARGET-BUKTI.md.

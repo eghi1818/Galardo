@@ -79,3 +79,4 @@
 - STEP-182 (2026-10-26 07:32): adaptor override pakai API sebenarnya (OverrideSpec+probe+revert); bukti forced.
 - STEP-183 (2026-10-26 07:36): tier override dipetakan (T1/T2/T3) - jalur override bekerja dari kode, forced terbukti.
 - STEP-184 (2026-10-26 07:39): HASIL-182 dilengkapi + pengunci verify_hasil_lengkap (tiap STEP wajib punya HASIL).
+- STEP-185 (2026-10-26 07:43): siapkan deploy VPS (tools/deploy_vps.sh + make deploy-vps + prosedur).

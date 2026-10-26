@@ -163,3 +163,6 @@ tunnel:
 
 resume-kit:
 	bash tools/buat_resume_kit.sh
+
+deploy-vps:
+	bash tools/deploy_vps.sh

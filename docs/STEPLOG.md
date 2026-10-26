@@ -179,3 +179,4 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 - STEP-192: 2026-10-26 13:31 verifikasi sekali jalan + progres; hitung_verifier mode daftar/dari-out (HASIL-192)
 - STEP-193: 2026-10-26 13:31 akar data/state.json rusak -> db.py toleran+atomik, verify_state_valid, trap HUP (HASIL-193)
 - STEP-194: 2026-10-26 14:26 akar backtick heredoc generator kit -> rekursi make hijau; escape backtick + exec 0</dev/null (HASIL-194)
+- STEP-195: 2026-10-26 16:05 origins tahan CT tumbang + resolve IP + baseline 2 target (HASIL-195)

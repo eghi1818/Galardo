@@ -126,7 +126,13 @@ def candidates(domain, timeout=25, resolve_hosts=True, limit=250):
     d = _bersih(domain)
     if not d:
         raise OriginError('domain kosong')
-    hosts = fetch_crt(d, timeout=timeout)
+    try:
+        hosts = fetch_crt(d, timeout=timeout)
+    except Exception as _e:
+        print("      [origins] crt.sh gagal: %s" % _e, flush=True)
+        hosts = []
+    if not hosts:
+        hosts = {d, 'www.' + d}
     hasil = []
     for h in sorted(hosts)[:limit]:
         row = {'host': h, 'kelas': classify(h), 'ips': []}

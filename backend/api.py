@@ -759,7 +759,7 @@ $('#f').addEventListener('submit',async e=>{
                 _es.update(egress.snapshot())
             return self._json(200, _es)
         if api_path.startswith('/origins/') and method == 'GET':
-            return self._json(200, origins.candidates(api_path.split('/origins/', 1)[1], resolve_hosts=False))
+            return self._json(200, origins.candidates(api_path.split('/origins/', 1)[1], resolve_hosts=True, limit=40))
         if api_path == "/intel/preflight" and method == "POST":
             _payload = {}
             try:

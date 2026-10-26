@@ -47,7 +47,7 @@ Kutip angka dari file ini, JANGAN dari ingatan. (angka dari .out/verifikasi-*.tx
 | verify_multilane.py | 23 | 0 | 0 | 0.0 |
 | verify_multilane_wired.py | 16 | 0 | 0 | 0.0 |
 | verify_netssl_wired.py | 0 | 0 | 0 | 0.0 |
-| verify_origins.py | 29 | 0 | 0 | 0.0 |
+| verify_origins.py | 33 | 0 | 0 | 0.0 |
 | verify_otlp.py | 0 | 0 | 0 | 0.0 |
 | verify_override_wired.py | 25 | 0 | 0 | 0.0 |
 | verify_ownership_ladder.py | 0 | 0 | 0 | 0.0 |
@@ -72,5 +72,5 @@ Kutip angka dari file ini, JANGAN dari ingatan. (angka dari .out/verifikasi-*.tx
 | verify_worm.py | 0 | 0 | 0 | 0.0 |
 
 jumlah verifier: 65
-total cek hijau: 461
+total cek hijau: 465
 verifier merah: tidak ada

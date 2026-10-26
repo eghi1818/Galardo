@@ -80,11 +80,27 @@ try:
     # --- live (opsional) ---
     try:
         c = origins.candidates('koler.space', timeout=20, resolve_hosts=False, limit=50)
-        ok(c['domain'] == 'koler.space' and c['jumlah'] >= 1, 'candidates() live: domain + jumlah')
+        ok(c['domain'] == 'koler.space', 'candidates() live: domain benar')
+        ok(c['jumlah'] >= 1, 'candidates() live: minimal 1 kandidat walau CT tumbang', c['jumlah'])
         ok(set(c['ringkas']) == {'origin-hint', 'kandidat', 'edge-maybe', 'edge'}, 'ringkas punya 4 kelas')
         ok(all(r['kelas'] for r in c['hosts']), 'tiap baris punya kelas')
     except Exception as e:
         print('  [skip] candidates() live: %s: %s' % (type(e).__name__, e))
+
+    # --- ketahanan: CT tumbang tidak boleh membuat candidates() melempar ---
+    _asli_fetch = origins.fetch_crt
+
+    def _boom(*a, **k):
+        raise origins.OriginError('crt.sh palsu tumbang')
+
+    origins.fetch_crt = _boom
+    try:
+        c2 = origins.candidates('contoh.invalid', timeout=5, resolve_hosts=False)
+        ok(c2['domain'] == 'contoh.invalid', 'CT tumbang: candidates() tetap jalan')
+        ok(c2['jumlah'] >= 1, 'CT tumbang: masih ada kandidat cadangan', c2['jumlah'])
+        ok(any(r['host'] == 'contoh.invalid' for r in c2['hosts']), 'CT tumbang: domain telanjang tetap masuk')
+    finally:
+        origins.fetch_crt = _asli_fetch
 
 finally:
     pass

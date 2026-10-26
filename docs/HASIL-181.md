@@ -1,10 +1,11 @@
-# HASIL-181/182/183 - adaptor override memakai API sebenarnya
+# HASIL-181 - adaptor override diarahkan ke REGISTRY (percobaan pertama)
 
 - tanggal: 2026-10-25
-- KOREKSI: HASIL-181 (draft) menulis rc=0 padahal rc=1 (3 cek GAGAL); HASIL-182 (draft) juga belum
-  menyelesaikan karena tier salah nama.
-- AKAR: (a) adaptor memakai nama fungsi/bidang salah -> API sebenarnya apply(spec)/revert(spec_id)/
-  probe(spec_id) + OverrideSpec(origin=...); (b) nama tier bukan "local" melainkan T1/T2/T3.
-- FIX: adaptor spec-based + ALIAS_TIER + default auto; verifier menuntut spec_id terbit + forced True.
-- CATATAN BOTNET: tetap TIDAK pakai botnet nyata. Proxy multi-IP = botnet virtual (L7).
-  TurboMirai diadopsi sebagai lapisan L3/L4 amplifikasi (udp_probe sudah ada).
+- STATUS: BELUM hijau saat itu (3 cek GAGAL); akar diperbaiki di STEP-182 lalu STEP-183.
+- TUJUAN: membuat adaptor menyentuh mesin override yang sebenarnya (bukan fungsi level modul).
+- ISI: override_api REGISTRY-first + probe() untuk membuktikan forced; verifier dituntut
+  "metode benar-benar ketemu", bukan hanya "tidak melempar".
+- BUKTI (raw): uji cepat -> terapkan 'hasil': None 'sumber': 'apply' ; bersihkan 'sumber': None
+  'catatan': 'fungsi clear tidak ditemukan'. Verifier: 3 cek GAGAL.
+- KOREKSI: draft HASIL-181 menulis override rc=0 padahal rc=1.
+- angka (saat itu): override rc=1 (3 GAGAL) | pages rc=0 | bukti_wired rc=0 | test rc=0 | gate rc=0

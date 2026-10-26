@@ -78,3 +78,4 @@
 - STEP-181 (2026-10-26 07:27): adaptor override REGISTRY-first + probe forced (bukti 404 bertanda X-Galardo-Override).
 - STEP-182 (2026-10-26 07:32): adaptor override pakai API sebenarnya (OverrideSpec+probe+revert); bukti forced.
 - STEP-183 (2026-10-26 07:36): tier override dipetakan (T1/T2/T3) - jalur override bekerja dari kode, forced terbukti.
+- STEP-184 (2026-10-26 07:39): HASIL-182 dilengkapi + pengunci verify_hasil_lengkap (tiap STEP wajib punya HASIL).

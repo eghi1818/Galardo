@@ -29,3 +29,4 @@ mode PG. Akibatnya proses kedua di mode PG tidak pernah melihat tulisan proses p
   STEPLOG 81-96 dari commit 58d8261..3f64fd9, `EMERGENCY.md` (acuan make test 61 -> 79),
   dan `gate.yml` yang tidak memasang node sehingga `node --check` di-skip di CI.
 - P1 belum bisa disebut tutup: run hijau di tab Actions belum dikonfirmasi (`gh` absen).
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

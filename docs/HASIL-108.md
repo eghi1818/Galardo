@@ -17,3 +17,4 @@ dipanggil end-to-end.
 
 ## Bukti
 - make gate + make test: .out/HASIL-108-gate.txt, .out/HASIL-108-test.txt
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

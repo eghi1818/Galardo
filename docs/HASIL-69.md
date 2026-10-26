@@ -13,3 +13,4 @@
                 Syarat diturunkan ke TEST_OPERATOR; ADMIN disiapkan untuk kebijakan ketat nanti.
 - F-12 DITUTUP: _g1() rekursi karena regex ikut mengganti m.group(1) di dalam _g1.
 - Verifikasi: verify_alerts 16/16, verify_rbac 18/18, make test hijau, smoke OK.
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

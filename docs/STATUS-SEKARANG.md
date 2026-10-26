@@ -83,3 +83,7 @@
 - STEP-186 (2026-10-26 07:49): daftar cek kanonik docs/VERIFIER-COUNT.md + make hitung-verifier + pengunci. verifier=62 total cek=424.
 - STEP-187 (2026-10-26 07:56): make verifikasi (jalankan SEMUA verifier) - temuan: gate tidak pernah menjalankan verifier; netssl merah diperbaiki.
 - STEP-188 (2026-10-26 11:12): capacity.py netssl + urutan daftar cek dibetulkan; make verifikasi HIJAU (63 verifier, 430 cek).
+- STEP-189 (2026-10-26 11:23): 'make hijau' jadi perintah cek tunggal (verifikasi+test); instruksi & kit diselaraskan + pengunci.
+- STEP-190 (2026-10-26 11:36): pengunci meregenerasi artefak dulu; 2 merah ditutup; make hijau HIJAU (64 verifier, 434 cek).
+- STEP-193 (2026-10-26 13:31): hijau rc=2 | verifier=65 cek=239 merah=tidak ada | db.py atomik + kunci verify_state_valid.
+- STEP-194 (2026-10-26 14:26): generator 16m->0.22s, hijau 962s->162s; verify_headers/auth_users/resume_kit/aturan_hijau sembuh; VERIFIER-COUNT jujur.

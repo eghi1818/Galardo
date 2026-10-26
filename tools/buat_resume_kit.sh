@@ -2,6 +2,7 @@
 # Galardo - KIT RESUME minimal. Root kit HANYA berisi yang perlu dilampirkan/tempel.
 # Sisanya masuk arsip/. Idempoten: folder kit dibangun ulang dari nol.
 set -u
+exec 0</dev/null   # jangan pernah menunggu input terminal
 REPO="${GALARDO_REPO:-$HOME/Documents/REPO/Galardo/Galardo-main}"
 KIT="${GALARDO_KIT:-$HOME/Desktop/GALARDO-RESUME}"
 
@@ -27,7 +28,7 @@ LAMPIRAN yang saya berikan: 01-GOAL-GALARDO.md, 02-STATUS-SEKARANG.md, 03-V1.4.m
 Baca keempatnya DULU. GOAL-GALARDO.md bersifat MENGIKAT.
 
 TUGAS PERTAMA (jangan menebak):
-1. Jalankan di repo: \`make gate\` lalu \`make test\`. Laporkan angka rc APA ADANYA.
+1. Jalankan di repo: \`make hijau\` lalu \`make test\`. Laporkan angka rc APA ADANYA.
 2. Sebutkan versi (V1.4) + HEAD yang Anda lihat sebelum mengusulkan apa pun.
 
 ATURAN KERJA (jangan diubah):
@@ -58,8 +59,11 @@ LANGKAH (kalau chat lama mati/hang/error):
 4. TEMPEL isi: TEMPEL-KE-CHAT-BARU.txt
 5. Folder arsip/ = salinan lengkap (tidak perlu dilampirkan).
 
-Kalau agent baru menebak-nebak: suruh baca 01-GOAL-GALARDO.md dan jalankan \`make gate\`.
+Kalau agent baru menebak-nebak: suruh baca 01-GOAL-GALARDO.md dan jalankan \`make hijau\`.
 Verifikasi integritas kit: shasum -a 256 -c SHA256SUMS
+
+PENTING: \`make hijau\` = SATU perintah cek semua (verifikasi SEMUA tools/verify_*.py + make test).
+\`make gate\` saja TIDAK cukup (gate tidak menjalankan verifier).
 KITEOF
 
 cat > "$KIT/resume.sh" <<'REOF'
@@ -80,7 +84,7 @@ echo "-- integritas kit --"
 ( cd "$KIT" && shasum -a 256 -c SHA256SUMS 2>/dev/null | grep -c "OK" | sed 's/^/  file OK: /' )
 echo
 echo "-- langkah berikut --"
-echo "  1) make gate   (SEMUA verifier, rc harus 0)"
+echo "  1) make hijau   (SEMUA verifier, rc harus 0)"
 echo "  2) make test   (suite integrasi, rc harus 0)"
 echo "  3) lampirkan 4 file LAMPIRAN + tempel TEMPEL-KE-CHAT-BARU.txt"
 REOF

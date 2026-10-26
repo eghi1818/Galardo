@@ -38,3 +38,4 @@ float; (3) karena itu tahap pertama memakai fungsi nyata dan mengukur amplifikas
 ## Bukti
 - tools/verify_udp_reflection.py: .out/HASIL-107-verifier.txt
 - make gate + make test: .out/HASIL-107-gate.txt, .out/HASIL-107-test.txt
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

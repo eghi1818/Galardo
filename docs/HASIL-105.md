@@ -18,3 +18,4 @@ pernah berjalan. Hasil pembacaan fixture di langkah 4 jadi dasar perbaikan berik
 
 ## Bukti
 - make test + make gate: .out/HASIL-105-test.txt, .out/HASIL-105-gate.txt
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

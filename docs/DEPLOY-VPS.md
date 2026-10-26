@@ -16,7 +16,7 @@ Default jalan tanpa kredensial apa pun. Semua integrasi fail-open.
 - [ ] Opsional: `subfinder` & `nikto` bila ingin dijalankan dari panel Tools
 
 ## 1. Verifikasi dulu di lokal (jangan deploy kalau merah)
-    make gate            # harus rc=0 (make test + SEMUA verifier)
+    make hijau            # harus rc=0 (make test + SEMUA verifier)
     make demo            # harus verdict RECOVERED + override 404/blank forced
 
 ## 2. Siapkan VPS
@@ -110,7 +110,7 @@ Alternatif nginx: proxy_pass http://127.0.0.1:8090; + certbot.
 - [ ] `data/` sebagai volume + backup harian terverifikasi
 - [ ] container `restart: unless-stopped`
 - [ ] login SSH non-root + key only
-- [ ] `make gate` dijalankan setiap habis upgrade
+- [ ] `make hijau` dijalankan setiap habis upgrade
 
 ## 13. Yang BELUM ada (jujur)
 - CI sudah ada (.github/workflows/gate.yml, jalan tiap push) — catatan ini usang
@@ -243,7 +243,7 @@ CMD ["python3", "backend/run_local.py"]
 ## CHECKLIST PINDAH VPS (V1.4)
 - Salin repo + .env. Env WAJIB: GALARDO_REQUIRE_AUTH=1, GALARDO_DEV_TOKEN, GALARDO_ADMIN_PASSWORD,
   GALARDO_GATEWAY_URL (anyip.io), GALARDO_MULTILANE=1, GALARDO_GATEWAY_STICKY=worker.
-- VPS: `make gate` lalu `make test` HARUS hijau sebelum menjalankan uji nyata.
+- VPS: `make hijau` lalu `make test` HARUS hijau sebelum menjalankan uji nyata.
 - Port 8090 hanya lokal; akses luar lewat `make tunnel` (butuh cloudflared).
 - Bukti: .out/ + docs/bukti/ledger.jsonl (hash chain) ikut disalin, jangan diubah.
 

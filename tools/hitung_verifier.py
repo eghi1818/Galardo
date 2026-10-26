@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Hitung angka cek tiap verifier secara NYATA (bukan dari ingatan) -> docs/VERIFIER-COUNT.md.
+"""Angka cek NYATA tiap verifier -> docs/VERIFIER-COUNT.md.
 
-Dipakai oleh `make hitung-verifier`. Menjalankan tiap tools/verify_*.py, mengambil baris
-terakhir 'N cek hijau' dan rc-nya. Angka inilah yang boleh dikutip di HASIL/STATUS.
+Mode: (default) jalankan semua | --daftar (nama saja, cepat) | --dari-out (dari .out, tanpa jalan ulang)
 """
 import glob
 import os
@@ -13,74 +12,77 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "docs", "VERIFIER-COUNT.md")
+RINGKAS = os.path.join(ROOT, ".out", "verifikasi-ringkas.txt")
 RE_CEK = re.compile(r"(\d+)\s+cek hijau")
 RE_GAGAL = re.compile(r"(\d+)\s+(?:GAGAL|gagal)")
 
 
+def nama_verifier():
+    return sorted(os.path.basename(p) for p in glob.glob(os.path.join(ROOT, "tools", "verify_*.py")))
+
+
+def tulis(baris, merah, catatan):
+    total = sum(b[1] for b in baris)
+    with open(OUT, "w", encoding="utf-8") as fh:
+        fh.write("# VERIFIER-COUNT - angka cek NYATA\n\n")
+        fh.write("Dihasilkan oleh `make hitung-verifier` (tools/hitung_verifier.py).\n")
+        fh.write("Kutip angka dari file ini, JANGAN dari ingatan. %s\n\n" % catatan)
+        fh.write("| verifier | cek hijau | gagal | rc | detik |\n|---|---|---|---|---|\n")
+        for nama, n, g, rc, dt in baris:
+            fh.write("| %s | %d | %d | %d | %.1f |\n" % (nama, n, g, rc, dt))
+        fh.write("\njumlah verifier: %d\n" % len(baris))
+        fh.write("total cek hijau: %d\n" % total)
+        fh.write("verifier merah: %s\n" % (", ".join(merah) if merah else "tidak ada"))
+    print("verifier: %d | total cek hijau: %d | merah: %s" % (len(baris), total, merah or "tidak ada"))
+
+
 def main():
-    verifier = sorted(os.path.basename(p) for p in glob.glob(os.path.join(ROOT, "tools", "verify_*.py")))
-    baris = []
-    total_cek = 0
-    merah = []
-    for nama in verifier:
+    mode = "jalankan"
+    if "--daftar" in sys.argv:
+        mode = "daftar"
+    elif "--dari-out" in sys.argv:
+        mode = "dari_out"
+    verifier = nama_verifier()
+
+    if mode == "daftar":
+        tulis([(v, 0, 0, 0, 0.0) for v in verifier], [], "(daftar nama; angka menyusul)")
+        return 0
+
+    if mode == "dari_out":
+        rc_peta = {}
+        if os.path.exists(RINGKAS):
+            for ln in open(RINGKAS, encoding="utf-8"):
+                b = ln.split(None, 1)
+                if len(b) == 2:
+                    rc_peta[b[1].strip()] = int(b[0])
+        baris, merah = [], []
+        for v in verifier:
+            p = os.path.join(ROOT, ".out", "verifikasi-%s.txt" % v)
+            keluaran = open(p, encoding="utf-8", errors="replace").read() if os.path.exists(p) else ""
+            cek = RE_CEK.findall(keluaran)
+            gagal = RE_GAGAL.findall(keluaran)
+            rc = rc_peta.get(v, 0)
+            if rc != 0:
+                merah.append(v)
+            baris.append((v, int(cek[-1]) if cek else 0, int(gagal[-1]) if gagal else 0, rc, 0.0))
+        tulis(baris, merah, "(angka dari .out/verifikasi-*.txt)")
+        return 0
+
+    baris, merah = [], []
+    for v in verifier:
         t0 = time.time()
         try:
-            r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", nama)],
+            r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", v)],
                                capture_output=True, text=True, timeout=300)
-            keluaran = (r.stdout or "") + (r.stderr or "")
-            rc = r.returncode
+            keluaran, rc = (r.stdout or "") + (r.stderr or ""), r.returncode
         except subprocess.TimeoutExpired:
             keluaran, rc = "", 124
         cek = RE_CEK.findall(keluaran)
         gagal = RE_GAGAL.findall(keluaran)
-        n = int(cek[-1]) if cek else 0
-        g = int(gagal[-1]) if gagal else 0
-        total_cek += n
         if rc != 0:
-            merah.append(nama)
-        baris.append((nama, n, g, rc, round(time.time() - t0, 1)))
-
-    with open(OUT, "w", encoding="utf-8") as fh:
-        fh.write("# VERIFIER-COUNT - angka cek NYATA\n\n")
-        fh.write("Dihasilkan oleh `make hitung-verifier` (tools/hitung_verifier.py).\n")
-        fh.write("Kutip angka dari file ini, JANGAN dari ingatan.\n\n")
-        fh.write("| verifier | cek hijau | gagal | rc | detik |\n|---|---|---|---|---|\n")
-        for nama, n, g, rc, dt in baris:
-            fh.write("| %s | %d | %d | %d | %.1f |\n" % (nama, n, g, rc, dt))
-        fh.write("\njumlah verifier: %d\n" % len(verifier))
-        fh.write("total cek hijau: %d\n" % total_cek)
-        fh.write("verifier merah: %s\n" % (", ".join(merah) if merah else "tidak ada"))
-
-    # KONFIRMASI ULANG: verifier merah dijalankan sekali lagi (bisa jadi merah hanya karena berkas
-    # daftar masih basi). Kalau lulus di percobaan kedua, baris diperbarui dan dikeluarkan dari merah.
-    if merah:
-        for i, (nama, n, g, rc, dt) in enumerate(baris):
-            if rc == 0:
-                continue
-            try:
-                r2 = subprocess.run([sys.executable, os.path.join(ROOT, "tools", nama)],
-                                    capture_output=True, text=True, timeout=300)
-                if r2.returncode == 0:
-                    kel2 = (r2.stdout or "") + (r2.stderr or "")
-                    c2 = RE_CEK.findall(kel2)
-                    baris[i] = (nama, int(c2[-1]) if c2 else 0, 0, 0, dt)
-                    total_cek += (int(c2[-1]) if c2 else 0) - n
-                    merah.remove(nama)
-            except Exception:
-                pass
-        with open(OUT, "w", encoding="utf-8") as fh:
-            fh.write("# VERIFIER-COUNT - angka cek NYATA\n\n")
-            fh.write("Dihasilkan oleh `make hitung-verifier` (tools/hitung_verifier.py).\n")
-            fh.write("Kutip angka dari file ini, JANGAN dari ingatan.\n\n")
-            fh.write("| verifier | cek hijau | gagal | rc | detik |\n|---|---|---|---|---|\n")
-            for nama, n, g, rc, dt in baris:
-                fh.write("| %s | %d | %d | %d | %.1f |\n" % (nama, n, g, rc, dt))
-            fh.write("\njumlah verifier: %d\n" % len(verifier))
-            fh.write("total cek hijau: %d\n" % total_cek)
-            fh.write("verifier merah: %s\n" % (", ".join(merah) if merah else "tidak ada"))
-
-    print("verifier: %d | total cek hijau: %d | merah: %s" % (len(verifier), total_cek, merah or "tidak ada"))
-    print("ditulis: docs/VERIFIER-COUNT.md")
+            merah.append(v)
+        baris.append((v, int(cek[-1]) if cek else 0, int(gagal[-1]) if gagal else 0, rc, round(time.time() - t0, 1)))
+    tulis(baris, merah, "(dijalankan sungguhan)")
     return 0 if not merah else 1
 
 

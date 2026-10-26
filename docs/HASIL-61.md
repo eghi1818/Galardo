@@ -14,3 +14,4 @@
 - POST /overrides/*/probe -> status=404 forced=true override_header="404" shim running=true forced_hits=2
 - POST /overrides/*/revert -> ok=true reverted=[T2] (audit spec_id ov-1792206822555)
 - Catatan: shim tier T2 memang jalan di make dev-up, jadi tidak ada failed_tiers.
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

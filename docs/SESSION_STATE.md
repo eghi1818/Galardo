@@ -15,8 +15,8 @@
 > - dashboard: `http://127.0.0.1:8090/` — tempel token dari `.env` `GALARDO_DEV_TOKEN` di kotak kanan atas
 > - auth: `GALARDO_REQUIRE_AUTH=1` (401 tanpa token, 200 dengan token); UI sudah punya kotak token
 > - pihak ketiga **TERBUKTI**: `T3_OK` (Cloudflare edge) + `OWN1_OK` (ownership TXT, quorum DoH 3/3) — STEP-118
-> - operasional: `make docker-up` / `make docker-down` / `make dev-up` / `make gate` / `make ci`
->   (catatan: `make gate` otomatis `docker compose stop galardo` karena port 8090 dipakai bersama)
+> - operasional: `make docker-up` / `make docker-down` / `make dev-up` / `make hijau` / `make ci`
+>   (catatan: `make hijau` otomatis `docker compose stop galardo` karena port 8090 dipakai bersama)
 > - backup: `tar -czf .out/backup/data-$(date +%Y%m%d).tgz data`
 > - sisa **OPSIONAL**: TLS via Cloudflare Tunnel, `GALARDO_POOL_*` (lane rotate), `make capacity`, `gh` CLI
 > - bukti mentah: `.out/STEP-115..121-*.txt`, rekaman `docs/HASIL-115..121.md`
@@ -35,7 +35,7 @@ Titik aman : tag terakhir `git tag -l | tail -n 1`; branch checkpoint/galardo-v1
 ## Konvensi
 - Keluaran mentah STEP -> .out/  (docs/CONTEXT.md)
 - Rekaman per STEP     -> docs/HASIL-<step>.md (satu tempat)
-- Gate wajib sebelum commit: make gate && make test (docs/RESILIENCE.md bagian 10)
+- Gate wajib sebelum commit: make hijau && make test (docs/RESILIENCE.md bagian 10)
 
 ## Baru-baru ini (jangan dikerjakan ulang)
 - STEP-98  : P6 nonce CSP per-respons; 2 verifier diperkuat.
@@ -64,7 +64,7 @@ Jangan buka lebih dari satu item sekaligus.
   (2) pihak ketiga live: `make tunnel` (mode cepat tanpa token, atau named tunnel bila
   GALARDO_CF_TUNNEL_TOKEN diisi).
 - CARA LANJUT DI CHAT BARU: baca docs/GOAL-GALARDO.md (MENGIKAT) lalu docs/STATUS-SEKARANG.md;
-  jalankan `make gate` (SEMUA tools/verify_*.py) dan `make test` sebelum menyentuh apa pun.
+  jalankan `make hijau` (SEMUA tools/verify_*.py) dan `make test` sebelum menyentuh apa pun.
 - ATURAN KERJA: bukti mentah dulu sebelum menambal; cek struktur via AST/behavioral (bukan teks);
   angka rc ditulis apa adanya; patch idempoten; commit + push tiap langkah hijau.
 

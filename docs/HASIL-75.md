@@ -37,3 +37,4 @@ Dua percobaan pertama gagal menulis: (a) regex `[^)]*` berhenti di `)` pertama s
 `budget` jadi keyword argumen `dict.get` -> TypeError (tertangkap 2 tes gagal);
 (b) script patch mati StopIteration karena `probe_ntp` tak punya loop `for`.
 Keduanya ditutup dengan penjaga AST (`dict.get` tanpa keyword) dan patch tahan-fungsi.
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

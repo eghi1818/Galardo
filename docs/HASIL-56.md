@@ -6,3 +6,4 @@
 - Hasil   : item 6 ditandai SELESAI; DASHBOARD-AUDIT.md di-upgrade; temuan F-2..F-4 dicatat
 - Rujukan : docs/UI-API-GAP.md (v4), docs/DASHBOARD-AUDIT.md
 - Kode    : tidak disentuh; `make test` tetap hijau
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

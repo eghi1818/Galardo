@@ -11,3 +11,4 @@
 - Percobaan 1 gagal: tools/run_local.py tidak ada; yang benar backend/run_local.py (Makefile dev-up).
 - Route API berprefiks /api/v1; probe ke /health tanpa prefiks memang 404.
 - stdout Python ter-buffer saat diarahkan ke file; pakai python3 -u agar log terbaca.
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

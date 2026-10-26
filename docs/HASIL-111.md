@@ -27,3 +27,4 @@ dipakai `make own1`) dan tools/verify_ownership_rung1.py (262 baris, dipakai gat
 ## Bukti
 - tools/verify_dns_ownership.py: .out/HASIL-111-verifier.txt
 - make gate + make test: .out/HASIL-111-gate.txt, .out/HASIL-111-test.txt
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

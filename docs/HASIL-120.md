@@ -22,3 +22,4 @@
 
 ## Sisa opsional
 - TLS via Caddy bila diekspos ke internet; GALARDO_POOL_* bila mau bukti lane rotate
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

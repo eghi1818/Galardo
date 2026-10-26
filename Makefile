@@ -172,3 +172,7 @@ hitung-verifier:
 
 verifikasi:
 	bash tools/jalankan_semua_verifier.sh
+
+# hijau = SATU perintah cek semua (verifikasi SEMUA verifier + test). Pakai ini, bukan gate.
+hijau:
+	bash tools/jalankan_semua_verifier.sh && make test

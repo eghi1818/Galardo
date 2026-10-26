@@ -30,3 +30,4 @@ bind, jadi ini bukan soal bind.
 - Uji sudo: keluaran bagian 2 (termasuk diagnostik bind raw)
 - tools/verify_udp_reflection.py: .out/HASIL-110-verifier.txt
 - make gate + make test: .out/HASIL-110-gate.txt, .out/HASIL-110-test.txt
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

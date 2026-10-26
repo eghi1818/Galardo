@@ -12,3 +12,4 @@
 - POST /sources/src-uji-59/remove -> {"removed":"src-uji-59"}
 - GET /identity-pool?count=8 -> count/pool_sha256/bucket_counts/entropy/sample terisi
 - Catatan: ID sumber berpola src-<label>; panel memakai s.id sehingga tepat.
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

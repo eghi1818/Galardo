@@ -7,3 +7,4 @@
            (url, expected_status, interval_sec, timeout_sec, failure_threshold)
 - Catatan: field kosong tidak dikirim; angka non-numerik diabaikan; hasil tampil apa adanya
 - Catatan: probe_contract sudah tampil read-only sebelumnya, kini bisa diubah dari UI
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

@@ -30,3 +30,4 @@ cuma dilaporkan lewat selamanya.
 ## Bukti
 - make test: .out/HASIL-104-test.txt (memuat baris [SKIP] + DEBUG bentuk)
 - make gate: .out/HASIL-104-gate.txt
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

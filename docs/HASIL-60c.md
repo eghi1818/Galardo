@@ -10,3 +10,4 @@
 - F-8: 409 preflight = keputusan desain fail-fast, bukan bug.
 - Catatan: patch awal menimbulkan rekursi (regex ikut mengganti panggilan di dalam helper); diperbaiki.
 - Ukur: 5 run berturut sebelum commit, semua hijau.
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

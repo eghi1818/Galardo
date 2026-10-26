@@ -50,3 +50,4 @@ dan AuthMessage-terpotong tidak bisa kembali tanpa membuat vektor ini gagal.
 Hijau offline BUKAN berarti protokol benar. verify_pg sempat 30/30 hijau sementara
 uji live gagal dua kali berturut-turut (F-13, lalu F-14). Uji live harus jadi bagian
 gate untuk modul protokol, bukan opsional.
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

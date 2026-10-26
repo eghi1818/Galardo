@@ -10,3 +10,4 @@
 - Catatan 1: traceback ConnectionResetError di output make test = noise normal (tertangkap)
 - Catatan 2: gate diperbaiki - cari baris RESULTS + cetak 15 baris terakhir bila gagal
 - Catatan 3: F-1 ditutup di STEP-60b (kunci idempotency unik per-run)
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

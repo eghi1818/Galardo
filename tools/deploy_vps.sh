@@ -38,8 +38,10 @@ fi
 echo
 
 echo "-- 4. verifikasi wajib (jangan lewat) --"
+make hijau > .out/deploy-vps-hijau.txt 2>&1; rv=$?
+echo "  hijau rc=$rv  (= make verifikasi + make test)"
 make verifikasi > .out/deploy-vps-verifikasi.txt 2>&1; rv=$?
-echo "  verifikasi rc=$rv (SEMUA tools/verify_*.py)"
+echo "  verifikasi: lihat .out/deploy-vps-hijau.txt (SEMUA tools/verify_*.py + make test)"
 make gate > .out/deploy-vps-gate.txt 2>&1; rg=$?
 echo "  gate rc=$rg"
 make test > .out/deploy-vps-test.txt 2>&1; rt=$?

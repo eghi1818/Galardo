@@ -15,3 +15,4 @@
 ## Dokumen yang ditutup
 - INVENTARIS V4 -> SELESAI; seksi Z jadi 'TIDAK ADA PENDING'
 - PENDING.md sisa PRD jadi 'tidak ada'; item 10/13/14 dikoreksi SELESAI
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

@@ -23,3 +23,4 @@ saat preflight belum PASS).
 ## Catatan
 F-1 tetap TUTUP untuk diagnosisnya; F-1b mencatat anggaran retry-nya kurang.
 Akar sisa ada di F-7 (probe lambat) yang masih terbuka.
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

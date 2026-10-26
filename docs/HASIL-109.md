@@ -28,3 +28,4 @@ rekursi. Urutan dibalik: substitusi dulu, sisipkan helper kemudian.
 - Uji pemisah sudo (network vs host order, 3 sumber): keluaran bagian 2
 - tools/verify_udp_reflection.py: .out/HASIL-109-verifier.txt
 - make gate + make test: .out/HASIL-109-gate.txt, .out/HASIL-109-test.txt
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

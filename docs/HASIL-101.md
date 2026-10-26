@@ -27,3 +27,4 @@ berperilaku beda di runner dan `timeout-minutes: 20` bisa sempit.
 
 ## Bukti
 - `make gate` + `make test`: lihat .out/HASIL-101-gate.txt dan .out/HASIL-101-test.txt
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

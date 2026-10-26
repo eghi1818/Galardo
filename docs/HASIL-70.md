@@ -8,3 +8,4 @@
 - Prinsip: opt-in via GALARDO_OTLP_URL; tanpa itu -> no-op. Fail-open: error tidak menghalangi job.
 - Tanpa dependensi: memakai netssl.context() + urllib, payload JSON
 - Verifikasi: verify_otlp 31/31, verify_compose hijau, compose config VALID, make test hijau
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

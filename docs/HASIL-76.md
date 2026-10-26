@@ -38,3 +38,4 @@ dikunci oleh cek `C origin tak terdaftar diomit`.
                 C origin terdaftar di-echo + Vary / origin tak terdaftar diomit + Vary
     make test -> 79 passed, 0 failed
     verify_devup -> 2/2 ; verify_udp_budget -> 16/16 ; verify_netssl_wired -> 20/20
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

@@ -33,6 +33,57 @@ def _mirror_mtime():
         return 0.0
 
 
+def _baca_toleran(fh):
+    """Baca JSON tahan berkas rusak.
+
+    Bila berkas sempat ditulis dua proses (ada data ekstra di ekor), ambil dokumen
+    JSON pertama saja dan cadangkan berkas aslinya ke .rusak.
+    """
+    import os as _os
+    import time as _time
+    teks = fh.read()
+    if not teks.strip():
+        try:
+            fh.seek(0)
+            _time.sleep(0.05)
+            teks = fh.read()
+        except Exception:
+            pass
+    if not teks.strip():
+        return {}
+    try:
+        return json.loads(teks)
+    except Exception:
+        obj, _end = json.JSONDecoder().raw_decode(teks.lstrip())
+        try:
+            nama = getattr(fh, "name", "")
+            if nama and not _os.path.exists(nama + ".rusak"):
+                with open(nama + ".rusak", "w", encoding="utf-8") as g:
+                    g.write(teks)
+        except Exception:
+            pass
+        return obj
+
+
+def _dump_ke(fh, data):
+    """Tulis atomik: ke .tmp lalu os.replace, supaya dua proses tidak saling merusak."""
+    import os as _os
+    teks = json.dumps(data, indent=1, default=str)
+    nama = getattr(fh, "name", None)
+    if not nama:
+        fh.write(teks)
+        fh.flush()
+        return
+    tmp = nama + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as g:
+        g.write(teks)
+    try:
+        fh.flush()
+    except Exception:
+        pass
+    _os.replace(tmp, nama)
+
+
 def _load():
     global _state, _state_mtime
     with LOCK:
@@ -54,7 +105,7 @@ def _load():
                     return _state
             try:
                 with open(DB_PATH, "r", encoding="utf-8") as f:
-                    _state = json.load(f)
+                    _state = _baca_toleran(f)
                 _state_mtime = mtime
             except (json.JSONDecodeError, OSError):
                 pass  # keep in-memory state on transient read issues
@@ -62,7 +113,7 @@ def _load():
             os.makedirs(DATA_DIR, exist_ok=True)
             if os.path.exists(DB_PATH):
                 with open(DB_PATH, "r", encoding="utf-8") as f:
-                    _state = json.load(f)
+                    _state = _baca_toleran(f)
                 _state_mtime = _mirror_mtime()
             else:
                 _state = {}
@@ -74,7 +125,7 @@ def _save():
     global _state_mtime
     tmp = DB_PATH + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(_state, f, indent=1, default=str)
+        _dump_ke(f, _state)
     os.replace(tmp, DB_PATH)
     _state_mtime = _mirror_mtime()
 

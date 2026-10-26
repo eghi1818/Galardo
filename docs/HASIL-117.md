@@ -8,3 +8,4 @@
 ## Catatan
 - App lokal (Mode Aktif) dimatikan lebih dulu agar port 8090 bebas.
 - Cara naik/turun: make docker-up / make docker-down.
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

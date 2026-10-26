@@ -26,9 +26,9 @@ def main():
     cek("generator ada", os.path.exists(gen))
     if not os.path.exists(gen):
         return 1
-    r = subprocess.run(["bash", "-n", gen], capture_output=True, text=True)
+    r = subprocess.run(["bash", "-n", gen], capture_output=True, stdin=subprocess.DEVNULL, text=True)
     cek("generator lolos bash -n", r.returncode == 0, r.stderr[:120])
-    r = subprocess.run(["bash", gen], capture_output=True, text=True, timeout=120)
+    r = subprocess.run(["bash", gen], capture_output=True, stdin=subprocess.DEVNULL, text=True, timeout=120)
     cek("generator berjalan tanpa error", r.returncode == 0, r.stderr[-200:])
 
     lampiran = ["01-GOAL-GALARDO.md", "02-STATUS-SEKARANG.md", "03-V1.4.md", "04-TARGET-BUKTI.md"]
@@ -51,15 +51,17 @@ def main():
     root_files = sorted(f for f in os.listdir(KIT) if os.path.isfile(os.path.join(KIT, f)))
     cek("root kit <= 8 berkas (minimal)", len(root_files) <= 8, repr(root_files))
 
-    r = subprocess.run(["shasum", "-a", "256", "-c", "SHA256SUMS"], cwd=KIT, capture_output=True, text=True)
+    r = subprocess.run(["shasum", "-a", "256", "-c", "SHA256SUMS"], cwd=KIT, capture_output=True, stdin=subprocess.DEVNULL, text=True)
     cek("SHA256SUMS terverifikasi", r.returncode == 0, (r.stdout + r.stderr)[-160:])
 
     sh = os.path.join(KIT, "resume.sh")
-    r = subprocess.run(["bash", "-n", sh], capture_output=True, text=True)
+    r = subprocess.run(["bash", "-n", sh], capture_output=True, stdin=subprocess.DEVNULL, text=True)
     cek("resume.sh lolos bash -n", r.returncode == 0, r.stderr[:120])
 
     baca = open(os.path.join(KIT, "00-BACA-DULU.txt"), encoding="utf-8").read() if os.path.exists(os.path.join(KIT, "00-BACA-DULU.txt")) else ""
-    cek("00-BACA menyebut 4 lampiran + make gate", "01-GOAL-GALARDO.md" in baca and "make gate" in baca)
+    cek("00-BACA menyebut 4 lampiran + make hijau",
+        "01-GOAL-GALARDO.md" in baca and ("make hijau" in baca or "make gate" in baca))
+    cek("00-BACA menyebut make hijau", "make hijau" in baca)
 
     print()
     if FAIL:

@@ -8,3 +8,4 @@
 - KOREKSI JUJUR: _start_lane (STEP-166) sebenarnya NO-OP karena Transport tak punya start/open/warmup;
   dan set_proxy memang satu argumen (set_proxy(self, proxy)) -> jalur proxy lolos lewat fallback.
 - TAMBAHAN yang dipertahankan: _vu_aman + vu_errors di engine (VU tidak boleh mati sunyi).
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

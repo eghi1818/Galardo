@@ -36,3 +36,4 @@ Perbaikan: import dipindah ke setelah docstring + penjaga AST (E2).
 ## Kenapa lolos selama ini
 verify_netssl_wired bagian D hanya memindai pemanggil create_default_context; urlopen
 polos tak pernah diperiksa. Sekarang diperiksa, termasuk lewat AST.
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

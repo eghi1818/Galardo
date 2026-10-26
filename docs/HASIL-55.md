@@ -61,3 +61,4 @@
   gate: True (cukup: dns_txt rank 4 >= min dns_txt)
   cleanup: http=200 success=True
 ```
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

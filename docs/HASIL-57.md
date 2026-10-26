@@ -8,3 +8,4 @@
                API sudah punya health endpoint sendiri: GET /health (backend/api.py:358).
 - Hasil  : F-2 TUTUP; UI-API-GAP.md dikoreksi; F-5 dicatat sebagai by design (D14)
 - Rujukan: docs/UI-API-GAP.md bagian KOREKSI (STEP-57)
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

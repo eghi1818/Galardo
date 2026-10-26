@@ -9,3 +9,4 @@
 - Ketahanan: counter di-mask 64-bit agar waktu negatif (sebelum epoch) tidak meledak
 - Verifikasi: verify_mfa 26/26, make test hijau, smoke OK
 - Tanpa dependensi luar: penting agar tetap jalan di Termux/Docker
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

@@ -21,3 +21,4 @@ meski keturunan masih hidup.
 ## Bukti
 - tools/verify_worm.py: .out/HASIL-112-verifier.txt (memuat waktu cascade & sisa proses)
 - make gate + make test: .out/HASIL-112-gate.txt, .out/HASIL-112-test.txt
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

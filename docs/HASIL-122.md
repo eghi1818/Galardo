@@ -14,3 +14,4 @@
 
 ## Arti
 - Galardo mengambil keputusan (safety abort) yang bisa diaudit, bukan hanya meneruskan trafik
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

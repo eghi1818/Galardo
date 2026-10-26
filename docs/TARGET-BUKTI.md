@@ -2,6 +2,8 @@
 
 Urutan yang WAJIB diikuti supaya "MATI" tidak jadi klaim:
 
+0. PRASYARAT: `make hijau` rc=0 (verifikasi SEMUA verifier + make test).
+   `make gate` saja TIDAK cukup - gate tidak menjalankan verifier.
 1. Intel masuk -> POST /api/v1/intel/preflight (klaim = hipotesis, divergensi dicatat).
 2. Kandidat origin -> GET /api/v1/origins/<domain> (putus rantai edge->origin).
 3. Baseline saksi -> POST /api/v1/checkhost (3+ negara, sebelum serangan).

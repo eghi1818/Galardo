@@ -28,3 +28,4 @@ tidak pernah dieksekusi. Perbaikan kodenya jadi STEP berikut.
 
 ## Bukti
 - make gate + make test: lihat .out/HASIL-103-gate.txt dan .out/HASIL-103-test.txt
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

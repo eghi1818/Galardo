@@ -9,3 +9,4 @@
   Ini menjawab pertanyaan terbuka di docs/SERVER-SPEC.md
 - Fail-open: broker mati tidak menghalangi; stat failed + last_error tercatat
 - Verifikasi: verify_bus 17/17, verify_compose hijau, compose config VALID, make test hijau
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

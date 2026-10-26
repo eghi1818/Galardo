@@ -27,7 +27,7 @@ def main():
         return 1
     isi = open(sh, encoding="utf-8").read()
     cek("skrip lolos bash -n", subprocess.run(["bash", "-n", sh], capture_output=True).returncode == 0)
-    for tanda, label in (("make gate", "menjalankan make gate"), ("make test", "menjalankan make test"),
+    for tanda, label in (("make hijau", "menjalankan make hijau (verifikasi+test)"), ("make test", "menjalankan make test"),
                          ("GALARDO_GATEWAY_URL", "memeriksa env anyip"), ("make tunnel", "menyebut make tunnel"),
                          ("TARGET-BUKTI.md", "menunjuk prosedur bukti")):
         cek("skrip: %s" % label, tanda in isi)

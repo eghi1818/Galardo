@@ -9,3 +9,4 @@
 - Bug yang tertangkap tes sendiri: nama arsip hanya sampai detik sehingga bertabrakan
   dalam detik yang sama; diperbaiki dengan suffix unik. backups/ masuk .gitignore.
 - Verifikasi: verify_backup 15/15, make test hijau, smoke OK
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

@@ -23,3 +23,4 @@ verify_dashboard_pages.py menuntut ketiganya konsisten.
 Tool yang belum terpasang (subfinder, nikto) tampil sebagai kartu "TIDAK ADA"
 dengan tombol opsi disabled - konsisten dengan sifat fail-open adapter.
 Perbaikan kosmetik: `badge()` tidak punya kunci READY -> dipakai HEALTHY/FAILED.
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

@@ -30,3 +30,4 @@ Isinya diringkas jadi status + pointer, bukan dihapus.
 ## Bukti
 - bash tools/resume.sh: keluaran status PENDING + HASIL terbaru
 - make gate + make test: lihat .out/HASIL-102-gate.txt dan .out/HASIL-102-test.txt
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

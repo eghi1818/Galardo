@@ -9,3 +9,4 @@
 - Token baru dicetak saat blok dijalankan; simpan untuk dipakai di UI.
 - KONEKSI-PIHAK-KETIGA.md: baris Cloudflare dikoreksi (kredensial SUDAH diisi, terbukti STEP-118).
 - Sisa: TLS/reverse proxy bila diekspos ke internet; pool proxy opsional.
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

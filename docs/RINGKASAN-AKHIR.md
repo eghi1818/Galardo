@@ -8,8 +8,8 @@
 > - dashboard: `http://127.0.0.1:8090/` — tempel token dari `.env` `GALARDO_DEV_TOKEN` di kotak kanan atas
 > - auth: `GALARDO_REQUIRE_AUTH=1` (401 tanpa token, 200 dengan token); UI sudah punya kotak token
 > - pihak ketiga **TERBUKTI**: `T3_OK` (Cloudflare edge) + `OWN1_OK` (ownership TXT, quorum DoH 3/3) — STEP-118
-> - operasional: `make docker-up` / `make docker-down` / `make dev-up` / `make gate` / `make ci`
->   (catatan: `make gate` otomatis `docker compose stop galardo` karena port 8090 dipakai bersama)
+> - operasional: `make docker-up` / `make docker-down` / `make dev-up` / `make hijau` / `make ci`
+>   (catatan: `make hijau` otomatis `docker compose stop galardo` karena port 8090 dipakai bersama)
 > - backup: `tar -czf .out/backup/data-$(date +%Y%m%d).tgz data`
 > - sisa **OPSIONAL**: TLS via Cloudflare Tunnel, `GALARDO_POOL_*` (lane rotate), `make capacity`, `gh` CLI
 > - bukti mentah: `.out/STEP-115..121-*.txt`, rekaman `docs/HASIL-115..121.md`
@@ -77,9 +77,9 @@ Pelajaran berulang: hijau offline != benar. Uji live + verifier AST menutup kela
 - Baris ROADMAP yang dulu dinormalkan: sebutan "VictoriaMetrics" opsional dikembalikan.
 
 ## Pembaruan STEP-102
-Angka pada daftar gate di atas berasal dari STEP-79. Angka terkini: make gate menjalankan
+Angka pada daftar gate di atas berasal dari STEP-79. Angka terkini: make hijau menjalankan
 36 verifier; verify_headers 23/0, verify_dashboard_pages 16/0, verify_proxypool 27/0,
-plus verifier baru verify_pg_multiproc 8/0. Semua dijalankan lewat `make gate` - tidak ada
+plus verifier baru verify_pg_multiproc 8/0. Semua dijalankan lewat `make hijau` - tidak ada
 lagi yang "dijalankan manual".
 
 > STATUS SEKARANG (kondisi terkini + blocker): `docs/STATUS-SEKARANG.md`
@@ -97,7 +97,7 @@ lagi yang "dijalankan manual".
   (2) pihak ketiga live: `make tunnel` (mode cepat tanpa token, atau named tunnel bila
   GALARDO_CF_TUNNEL_TOKEN diisi).
 - CARA LANJUT DI CHAT BARU: baca docs/GOAL-GALARDO.md (MENGIKAT) lalu docs/STATUS-SEKARANG.md;
-  jalankan `make gate` (SEMUA tools/verify_*.py) dan `make test` sebelum menyentuh apa pun.
+  jalankan `make hijau` (SEMUA tools/verify_*.py) dan `make test` sebelum menyentuh apa pun.
 - ATURAN KERJA: bukti mentah dulu sebelum menambal; cek struktur via AST/behavioral (bukan teks);
   angka rc ditulis apa adanya; patch idempoten; commit + push tiap langkah hijau.
 

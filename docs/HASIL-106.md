@@ -33,3 +33,4 @@ Penjaga sekarang memakai penanda komentar yang unik.
 - make test: .out/HASIL-106-test.txt (harus memuat "recovery: lewat_RECOVERY_WAIT=True
   status_akhir=ABORTED")
 - make gate: .out/HASIL-106-gate.txt
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

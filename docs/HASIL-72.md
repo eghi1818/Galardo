@@ -56,3 +56,4 @@ Commit 4c4c34a memuat kode + HASIL-72 + F-15/F-16/F-17, TETAPI skrip sinkron
 STEPLOG/SESSION_STATE/ROADMAP mati di tengah (NameError: re tidak diimpor), sehingga
 pesan commit sempat mengklaim 'sinkron' padahal belum. Disinkronkan di commit
 lanjutan (docs-only) pada step yang sama.
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

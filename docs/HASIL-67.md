@@ -17,3 +17,4 @@ Bukti "build/up/health 200" di file ini TIDAK membuktikan container sehat:
 - F-20: api.serve()/lab_target.serve() bind 127.0.0.1 -> port publish mati dari host (000).
 - Akibat: angka 200 pada probe waktu itu berasal dari server HOST di port 8090, bukan container.
 Terbukti ulang setelah host dimatikan + pakai docker inspect: docs/HASIL-73.md bagian 4-7.
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

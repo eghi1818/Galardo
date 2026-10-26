@@ -15,3 +15,4 @@
   (baris 206 log). Ditutup dengan import re + try/except penuh -> 500 berpesan.
 - 64-K: F-1 kambuh karena regex penambal melewatkan bentuk f-string bersubscript
   ({job3['id']}); semua pemanggilan /start kini lewat start_job, jendela retry 30x0.4s.
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

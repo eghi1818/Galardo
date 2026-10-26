@@ -32,3 +32,4 @@ Status: SELESAI. Fail-open: tool yang belum terpasang tidak mematikan Galardo.
 Biner yang ADA di mesin ini: traceroute (+ dig). subfinder/nikto belum terpasang
 (`brew install subfinder nikto`). Justru itu yang membuat jalur fail-open teruji nyata.
 Panel dashboard untuk tool ini belum dibuat (kandidat langkah berikutnya).
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

@@ -14,3 +14,4 @@
 - POST /targets/tgt-lab/verify/attest -> verified=true level=1 is_proof=false
 - GET  /targets/tgt-lab/ownership -> status=VERIFIED ownership_level=1 proof terisi
 - Catatan: Verify DNS tidak berlaku untuk domain 127.0.0.1 (butuh zona publik); pakai koler.space.
+- angka: rc=2 (belum dicatat blok ini; lihat HASIL-193)

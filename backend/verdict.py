@@ -55,6 +55,18 @@ UJI_FALSIFIKASI = [
 ]
 
 
+def nilai_dari(payload):
+    """Jembatan: panggil penilai utama apa pun namanya (dipakai endpoint/wiring)."""
+    for nama in ("nilai", "klasifikasi", "classify", "hitung", "vonis"):
+        fn = globals().get(nama)
+        if callable(fn):
+            try:
+                return fn(**payload) if isinstance(payload, dict) else fn(payload)
+            except TypeError:
+                return fn(payload)
+    return {"mode": "BELUM_ADA_PENILAI", "catatan": "verdict.py belum punya fungsi penilai"}
+
+
 def _ok(bukti, kunci):
     d = bukti.get(kunci) or {}
     return d.get("ok") is not False

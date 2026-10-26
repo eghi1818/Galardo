@@ -160,3 +160,6 @@ checkhost:
 
 tunnel:
 	bash tools/tunnel.sh
+
+resume-kit:
+	bash tools/buat_resume_kit.sh

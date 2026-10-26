@@ -21,6 +21,9 @@ import proxy_provider
 import gateway
 import egress
 import checkhost
+import verdict
+import bukti
+import falsify
 import origins
 import intel
 import proxy as proxy_lanes  # lane egress berlabel (item 2/3/4)
@@ -791,6 +794,58 @@ $('#f').addEventListener('submit',async e=>{
                 return self._json(422, {"error": "url wajib"})
             try:
                 return self._json(200, checkhost.probe(_url, max_nodes=_mn))
+            except Exception as exc:
+                return self._json(422, {"error": "%s" % exc})
+
+        if api_path == "/verdict" and method == "POST":
+            _p = {}
+            try:
+                _p = self._body()
+            except Exception:
+                _p = {}
+            if isinstance(_p, tuple) and len(_p) == 2:
+                _p = _p[1]
+            if not isinstance(_p, dict):
+                _p = {}
+            try:
+                return self._json(200, verdict.nilai_dari(_p))
+            except Exception as exc:
+                return self._json(422, {"error": "%s" % exc})
+
+        if api_path == "/falsify" and method == "POST":
+            _p = {}
+            try:
+                _p = self._body()
+            except Exception:
+                _p = {}
+            if isinstance(_p, tuple) and len(_p) == 2:
+                _p = _p[1]
+            if not isinstance(_p, dict):
+                _p = {}
+            try:
+                return self._json(200, falsify.jalankan(_p.get("verdict") or {}, _p.get("saksi") or {}))
+            except Exception as exc:
+                return self._json(422, {"error": "%s" % exc})
+
+        if api_path == "/bukti" and method == "POST":
+            _p = {}
+            try:
+                _p = self._body()
+            except Exception:
+                _p = {}
+            if isinstance(_p, tuple) and len(_p) == 2:
+                _p = _p[1]
+            if not isinstance(_p, dict):
+                _p = {}
+            try:
+                _path = _p.get("path")
+                if not _path:
+                    _path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs", "bukti", "ledger.jsonl")
+                _lama = bukti.muat(_path)
+                _prev = _lama[-1]["hash_entri"] if _lama else bukti.GENESIS
+                _e = bukti.buat(_p.get("kejadian") or "kejadian", _p.get("artefak") or {}, sebelumnya=_prev)
+                bukti.simpan(_e, _path)
+                return self._json(200, {"entri": _e, "rantai": bukti.verifikasi_rantai(bukti.muat(_path))})
             except Exception as exc:
                 return self._json(422, {"error": "%s" % exc})
 

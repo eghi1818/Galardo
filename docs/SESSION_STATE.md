@@ -67,3 +67,7 @@ Jangan buka lebih dari satu item sekaligus.
   jalankan `make gate` (SEMUA tools/verify_*.py) dan `make test` sebelum menyentuh apa pun.
 - ATURAN KERJA: bukti mentah dulu sebelum menambal; cek struktur via AST/behavioral (bukan teks);
   angka rc ditulis apa adanya; patch idempoten; commit + push tiap langkah hijau.
+
+## V1.4 (cap 2026-10-25)
+Versi: GALARDO V1.4. Baca docs/V1.4.md + docs/TARGET-BUKTI.md. Sisa: kredensial anyip.io,
+bukti rotasi egress, lalu pindah VPS dan bukti BEBAN pada wecash.ai + waspadaweb.com.

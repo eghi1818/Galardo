@@ -239,3 +239,10 @@ CMD ["python3", "backend/run_local.py"]
 130:docker-down:
 133:gate: test
 ```
+
+## CHECKLIST PINDAH VPS (V1.4)
+- Salin repo + .env. Env WAJIB: GALARDO_REQUIRE_AUTH=1, GALARDO_DEV_TOKEN, GALARDO_ADMIN_PASSWORD,
+  GALARDO_GATEWAY_URL (anyip.io), GALARDO_MULTILANE=1, GALARDO_GATEWAY_STICKY=worker.
+- VPS: `make gate` lalu `make test` HARUS hijau sebelum menjalankan uji nyata.
+- Port 8090 hanya lokal; akses luar lewat `make tunnel` (butuh cloudflared).
+- Bukti: .out/ + docs/bukti/ledger.jsonl (hash chain) ikut disalin, jangan diubah.

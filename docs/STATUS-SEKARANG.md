@@ -74,3 +74,4 @@
 - STEP-177 (2026-10-25 21:18): fix import evidence_mod + KIT RESUME Desktop (make resume-kit) + verifier kit.
 - STEP-178 (2026-10-25 21:35): fix kit ONBOARDING + verifier bukti_wired; batch STEP-175..178 masuk commit + tag V1.4.
 - STEP-179 (2026-10-26 07:19): kit minimal (4 lampiran) + docs/BUKTI-404.md + fix verifier bukti_wired.
+- STEP-180 (2026-10-26 07:23): panel Override edge di dashboard + endpoint override_api (header pembeda X-Galardo-Override).

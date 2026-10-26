@@ -23,6 +23,7 @@ import egress
 import checkhost
 import verdict
 import bukti
+import override_api
 import falsify
 import origins
 import intel
@@ -846,6 +847,44 @@ $('#f').addEventListener('submit',async e=>{
                 _e = bukti.buat(_p.get("kejadian") or "kejadian", _p.get("artefak") or {}, sebelumnya=_prev)
                 bukti.simpan(_e, _path)
                 return self._json(200, {"entri": _e, "rantai": bukti.verifikasi_rantai(bukti.muat(_path))})
+            except Exception as exc:
+                return self._json(422, {"error": "%s" % exc})
+
+        if api_path == "/override/status" and method == "GET":
+            try:
+                return self._json(200, override_api.status())
+            except Exception as exc:
+                return self._json(422, {"error": "%s" % exc})
+
+        if api_path == "/override/terapkan" and method == "POST":
+            _p = {}
+            try:
+                _p = self._body()
+            except Exception:
+                _p = {}
+            if isinstance(_p, tuple) and len(_p) == 2:
+                _p = _p[1]
+            if not isinstance(_p, dict):
+                _p = {}
+            if not _p.get("domain"):
+                return self._json(422, {"error": "domain wajib"})
+            try:
+                return self._json(200, override_api.terapkan(_p.get("domain"), _p.get("mode") or "404"))
+            except Exception as exc:
+                return self._json(422, {"error": "%s" % exc})
+
+        if api_path == "/override/bersihkan" and method == "POST":
+            _p = {}
+            try:
+                _p = self._body()
+            except Exception:
+                _p = {}
+            if isinstance(_p, tuple) and len(_p) == 2:
+                _p = _p[1]
+            if not isinstance(_p, dict):
+                _p = {}
+            try:
+                return self._json(200, override_api.bersihkan(_p.get("domain")))
             except Exception as exc:
                 return self._json(422, {"error": "%s" % exc})
 

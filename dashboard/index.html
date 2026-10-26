@@ -392,7 +392,15 @@ RENDER.override = async function(){
     var b3 = document.getElementById('ov-preflight');
     if (b1) b1.onclick = function(){ if (!dom()) { show({error:'isi domain dulu'}); return; } show({memuat:true}); req('/origins/' + encodeURIComponent(dom())).then(show); };
     if (b2) b2.onclick = function(){ show({memuat:true}); req('/egress/status?probe=1').then(show); };
-    if (b3) b3.onclick = function(){ var ta = document.getElementById('ov-intel'); var payload = (ta && ta.value ? ta.value : ''); if (!payload.trim()) { show({error:'isi klaim intel dulu'}); return; } show({memuat:true}); req('/intel/preflight', {method:'POST', body: JSON.stringify(payload)}).then(show); };
+    var b4 = document.getElementById('ov-ovterap');
+  var b5 = document.getElementById('ov-ovbersih');
+  var b6 = document.getElementById('ov-ovstatus');
+  function ovdom(){ var el = document.getElementById('ov-ovdom'); return (el && el.value ? el.value : '').trim(); }
+  function ovmode(){ var el = document.getElementById('ov-ovmode'); return (el && el.value ? el.value : '404'); }
+  if (b4) b4.onclick = function(){ if (!ovdom()) { show({error:'isi domain dulu'}); return; } show({memuat:true}); req('/override/terapkan', {method:'POST', body: JSON.stringify({domain: ovdom(), mode: ovmode()})}).then(show); };
+  if (b5) b5.onclick = function(){ show({memuat:true}); req('/override/bersihkan', {method:'POST', body: JSON.stringify({domain: ovdom()})}).then(show); };
+  if (b6) b6.onclick = function(){ show({memuat:true}); req('/override/status').then(show); };
+  if (b3) b3.onclick = function(){ var ta = document.getElementById('ov-intel'); var payload = (ta && ta.value ? ta.value : ''); if (!payload.trim()) { show({error:'isi klaim intel dulu'}); return; } show({memuat:true}); req('/intel/preflight', {method:'POST', body: JSON.stringify(payload)}).then(show); };
   }, 0);
   return '<div class="panel">' +
     '<h2>Override (Goal 3)</h2>' +
@@ -405,7 +413,15 @@ RENDER.override = async function(){
     '<h3>Pre-flight intel (REA = hipotesis)</h3>' +
     '<textarea id="ov-intel" rows="6" style="width:100%" placeholder="domain: contoh.com&#10;origin: 1.2.3.4&#10;sumber: rea"></textarea>' +
     '<div class="row"><button id="ov-preflight" class="btn">Bandingkan dengan pengukuran</button></div>' +
-    '<pre id="ov-out" style="white-space:pre-wrap"></pre>' +
+      '<h3>Edge override (Goal 3) - bikin 404/410/503</h3>' +
+  '<div class="row">' +
+  '<input id="ov-ovdom" placeholder="domain target" style="min-width:220px" />' +
+  '<select id="ov-ovmode"><option>404</option><option>410</option><option>503</option><option>blank</option></select>' +
+  '<button id="ov-ovterap" class="btn">Terapkan</button>' +
+  '<button id="ov-ovbersih" class="btn">Bersihkan</button>' +
+  '<button id="ov-ovstatus" class="btn">Status override</button>' +
+  '</div>' +
+'<pre id="ov-out" style="white-space:pre-wrap"></pre>' +
     '</div>';
 };
 

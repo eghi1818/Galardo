@@ -20,3 +20,10 @@
 1. Jalankan ulang `make t3` pada target yang sama, rekam: header pembeda, status, body hash.
 2. Simpan hasil ke .out/ dan buat entri bukti ber-hash via POST /api/v1/bukti (docs/bukti/ledger.jsonl).
 3. Tampilkan di halaman Override dashboard (status override per domain).
+
+## Konfirmasi dari kode (STEP-180)
+- `backend/routeoverride.py:38` -> `OVERRIDE_HEADER = "X-Galardo-Override"`.
+- Docstring: setiap respons paksa SELALU membawa header `X-Galardo-Override: <mode>`.
+- Jadi bukti 404 kita bisa dibedakan tegas dari 404 asli upstream: cukup periksa header itu.
+- Panel + endpoint: `GET /api/v1/override/status`, `POST /api/v1/override/terapkan`,
+  `POST /api/v1/override/bersihkan`, dan bagian "Edge override (Goal 3)" di halaman Override dashboard.

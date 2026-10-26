@@ -164,3 +164,4 @@ Acuan tes: make test 79/79, verify_db_pg 46/46, verify_pg 35/35, verify_netssl_w
 - STEP-177: 2026-10-25 21:18 kit rc=1 bukti rc=0 bw rc=1 verdict rc=0 test rc=0 gate rc=0
 - STEP-178: 2026-10-25 21:35 kit rc=0 bw rc=1 bukti rc=0 fa rc=0 verdict rc=0 test rc=0 gate rc=0
 - STEP-179: 2026-10-26 07:19 kit rc=0 bw rc=0 bukti rc=0 fa rc=0 verdict rc=0 test rc=0 gate rc=0
+- STEP-180: 2026-10-26 07:23 override rc=0 pages rc=0 bw rc=0 kit rc=0 test rc=0 gate rc=0

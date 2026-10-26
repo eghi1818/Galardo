@@ -1,0 +1,14 @@
+schema_version: "1.0"
+name: uji-waspadaweb
+description: uji kecil pertama ke target nyata (pra-anyip)
+target_ref: waspadaweb
+profile:
+  duration_seconds: 30
+  virtual_users: 4
+  max_rps: 20
+  max_concurrency: 20
+requests:
+  - name: home
+    method: GET
+    path: /
+    weight: 1

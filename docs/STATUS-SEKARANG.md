@@ -88,3 +88,4 @@
 - STEP-193 (2026-10-26 13:31): hijau rc=2 | verifier=65 cek=239 merah=tidak ada | db.py atomik + kunci verify_state_valid.
 - STEP-194 (2026-10-26 14:26): generator 16m->0.22s, hijau 962s->162s; verify_headers/auth_users/resume_kit/aturan_hijau sembuh; VERIFIER-COUNT jujur.
 - STEP-195 (2026-10-26 16:05): origins 500 diperbaiki; verifier cek-live dijadikan toleran + uji ketahanan CT tumbang.
+- STEP-196 (2026-10-26 16:57): scenario-validate diperbaiki; app_up/app_down; target VERIFIED; sisa kendala di lapisan policy.

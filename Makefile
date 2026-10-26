@@ -34,8 +34,11 @@ seed-lab:
 test:
 	cd tests && GALARDO_TARGET_ORIGIN=http://127.0.0.1:$(TESTPORT) $(PY) tests_integration.py
 
+SCENARIO ?=
+
 scenario-validate:
-	@cd $(BACKEND) && $(PY) -c "\
+	@python3 tools/validasi_skenario.py $(or $(SCENARIO),$(FILE))
+
 import sys, json; sys.path.insert(0, '.');\
 import api as _a, os; _a.seed_lab();\
 from scenario import parse_scenario_yaml, ScenarioError;\
@@ -176,3 +179,9 @@ verifikasi:
 # hijau = SATU perintah cek semua (verifikasi SEMUA verifier + test). Pakai ini, bukan gate.
 hijau:
 	bash tools/jalankan_semua_verifier.sh && make test
+
+app-up:
+	@nohup bash tools/app_up.sh >/dev/null 2>&1 & sleep 3; echo "app-up: jalan di http://127.0.0.1:8090"
+
+app-down:
+	@bash tools/app_down.sh

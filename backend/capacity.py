@@ -11,6 +11,19 @@ import time
 import urllib.error
 import urllib.request
 
+try:
+    from . import netssl as _ns
+except Exception:
+    try:
+        import netssl as _ns  # type: ignore
+    except Exception:
+        _ns = None
+
+def _ctx():
+    """Konteks TLS repo (aturan netssl): semua fetch HTTPS backend wajib memakai ini."""
+    return _ns.context() if _ns is not None else None
+
+
 __all__ = ["run", "knee", "ttr", "ringkasan", "ringkas_teks", "describe"]
 
 AMBANG_P95 = 2.0
@@ -35,7 +48,7 @@ def _satu_step(url, konkurensi, detik, timeout):
             t0 = time.time()
             try:
                 req = urllib.request.Request(url, headers={"User-Agent": "galardo-capacity"})
-                with urllib.request.urlopen(req, timeout=timeout) as r:
+                with urllib.request.urlopen(req, timeout=timeout, context=_ctx()) as r:
                     r.read(64)
                     kode = r.status
                 dt = time.time() - t0

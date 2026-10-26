@@ -166,3 +166,9 @@ resume-kit:
 
 deploy-vps:
 	bash tools/deploy_vps.sh
+
+hitung-verifier:
+	python3 tools/hitung_verifier.py
+
+verifikasi:
+	bash tools/jalankan_semua_verifier.sh

@@ -80,3 +80,6 @@
 - STEP-183 (2026-10-26 07:36): tier override dipetakan (T1/T2/T3) - jalur override bekerja dari kode, forced terbukti.
 - STEP-184 (2026-10-26 07:39): HASIL-182 dilengkapi + pengunci verify_hasil_lengkap (tiap STEP wajib punya HASIL).
 - STEP-185 (2026-10-26 07:43): siapkan deploy VPS (tools/deploy_vps.sh + make deploy-vps + prosedur).
+- STEP-186 (2026-10-26 07:49): daftar cek kanonik docs/VERIFIER-COUNT.md + make hitung-verifier + pengunci. verifier=62 total cek=424.
+- STEP-187 (2026-10-26 07:56): make verifikasi (jalankan SEMUA verifier) - temuan: gate tidak pernah menjalankan verifier; netssl merah diperbaiki.
+- STEP-188 (2026-10-26 11:12): capacity.py netssl + urutan daftar cek dibetulkan; make verifikasi HIJAU (63 verifier, 430 cek).

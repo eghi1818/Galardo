@@ -38,12 +38,14 @@ fi
 echo
 
 echo "-- 4. verifikasi wajib (jangan lewat) --"
+make verifikasi > .out/deploy-vps-verifikasi.txt 2>&1; rv=$?
+echo "  verifikasi rc=$rv (SEMUA tools/verify_*.py)"
 make gate > .out/deploy-vps-gate.txt 2>&1; rg=$?
 echo "  gate rc=$rg"
 make test > .out/deploy-vps-test.txt 2>&1; rt=$?
 echo "  test rc=$rt"
 tail -2 .out/deploy-vps-test.txt
-[ "$rg" = "0" ] && [ "$rt" = "0" ] || RC=1
+[ "$rv" = "0" ] && [ "$rg" = "0" ] && [ "$rt" = "0" ] || RC=1
 echo
 
 echo "-- 5. langkah berikutnya --"
